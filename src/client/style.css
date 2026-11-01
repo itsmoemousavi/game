@@ -74,7 +74,7 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 @media (pointer: coarse) { #hint { display: none; } }
 
 .overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; pointer-events: none; }
-#respawn { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); display: none; padding: 6px 14px; border-radius: 8px; background: rgba(120,20,20,0.75); font-size: 15px; pointer-events: none; white-space: nowrap; }
+#respawn { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); display: none; padding: 6px 14px; border-radius: 8px; background: rgba(120,20,20,0.75); font-size: 13px; pointer-events: none; white-space: nowrap; }
 #gameover { background: rgba(0,0,0,0.7); pointer-events: auto; }
 #gameover .box { text-align: center; }
 #gameover h2 { font-size: 48px; margin: 0; } #gameover h2.win { color: #6fb0ff; } #gameover h2.lose { color: #ff7b7f; }
@@ -140,3 +140,12 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #toasts div { padding: 4px 12px; border-radius: 8px; background: rgba(0,0,0,0.7); font-size: 13px; font-weight: 600; white-space: nowrap; animation: toast 3.2s forwards; }
 @keyframes toast { 0% { opacity: 0; transform: translateY(-6px); } 8% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; } }
 #itembar .item.placing { border-color: #facc15; animation: pulse 0.5s infinite alternate; }
+
+/* ---------- kill feed ---------- */
+#killfeed { position: absolute; right: max(10px, env(safe-area-inset-right)); top: 48px; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; pointer-events: none; }
+#killfeed div { display: flex; gap: 6px; align-items: center; padding: 3px 8px; border-radius: 6px; background: rgba(0,0,0,0.6); font-size: 12px; font-weight: 700; animation: feed 9s forwards; }
+#killfeed .vs { opacity: 0.8; font-size: 11px; }
+#killfeed .me { outline: 1px solid #ffe066; }
+@keyframes feed { 0% { opacity: 0; transform: translateX(10px); } 4% { opacity: 1; transform: none; } 85% { opacity: 1; } 100% { opacity: 0; } }
+#killed-by:empty { display: none; }
+#killed-by { margin-right: 6px; color: #ffd0d0; }

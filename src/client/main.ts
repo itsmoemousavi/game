@@ -116,7 +116,12 @@ onTap('#btn-mute', () => {
   sfx.setMuted(!sfx.muted);
   syncMute();
 });
-// Any UI tap gets a soft click (and keeps the audio context alive on iOS).
+// Every gesture (re)unlocks audio: iOS only starts/resumes sound inside a user gesture,
+// and may suspend it again after a call, a notification or switching apps.
+for (const ev of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) {
+  window.addEventListener(ev, () => sfx.unlock(), { capture: true, passive: true });
+}
+// Any UI tap gets a soft click.
 app.addEventListener('pointerdown', (e) => {
   if ((e.target as HTMLElement).closest('button')) sfx.play('click', 0.6);
 });
@@ -144,8 +149,8 @@ function announce(w: World, events: GameEvent[]) {
       if (u?.structure && u.structure.tier !== 'fountain') {
         const tier = { tower1: 'tier-1 tower', tower2: 'tier-2 tower', barracks: 'barracks', shrineTower: 'shrine tower', shrine: 'Shrine' }[u.structure.tier as string];
         hud.toast(`${TEAM_NAMES[u.team as Team]} ${u.structure.lane ?? ''} ${tier} destroyed`, u.team === myTeam ? '#ff7b7f' : '#6fb0ff');
-      } else if (u?.hero && w.unit(e.killerId)?.hero) {
-        hud.toast(`${name(e.killerId!)} killed ${name(e.unitId)}`, u.team === myTeam ? '#ff7b7f' : '#6fb0ff');
+      } else if (u?.hero) {
+        hud.killFeed(w, u, w.unit(e.killerId), myHeroId);
       }
     }
   }

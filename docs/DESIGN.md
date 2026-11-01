@@ -35,10 +35,12 @@ If 3D performance in a Capacitor WebView ever becomes a blocker, the simulation 
 - 200 × 200 m, split diagonally by a river. **Azure** (team 0) owns the bottom-left triangle; **Crimson** (team 1) owns the top-right. The map is point-symmetric, so both sides are identical (enforced by a test).
 - **3 lanes:** top (left edge → top edge), mid (diagonal), bottom (bottom edge → right edge).
 - **Maze:** the space between lanes is walls (forest) carved with narrow jungle corridors and rooms. Rooms will hold neutral camps.
-- **Per team:**
-  - each lane: Tier‑1 tower → Tier‑2 tower + Barracks
-  - base: 2 Shrine towers → Shrine
+- **Per team (Dota-style layout):**
+  - each lane: a Tier‑1 tower beside the lane, about halfway from the base to the river
+  - each lane's **gate**: where the lane leaves the base, a Tier‑2 tower on one side and the Barracks on the other; creeps walk between them
+  - base: 2 Shrine towers in front of the Shrine
   - Fountain: spawn, healing, very strong defence, invulnerable
+  - Towers stand at the edge of the lane, not in the middle, so creeps don't have to walk around them
 - **Protection rules** (structures are invulnerable until their turn; shown in-game by a dashed gold ring):
   1. Tier‑1 towers: always attackable.
   2. Tier‑2 tower **and** barracks of a lane: after that lane's Tier‑1 falls.
@@ -186,7 +188,13 @@ Numbers are in `src/sim/constants.ts`, `data/units.ts` and `objectives.ts`.
 - Your own actions play at full volume; everything else fades with distance from the camera and is silent if your team can't see it.
 - 🔊 button to mute; the choice is remembered.
 
-**Announcements:** short toasts for hero kills, destroyed buildings, the boss, power-ups your team picks up, buybacks, the tower shield and revives.
+**Kill feed** (top right): every hero death as "Killer ⚔ Victim" in team colours, including deaths to towers, creeps, jungle camps and the Warden. Your own lines are outlined, and the respawn banner says who killed you.
+
+**Announcements:** short toasts for destroyed buildings, the boss, power-ups your team picks up, buybacks, the tower shield and revives.
+
+**Attack controls:** Attack is press-and-hold, and works together with the joystick (multi-touch). While held, your hero hits the best enemy in range (heroes first), and keeps walking where the joystick points when nothing is in range. Without the joystick, holding Attack walks to the nearest enemy. A quick tap still gets at least one hit in.
+
+**Sound on iPhone:** iOS mutes web sounds when the ring/silent switch is on. The game marks itself as media playback (and keeps a silent track playing) so sound works either way; audio is re-enabled on every tap.
 
 ## 7. Bots
 

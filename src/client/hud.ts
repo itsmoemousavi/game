@@ -13,7 +13,6 @@ import {
   castBlocker,
   isNight,
   maxAbilityLevel,
-  phaseTimeLeft,
 } from '../sim';
 
 const fmtTime = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
@@ -53,6 +52,8 @@ export class Hud {
       'btn-glyph',
       'buffs',
       'toasts',
+      'killfeed',
+      'killed-by',
     ]) {
       this.el[id] = root.querySelector(`#${id}`)!;
     }
@@ -134,6 +135,39 @@ export class Hud {
     });
   }
 
+  /**
+   * Kill feed (top right): "Killer ⚔ Victim" with team colours. Killers that aren't
+   * heroes show as Tower / Creeps / Camp / Warden / Fountain.
+   */
+  killFeed(w: World, victim: Unit, killer: Unit | undefined, meId: number) {
+    const color = (u: Unit | undefined) => (u && u.team !== 2 ? (u.team === 0 ? '#6fb0ff' : '#ff7b7f') : '#d9a25f');
+    const label = (u: Unit | undefined) => {
+      if (!u) return 'Unknown';
+      if (u.hero) return HEROES[u.hero.defId].name;
+      if (u.structure) return u.structure.tier === 'fountain' ? 'Fountain' : u.structure.tier === 'shrineTower' ? 'Shrine tower' : 'Tower';
+      if (u.neutral?.boss) return 'Warden';
+      if (u.neutral) return 'Jungle camp';
+      return 'Creeps';
+    };
+    const d = document.createElement('div');
+    if (victim.id === meId || killer?.id === meId) d.className = 'me';
+    const k = document.createElement('span');
+    k.textContent = label(killer);
+    k.style.color = color(killer);
+    const vs = document.createElement('span');
+    vs.className = 'vs';
+    vs.textContent = '⚔';
+    const v = document.createElement('span');
+    v.textContent = label(victim);
+    v.style.color = color(victim);
+    d.append(k, vs, v);
+    this.el.killfeed.appendChild(d);
+    while (this.el.killfeed.children.length > 5) this.el.killfeed.firstElementChild!.remove();
+    setTimeout(() => d.remove(), 9200);
+    if (victim.id === meId) this.el['killed-by'].textContent = `Killed by ${label(killer)} ·`;
+    void w;
+  }
+
   /** Short announcement under the top bar. */
   toast(text: string, color = '#fff') {
     const d = document.createElement('div');
@@ -182,8 +216,8 @@ export class Hud {
 
     this.el.respawn.style.display = !me.alive && w.winner === null ? 'block' : 'none';
     const night = isNight(w.time);
-    const left = Math.ceil(phaseTimeLeft(w.time));
-    this.el.daynight.textContent = `${night ? '☾' : '☀'} ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+    this.el.daynight.textContent = night ? '☾ Night' : '☀ Day';
+    if (me.alive) this.el['killed-by'].textContent = '';
     this.el.daynight.classList.toggle('night', night);
     this.el.daynight.title = night ? 'Night: everyone sees less' : 'Day';
     this.el['respawn-time'].textContent = String(Math.max(0, Math.ceil(h.respawnTimer)));

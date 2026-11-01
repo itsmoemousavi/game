@@ -98,12 +98,15 @@ const RIVER: [Vec2, Vec2] = [
   { x: 180, y: 180 },
 ];
 
-/** Fraction of lane length (from own base) where tier-1 / tier-2 towers stand. */
-const TOWER_FRACTION: Record<LaneId, { t1: number; t2: number }> = {
-  top: { t1: 0.36, t2: 0.2 },
-  mid: { t1: 0.38, t2: 0.22 },
-  bot: { t1: 0.36, t2: 0.2 },
-};
+/**
+ * Tier-1 towers stand this far along the way from the base gate to the river
+ * (as a fraction), so every lane's outer tower is equally "half-way out".
+ */
+const T1_FRACTION = 0.55;
+/** Towers stand beside the lane, not in the middle of it. */
+const TOWER_SIDE_OFFSET = 4.5;
+/** Tier-2 tower + barracks form a gate this far from where the lane leaves the base. */
+const GATE_DISTANCE = 5;
 
 export function teamLanePath(map: GameMap, team: Team, lane: LaneId): Vec2[] {
   return map.teamLanes[team][lane];
@@ -135,41 +138,55 @@ export function createMap(): GameMap {
   for (const room of JUNGLE_ROOMS) carveCircle(room.c, room.r);
   for (const [a, b] of JUNGLE_PATHS) carveSeg(a, b, JUNGLE_WIDTH);
 
-  // Structures (team 0, then mirrored for team 1).
+  // Structures (team 0, then mirrored for team 1). Dota-style layout:
+  //   lane: tier-1 tower out in the lane → tier-2 tower + barracks as a gate where the
+  //   lane leaves the base → two shrine towers guarding the Shrine.
   const structures: StructureSpawn[] = [];
-  for (const lane of LANE_IDS) {
-    const path = LANES[lane];
-    const len = polylineLength(path);
-    const f = TOWER_FRACTION[lane];
-    const t1 = pointAlong(path, len * f.t1);
-    const t2 = pointAlong(path, len * f.t2);
-    // Barracks sits beside tier-2, a little closer to base, offset off the lane.
-    const behind = pointAlong(path, len * f.t2 - 5);
-    const ahead = pointAlong(path, len * f.t2 + 1);
-    const dx = ahead.x - behind.x;
-    const dy = ahead.y - behind.y;
-    const l = Math.hypot(dx, dy) || 1;
-    // Perpendicular pointing toward the team-0 interior (away from the map edge).
-    let px = -dy / l;
-    let py = dx / l;
-    if (px * (100 - behind.x) + py * (100 - behind.y) < 0) {
+  const sideOf = (path: Vec2[], d: number) => {
+    // Unit vector perpendicular to the lane at distance d, pointing to the map's inside.
+    const a = pointAlong(path, Math.max(0, d - 1));
+    const b = pointAlong(path, d + 1);
+    const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    let px = -(b.y - a.y) / l;
+    let py = (b.x - a.x) / l;
+    const dot = px * (100 - a.x) + py * (100 - a.y);
+    if (dot < -0.5) {
       px = -px;
       py = -py;
     }
-    const rax = { x: behind.x + px * 7, y: behind.y + py * 7 };
-    structures.push({ team: 0, tier: 'tower1', lane, pos: t1 });
-    structures.push({ team: 0, tier: 'tower2', lane, pos: t2 });
-    structures.push({ team: 0, tier: 'barracks', lane, pos: rax });
-    carveCircle(rax, 5);
+    return { px, py, at: pointAlong(path, d) };
+  };
+  for (const lane of LANE_IDS) {
+    const path = LANES[lane];
+    // Distance along the lane to where it reaches the river (the y = x line).
+    let river = polylineLength(path);
+    for (let d = 0; d < river; d += 0.5) {
+      const p = pointAlong(path, d);
+      if (p.y <= p.x) {
+        river = d;
+        break;
+      }
+    }
+    const t1 = sideOf(path, river * T1_FRACTION);
+    const gate = sideOf(path, GATE_DISTANCE);
+    const t1Pos = { x: t1.at.x + t1.px * TOWER_SIDE_OFFSET, y: t1.at.y + t1.py * TOWER_SIDE_OFFSET };
+    const t2Pos = { x: gate.at.x + gate.px * TOWER_SIDE_OFFSET, y: gate.at.y + gate.py * TOWER_SIDE_OFFSET };
+    const raxPos = { x: gate.at.x - gate.px * (TOWER_SIDE_OFFSET + 1), y: gate.at.y - gate.py * (TOWER_SIDE_OFFSET + 1) };
+    structures.push({ team: 0, tier: 'tower1', lane, pos: t1Pos });
+    structures.push({ team: 0, tier: 'tower2', lane, pos: t2Pos });
+    structures.push({ team: 0, tier: 'barracks', lane, pos: raxPos });
+    for (const p of [t1Pos, t2Pos]) carveCircle(p, 3.5);
+    carveCircle(raxPos, 4.5);
   }
+  // Shrine towers flank the Shrine on the side facing the lanes.
   const toCenter = Math.atan2(-1, 1);
   for (const sign of [-1, 1]) {
-    const a = toCenter + (sign * 40 * Math.PI) / 180;
+    const a = toCenter + (sign * 42 * Math.PI) / 180;
     structures.push({
       team: 0,
       tier: 'shrineTower',
       lane: null,
-      pos: { x: SHRINE0.x + Math.cos(a) * 13, y: SHRINE0.y + Math.sin(a) * 13 },
+      pos: { x: SHRINE0.x + Math.cos(a) * 12.5, y: SHRINE0.y + Math.sin(a) * 12.5 },
     });
   }
   structures.push({ team: 0, tier: 'shrine', lane: null, pos: SHRINE0 });

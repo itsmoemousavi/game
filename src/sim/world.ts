@@ -64,6 +64,11 @@ export type Command =
   | { type: 'moveTo'; unitId: number; x: number; y: number }
   | { type: 'attack'; unitId: number; targetId: number }
   | { type: 'attackNearest'; unitId: number }
+  /**
+   * Attack button held (mobile): while held, attack the best enemy in range; if nothing
+   * is in range keep following the joystick (or, with no joystick, chase the nearest enemy).
+   */
+  | { type: 'attackHold'; unitId: number; held: boolean }
   | { type: 'stop'; unitId: number }
   /** Use ability `slot` (0 = Q, 1 = W, 2 = R). Give targetId for unit-target abilities, x/y otherwise. */
   | { type: 'cast'; unitId: number; slot: number; targetId?: number; x?: number; y?: number }
@@ -193,6 +198,8 @@ export interface HeroState {
   channel: { kind: 'tp'; t: number; total: number; targetId: number } | null;
   /** Item bonuses currently applied (cooldown reduction, spell amp, lifesteal, ult upgrade...). */
   bonus: Required<ItemStats>;
+  /** Attack button is being held (see Command 'attackHold'). */
+  attackHeld: boolean;
   buybackCooldown: number;
   /** Set when a revive charm saves the hero: respawn here instead of the fountain. */
   reviveAt: Vec2 | null;
@@ -482,6 +489,14 @@ export class World {
         h.order = t ? { type: 'attack', targetId: t.id } : { type: 'idle' };
         break;
       }
+      case 'attackHold':
+        h.attackHeld = cmd.held;
+        if (cmd.held && h.order.type !== 'dir') {
+          // Not steering: lock onto the best target right away (classic tap-to-attack).
+          const t = this.pickAutoTarget(u);
+          if (t) h.order = { type: 'attack', targetId: t.id };
+        }
+        break;
       case 'stop':
         h.order = { type: 'idle' };
         break;
@@ -671,6 +686,7 @@ export class World {
       tpCooldown: 0,
       channel: null,
       bonus: itemBonuses([]),
+      attackHeld: false,
       buybackCooldown: 0,
       reviveAt: null,
       bot: { thinkTimer: (index % 6) * 0.05, retreating: false, buildIndex: 0 },
@@ -872,6 +888,29 @@ export class World {
   private updateHero(u: Unit) {
     const h = u.hero!;
     const o = h.order;
+    // Holding Attack while steering: hit whatever is in range, otherwise keep walking.
+    if (h.attackHeld && (o.type === 'dir' || o.type === 'idle' || o.type === 'move')) {
+      let t = this.unit(u.targetId);
+      if (!this.canAttack(u, t) || !this.canSee(u.team, t) || !this.inReach(u, t)) {
+        const reach = u.attackRange + u.radius + 1.5;
+        t = this.enemiesNear(u, u.x, u.y, reach, (e) => e.kind !== 'ward' && this.canSee(u.team, e))
+          .filter((e) => this.inReach(u, e))
+          .sort((a, b) => Number(!!b.hero) - Number(!!a.hero) || dist(u.x, u.y, a.x, a.y) - dist(u.x, u.y, b.x, b.y))[0];
+      }
+      if (t && this.tryAttack(u, t)) {
+        u.targetId = t.id;
+        return;
+      }
+      if (o.type === 'idle') {
+        // Holding attack without steering: walk to the nearest enemy and hit it.
+        const chase = this.pickAutoTarget(u);
+        if (chase) {
+          u.targetId = chase.id;
+          if (!this.tryAttack(u, chase)) this.navigate(u, chase.x, chase.y, 0);
+          return;
+        }
+      }
+    }
     switch (o.type) {
       case 'dir':
         this.stepMove(u, o.dx, o.dy, this.speedOf(u) * DT);

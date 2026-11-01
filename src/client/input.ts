@@ -87,7 +87,9 @@ export class Input {
         },
         opt,
       );
-    press(root.querySelector('#btn-attack')!, () => this.queue.push({ type: 'attackNearest', unitId: this.heroId() }));
+    // Attack: press-and-hold. Works together with the joystick (multi-touch):
+    // hold Attack while steering to hit anything in range and keep walking otherwise.
+    press(root.querySelector('#btn-attack')!, (e) => this.attackDown(e.pointerId));
     root.querySelectorAll<HTMLElement>('[data-slot]').forEach((btn) => {
       const slot = Number(btn.dataset.slot);
       press(btn, (e) => this.onAbilityDown(e, slot));
@@ -99,6 +101,27 @@ export class Input {
 
   destroy() {
     this.abort.abort();
+  }
+
+  private attackPointer: number | null = null;
+  private attackSince = 0;
+  private attackRelease: ReturnType<typeof setTimeout> | null = null;
+
+  private attackDown(pointerId: number) {
+    if (this.attackRelease) clearTimeout(this.attackRelease);
+    this.attackPointer = pointerId;
+    this.attackSince = performance.now();
+    this.queue.push({ type: 'attackHold', unitId: this.heroId(), held: true });
+  }
+
+  private attackUp() {
+    this.attackPointer = null;
+    // A quick tap still gets at least one swing in.
+    const wait = Math.max(0, 600 - (performance.now() - this.attackSince));
+    this.attackRelease = setTimeout(() => {
+      this.queue.push({ type: 'attackHold', unitId: this.heroId(), held: false });
+      this.attackRelease = null;
+    }, wait);
   }
 
   get peeking() {
@@ -146,11 +169,12 @@ export class Input {
       }
       if (k === ' ') {
         e.preventDefault();
-        this.queue.push({ type: 'attackNearest', unitId: this.heroId() });
+        this.attackDown(-1);
         return;
       }
       if (k === 'h') this.queue.push({ type: 'stop', unitId: this.heroId() });
     }
+    if (!down && k === ' ') this.attackUp();
     if (down) this.keys.add(k);
     else this.keys.delete(k);
   }
@@ -305,6 +329,7 @@ export class Input {
   }
 
   private onPointerUp(e: PointerEvent, cancelled = false) {
+    if (this.attackPointer === e.pointerId) this.attackUp();
     if (this.peek === e.pointerId) {
       this.peek = null;
       const me = this.world().unit(this.heroId());
