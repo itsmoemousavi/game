@@ -354,13 +354,14 @@ export class Renderer {
         ctx.fill();
         continue;
       }
-      ctx.strokeStyle = '#d9fff0';
-      ctx.lineWidth = 0.35;
+      const wave = sk.kind === 'tidalWave';
+      ctx.strokeStyle = wave ? '#cffafe' : '#d9fff0';
+      ctx.lineWidth = wave ? 0.8 : 0.35;
       ctx.beginPath();
       ctx.moveTo(p.x - sk.dx * 2.5, p.y - sk.dy * 2.5);
       ctx.lineTo(p.x + sk.dx * 0.8, p.y + sk.dy * 0.8);
       ctx.stroke();
-      ctx.strokeStyle = 'rgba(63,191,127,0.4)';
+      ctx.strokeStyle = wave ? 'rgba(6,182,212,0.45)' : 'rgba(63,191,127,0.4)';
       ctx.lineWidth = sk.width;
       ctx.beginPath();
       ctx.moveTo(p.x - sk.dx * 4, p.y - sk.dy * 4);
@@ -592,6 +593,9 @@ export class Renderer {
       if (z.kind === 'arrowStorm') {
         ctx.fillStyle = 'rgba(63,191,127,0.18)';
         ctx.strokeStyle = 'rgba(160,255,200,0.7)';
+      } else if (z.kind === 'maelstrom') {
+        ctx.fillStyle = 'rgba(6,182,212,0.22)';
+        ctx.strokeStyle = 'rgba(165,243,252,0.8)';
       } else {
         ctx.fillStyle = 'rgba(255,110,30,0.25)';
         ctx.strokeStyle = 'rgba(255,170,60,0.7)';
@@ -615,12 +619,13 @@ export class Renderer {
     for (const b of w.blasts) {
       if (!seesPoint(b.team, b.x, b.y)) continue;
       const k = Math.min(1, b.t / b.delay);
-      ctx.strokeStyle = b.kind === 'cataclysm' ? 'rgba(255,90,40,0.9)' : 'rgba(230,190,90,0.9)';
+      const green = b.kind === 'rootSnare' || b.kind === 'overgrowth';
+      ctx.strokeStyle = b.kind === 'cataclysm' ? 'rgba(255,90,40,0.9)' : green ? 'rgba(132,204,22,0.9)' : 'rgba(230,190,90,0.9)';
       ctx.lineWidth = 0.25;
       ctx.beginPath();
       ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.fillStyle = b.kind === 'cataclysm' ? 'rgba(255,90,40,0.3)' : 'rgba(230,190,90,0.3)';
+      ctx.fillStyle = b.kind === 'cataclysm' ? 'rgba(255,90,40,0.3)' : green ? 'rgba(132,204,22,0.3)' : 'rgba(230,190,90,0.3)';
       ctx.beginPath();
       ctx.arc(b.x, b.y, b.radius * k, 0, Math.PI * 2);
       ctx.fill();

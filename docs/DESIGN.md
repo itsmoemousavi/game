@@ -81,6 +81,16 @@ If 3D performance in a Capacitor WebView ever becomes a blocker, the simulation 
 | **Vexa, the Gale Archer** | Ranged carry | *Piercing Arrow*: line skillshot | *Hunter's Rhythm* (passive): every 4th attack crits + speed burst | *Arrow Storm*: 3 s area barrage, damage + slow |
 | **Orin, the Emberseer** | Mage / support | *Fireball*: targeted AoE nuke | *Mending Flame*: heal an ally over time | *Cataclysm*: delayed meteor, huge damage + burning ground |
 
+**New heroes (implemented):**
+
+| Hero | Role | Q | W | R (Ultimate) |
+|---|---|---|---|---|
+| **Syl, the Shadeblade** | Melee assassin | *Shadow Lunge*: leap next to an enemy and strike (80–200) | *Veil*: invisible + 15–30% speed for 3–4.5 s (attacking/casting reveals) | *Execution*: 150–350 + 30–50% of the target's missing health |
+| **Grom, the Ironroot** | Melee bruiser | *Root Snare*: after 0.4 s, roots (1.2–2.1 s) and damages (60–180) in a 3 m area | *Bark Skin*: +6–12 armor and 8–20 health regen for 6 s | *Overgrowth*: roots everyone within 9 m (2–3 s), then 40–80 damage per second for 3 s |
+| **Kaela, the Tidecaller** | Ranged support | *Tidal Wave*: line wave, 70–190 damage + 30% slow to everyone hit | *Brine Veil*: heal an ally 60–150, +4–10 armor and +15% speed for 5 s | *Maelstrom*: 6 m area for 4 s, 50–110 damage per second, 50% slow |
+
+Bots pick random heroes (no duplicates within a team), and every hero has a recommended item build.
+
 Ability levels: basic abilities max level 4 (and at most ⌈hero level / 2⌉), ultimate max level 3 (learnable at levels 6 / 10 / 14). Heroes start with 1 skill point and gain 1 per level.
 
 **Implemented (milestone 3).** Numbers are in `src/sim/data/heroes.ts`; behaviour is in `src/sim/abilities.ts`.
@@ -338,7 +348,6 @@ Done or dropped: high ground (done), talents (dropped for now), Android build (n
 
 These were proposed and are parked for later:
 - **Pings and quick-chat wheel:** "Attack", "Retreat", "Enemy missing".
-- **More heroes:** 6–8 for variety.
 - **Balance:** bots-only test matches currently take 37–52 min; the target is 15–20 min.
 
 ## 9. Things to plan for before the store release

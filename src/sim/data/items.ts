@@ -254,10 +254,13 @@ export const SHOP_RADIUS = 22;
 export const SALVE = { heal: 350, duration: 8 };
 
 /** Default build orders (also the "recommended" list in the shop). */
-export const BUILDS: Record<'brakk' | 'vexa' | 'orin', ItemId[]> = {
+export const BUILDS: Record<'brakk' | 'vexa' | 'orin' | 'syl' | 'grom' | 'kaela', ItemId[]> = {
   brakk: ['healingSalve', 'swiftBoots', 'vitalStone', 'vitalStone', 'titanHeart', 'shadowStep', 'crownOfAscension', 'wardedCloak'],
   vexa: ['healingSalve', 'swiftBoots', 'ironBlade', 'quickGloves', 'twinBlades', 'lifedrinker', 'crownOfAscension', 'wardedCloak'],
   orin: ['healingSalve', 'swiftBoots', 'manaCrystal', 'arcaneAmplifier', 'archmageStaff', 'focusLens', 'crownOfAscension', 'wardedCloak'],
+  syl: ['healingSalve', 'swiftBoots', 'ironBlade', 'lifedrinker', 'shadowStep', 'quickGloves', 'twinBlades', 'crownOfAscension'],
+  grom: ['healingSalve', 'swiftBoots', 'vitalStone', 'guardPlate', 'vitalStone', 'titanHeart', 'wardedCloak', 'crownOfAscension'],
+  kaela: ['healingSalve', 'swiftBoots', 'manaCrystal', 'focusLens', 'guardPlate', 'wardedCloak', 'arcaneAmplifier', 'crownOfAscension'],
 };
 
 /** Blink can't be used this long after taking damage from an enemy hero. */

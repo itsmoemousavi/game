@@ -91,7 +91,8 @@ $<HTMLButtonElement>('#btn-play').addEventListener('click', () => startMatch());
 function buildSlots(): PlayerSlot[] {
   const slots: PlayerSlot[] = [];
   for (const team of [0, 1] as Team[]) {
-    const heroes = [...HERO_IDS];
+    // Bots get random heroes (no duplicates within a team).
+    const heroes = [...HERO_IDS].sort(() => Math.random() - 0.5);
     const lanePool = [...LANE_IDS];
     if (team === myTeam) {
       heroes.splice(heroes.indexOf(pickedHero), 1);

@@ -2,8 +2,8 @@
  * Hero definitions. Everything about a hero is data so we can rebalance or swap heroes
  * without touching game logic. Ability behaviour lives in ../abilities.ts.
  */
-export type HeroId = 'brakk' | 'vexa' | 'orin';
-export type HeroRole = 'Tank / Initiator' | 'Ranged Carry' | 'Mage / Support';
+export type HeroId = 'brakk' | 'vexa' | 'orin' | 'syl' | 'grom' | 'kaela';
+export type HeroRole = 'Tank / Initiator' | 'Ranged Carry' | 'Mage / Support' | 'Melee Assassin' | 'Bruiser / Controller' | 'Support / Controller';
 
 export type AbilityId =
   | 'shieldCharge'
@@ -14,7 +14,16 @@ export type AbilityId =
   | 'arrowStorm'
   | 'fireball'
   | 'mendingFlame'
-  | 'cataclysm';
+  | 'cataclysm'
+  | 'shadowLunge'
+  | 'veil'
+  | 'execution'
+  | 'rootSnare'
+  | 'barkSkin'
+  | 'overgrowth'
+  | 'tidalWave'
+  | 'brineVeil'
+  | 'maelstrom';
 
 /**
  * How an ability is aimed.
@@ -260,9 +269,199 @@ export const HEROES: Record<HeroId, HeroDef> = {
       },
     ],
   },
+  syl: {
+    id: 'syl',
+    name: 'Syl',
+    title: 'the Shadeblade',
+    role: 'Melee Assassin',
+    color: '#a78bfa',
+    baseHp: 560,
+    hpPerLevel: 76,
+    hpRegen: 1.8,
+    baseMana: 280,
+    manaPerLevel: 28,
+    manaRegen: 1.1,
+    baseArmor: 3,
+    armorPerLevel: 0.5,
+    baseDamage: 52,
+    damagePerLevel: 4.3,
+    attackInterval: 1.35,
+    attackIntervalPerLevel: 0.03,
+    attackRange: 1.5,
+    projectileSpeed: 0,
+    moveSpeed: 7.4,
+    abilities: [
+      {
+        id: 'shadowLunge',
+        slot: 'Q',
+        name: 'Shadow Lunge',
+        ultimate: false,
+        targeting: 'enemy',
+        castRange: 8,
+        radius: 0,
+        manaCost: [70, 75, 80, 85],
+        cooldown: [11, 10, 9, 8],
+        values: { damage: [80, 120, 160, 200] },
+        summary: 'Leaps to an enemy and strikes it.',
+      },
+      {
+        id: 'veil',
+        slot: 'W',
+        name: 'Veil',
+        ultimate: false,
+        targeting: 'none',
+        castRange: 0,
+        radius: 0,
+        manaCost: [60, 60, 60, 60],
+        cooldown: [16, 15, 14, 13],
+        values: { duration: [3, 3.5, 4, 4.5], speedPct: [15, 20, 25, 30] },
+        summary: 'Turns invisible and faster for a few seconds. Attacking or casting reveals Syl.',
+      },
+      {
+        id: 'execution',
+        slot: 'R',
+        name: 'Execution',
+        ultimate: true,
+        targeting: 'enemy',
+        castRange: 4,
+        radius: 0,
+        manaCost: [120, 140, 160],
+        cooldown: [60, 50, 40],
+        values: { damage: [150, 250, 350], missingPct: [30, 40, 50] },
+        summary: 'A finishing blow: base damage plus a share of the health the target is missing.',
+      },
+    ],
+  },
+  grom: {
+    id: 'grom',
+    name: 'Grom',
+    title: 'the Ironroot',
+    role: 'Bruiser / Controller',
+    color: '#65a30d',
+    baseHp: 760,
+    hpPerLevel: 100,
+    hpRegen: 3.2,
+    baseMana: 240,
+    manaPerLevel: 24,
+    manaRegen: 1,
+    baseArmor: 3,
+    armorPerLevel: 0.45,
+    baseDamage: 50,
+    damagePerLevel: 3.2,
+    attackInterval: 1.6,
+    attackIntervalPerLevel: 0.02,
+    attackRange: 1.6,
+    projectileSpeed: 0,
+    moveSpeed: 6.8,
+    abilities: [
+      {
+        id: 'rootSnare',
+        slot: 'Q',
+        name: 'Root Snare',
+        ultimate: false,
+        targeting: 'point',
+        castRange: 10,
+        radius: 3,
+        manaCost: [90, 95, 100, 105],
+        cooldown: [12, 11, 10, 9],
+        values: { damage: [60, 100, 140, 180], stun: [1.2, 1.5, 1.8, 2.1] },
+        summary: 'Roots grab enemies in an area after a short moment: damage and they can’t move or act.',
+      },
+      {
+        id: 'barkSkin',
+        slot: 'W',
+        name: 'Bark Skin',
+        ultimate: false,
+        targeting: 'none',
+        castRange: 0,
+        radius: 0,
+        manaCost: [60, 60, 60, 60],
+        cooldown: [18, 17, 16, 15],
+        values: { armor: [6, 8, 10, 12], regen: [8, 12, 16, 20], duration: [6, 6, 6, 6] },
+        summary: 'Hardens Grom’s skin: bonus armor and fast health regeneration for 6 seconds.',
+      },
+      {
+        id: 'overgrowth',
+        slot: 'R',
+        name: 'Overgrowth',
+        ultimate: true,
+        targeting: 'none',
+        castRange: 0,
+        radius: 9,
+        manaCost: [150, 175, 200],
+        cooldown: [85, 75, 65],
+        values: { stun: [2, 2.5, 3], dps: [40, 60, 80], duration: [3, 3, 3] },
+        summary: 'Vines burst out around Grom: every enemy nearby is rooted, then takes damage over time.',
+      },
+    ],
+  },
+  kaela: {
+    id: 'kaela',
+    name: 'Kaela',
+    title: 'the Tidecaller',
+    role: 'Support / Controller',
+    color: '#06b6d4',
+    baseHp: 500,
+    hpPerLevel: 66,
+    hpRegen: 1.5,
+    baseMana: 420,
+    manaPerLevel: 48,
+    manaRegen: 2,
+    baseArmor: 1,
+    armorPerLevel: 0.3,
+    baseDamage: 42,
+    damagePerLevel: 3,
+    attackInterval: 1.6,
+    attackIntervalPerLevel: 0.02,
+    attackRange: 8.5,
+    projectileSpeed: 18,
+    moveSpeed: 6.9,
+    abilities: [
+      {
+        id: 'tidalWave',
+        slot: 'Q',
+        name: 'Tidal Wave',
+        ultimate: false,
+        targeting: 'direction',
+        castRange: 14,
+        radius: 1.5,
+        manaCost: [90, 100, 110, 120],
+        cooldown: [9, 9, 9, 9],
+        values: { damage: [70, 110, 150, 190], slowPct: [30, 30, 30, 30] },
+        summary: 'Sends a wave in a line: damages and slows every enemy it hits.',
+      },
+      {
+        id: 'brineVeil',
+        slot: 'W',
+        name: 'Brine Veil',
+        ultimate: false,
+        targeting: 'ally',
+        castRange: 10,
+        radius: 0,
+        manaCost: [80, 85, 90, 95],
+        cooldown: [14, 13, 12, 11],
+        values: { heal: [60, 90, 120, 150], armor: [4, 6, 8, 10], speedPct: [15, 15, 15, 15] },
+        summary: 'Heals an ally (or Kaela) and gives bonus armor and speed for 5 seconds.',
+      },
+      {
+        id: 'maelstrom',
+        slot: 'R',
+        name: 'Maelstrom',
+        ultimate: true,
+        targeting: 'point',
+        castRange: 14,
+        radius: 6,
+        manaCost: [150, 175, 200],
+        cooldown: [80, 70, 60],
+        values: { dps: [50, 80, 110], slowPct: [50, 50, 50], duration: [4, 4, 4] },
+        summary: 'A whirlpool rages over an area for 4 seconds: damage and a heavy slow.',
+      },
+    ],
+  },
+
 };
 
-export const HERO_IDS: HeroId[] = ['brakk', 'vexa', 'orin'];
+export const HERO_IDS: HeroId[] = ['brakk', 'vexa', 'orin', 'syl', 'grom', 'kaela'];
 
 /** Highest level an ability may have at a given hero level (Dota-style). */
 export function maxAbilityLevel(def: AbilityDef, heroLevel: number): number {

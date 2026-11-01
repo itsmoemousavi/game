@@ -126,7 +126,7 @@ export interface Buff {
 /** Lingering ground area that ticks damage / slow on enemies inside (Arrow Storm, burning ground). */
 export interface Zone {
   id: number;
-  kind: 'arrowStorm' | 'burn';
+  kind: 'arrowStorm' | 'burn' | 'maelstrom';
   team: Side;
   sourceId: number;
   x: number;
@@ -141,7 +141,7 @@ export interface Zone {
 /** Delayed one-shot area effect (Earthsplitter wind-up, Cataclysm meteor). */
 export interface Blast {
   id: number;
-  kind: 'earthsplitter' | 'cataclysm';
+  kind: 'earthsplitter' | 'cataclysm' | 'rootSnare' | 'overgrowth';
   team: Side;
   sourceId: number;
   x: number;
@@ -157,7 +157,7 @@ export interface Blast {
 /** Non-homing projectile travelling in a straight line (Piercing Arrow). */
 export interface Skillshot {
   id: number;
-  kind: 'piercingArrow' | 'fireball';
+  kind: 'piercingArrow' | 'fireball' | 'tidalWave';
   team: Side;
   sourceId: number;
   x: number;
@@ -173,6 +173,8 @@ export interface Skillshot {
   hit: number[];
   /** If set: stop at the first enemy hit (or at max range) and explode in this radius. */
   explode?: number;
+  /** Slow applied to everything hit. */
+  slow?: { pct: number; t: number };
 }
 
 export interface Dash {
@@ -1218,6 +1220,7 @@ export class World {
         }
         s.hit.push(e.id);
         this.dealDamage(s.sourceId, e, s.damage, 'spell');
+        if (s.slow) this.addBuff(e, { key: `slow:${s.kind}`, t: s.slow.t, slowPct: s.slow.pct });
       }
       if (s.explode && (exploded || s.remaining <= 0)) {
         for (const e of this.units) {

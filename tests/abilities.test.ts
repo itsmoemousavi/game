@@ -4,7 +4,7 @@ import { HERO_IDS, LANE_IDS, PlayerSlot, TICK_RATE, Team, Unit, World, XP_TABLE 
 /** All six heroes human-controlled (so they stay idle) and moved into an empty jungle room. */
 function arena() {
   const slots: PlayerSlot[] = [];
-  for (const team of [0, 1] as Team[]) HERO_IDS.forEach((heroId, i) => slots.push({ team, heroId, controller: 'human', lane: LANE_IDS[i] }));
+  for (const team of [0, 1] as Team[]) HERO_IDS.slice(0, 3).forEach((heroId, i) => slots.push({ team, heroId, controller: 'human', lane: LANE_IDS[i] }));
   const w = new World({ seed: 3, slots });
   const hero = (team: Team, id: string) => w.heroes.find((h) => h.team === team && h.hero!.defId === id)!;
   // Park everybody far apart so nothing interacts unless a test places it.

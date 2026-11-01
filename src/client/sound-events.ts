@@ -9,6 +9,15 @@ const CAST_SOUNDS: Record<string, SoundName> = {
   fireball: 'fire',
   mendingFlame: 'heal',
   cataclysm: 'meteor',
+  shadowLunge: 'charge',
+  veil: 'teleport',
+  execution: 'slam',
+  rootSnare: 'cast',
+  barkSkin: 'glyph',
+  overgrowth: 'cast',
+  tidalWave: 'storm',
+  brineVeil: 'heal',
+  maelstrom: 'storm',
 };
 
 /**

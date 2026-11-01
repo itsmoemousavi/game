@@ -4,7 +4,7 @@ import { World, HERO_IDS, LANE_IDS, TICK_RATE, PlayerSlot, Team } from '../src/s
 const seed = Number(process.argv[2] ?? 1);
 const maxMin = Number(process.argv[3] ?? 40);
 const slots: PlayerSlot[] = [];
-for (const team of [0, 1] as Team[]) HERO_IDS.forEach((heroId, i) => slots.push({ team, heroId, controller: 'bot', lane: LANE_IDS[i] }));
+for (const team of [0, 1] as Team[]) HERO_IDS.slice(0, 3).forEach((heroId, i) => slots.push({ team, heroId, controller: 'bot', lane: LANE_IDS[i] }));
 const w = new World({ seed, slots });
 const t0 = performance.now();
 let lastMin = -1;

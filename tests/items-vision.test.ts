@@ -20,7 +20,7 @@ import {
 
 function humans() {
   const slots: PlayerSlot[] = [];
-  for (const team of [0, 1] as Team[]) HERO_IDS.forEach((heroId, i) => slots.push({ team, heroId, controller: 'human', lane: LANE_IDS[i] }));
+  for (const team of [0, 1] as Team[]) HERO_IDS.slice(0, 3).forEach((heroId, i) => slots.push({ team, heroId, controller: 'human', lane: LANE_IDS[i] }));
   const w = new World({ seed: 5, slots });
   const hero = (team: Team, id: string) => w.heroes.find((h) => h.team === team && h.hero!.defId === id)!;
   return { w, hero };
@@ -237,7 +237,7 @@ describe('trees block sight', () => {
 describe('movement around buildings', () => {
   it('creeps never get stuck on towers or barracks over a long game', () => {
     const slots: PlayerSlot[] = [];
-    for (const team of [0, 1] as Team[]) HERO_IDS.forEach((heroId, i) => slots.push({ team, heroId, controller: 'bot', lane: LANE_IDS[i] }));
+    for (const team of [0, 1] as Team[]) HERO_IDS.slice(0, 3).forEach((heroId, i) => slots.push({ team, heroId, controller: 'bot', lane: LANE_IDS[i] }));
     const w = new World({ seed: 9, slots });
     // Per creep: where it was when it last had nothing to do (no fight, no crowd).
     const idleSince = new Map<number, { x: number; y: number; t: number }>();

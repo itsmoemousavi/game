@@ -10,7 +10,7 @@ describe('smarter bots', () => {
     const slots: PlayerSlot[] = [];
     // Azure: bots. Crimson: idle "humans" that we park at Azure's top tier-1 tower.
     for (const team of [0, 1] as Team[])
-      HERO_IDS.forEach((heroId, i) => slots.push({ team, heroId, controller: team === 0 ? 'bot' : 'human', lane: LANE_IDS[i] }));
+      HERO_IDS.slice(0, 3).forEach((heroId, i) => slots.push({ team, heroId, controller: team === 0 ? 'bot' : 'human', lane: LANE_IDS[i] }));
     const w = new World({ seed: 31, slots });
     run(w, 20);
     const t1 = w.structures.find((s) => s.team === 0 && s.structure!.tier === 'tower1' && s.structure!.lane === 'bot')!;
@@ -29,7 +29,7 @@ describe('smarter bots', () => {
     const slots: PlayerSlot[] = [];
     const diff: BotDifficulty[] = ['hard', 'easy'];
     for (const team of [0, 1] as Team[])
-      HERO_IDS.forEach((heroId, i) => slots.push({ team, heroId, controller: 'bot', lane: LANE_IDS[i], difficulty: diff[team] }));
+      HERO_IDS.slice(0, 3).forEach((heroId, i) => slots.push({ team, heroId, controller: 'bot', lane: LANE_IDS[i], difficulty: diff[team] }));
     const w = new World({ seed: 7, slots });
     run(w, 50 * 60);
     expect(w.winner).toBe(0);

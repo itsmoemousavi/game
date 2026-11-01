@@ -3,7 +3,7 @@ import { HERO_IDS, ITEMS, LANE_IDS, PlayerSlot, TICK_RATE, Team, Unit, World, pr
 
 function humans() {
   const slots: PlayerSlot[] = [];
-  for (const team of [0, 1] as Team[]) HERO_IDS.forEach((heroId, i) => slots.push({ team, heroId, controller: 'human', lane: LANE_IDS[i] }));
+  for (const team of [0, 1] as Team[]) HERO_IDS.slice(0, 3).forEach((heroId, i) => slots.push({ team, heroId, controller: 'human', lane: LANE_IDS[i] }));
   const w = new World({ seed: 21, slots });
   const hero = (team: Team, id: string) => w.heroes.find((h) => h.team === team && h.hero!.defId === id)!;
   return { w, hero };

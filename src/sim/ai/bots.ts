@@ -278,10 +278,18 @@ function useAbilities(w: World, me: Unit, target: Unit): boolean {
   if (useItems(w, me, target, d)) return false; // keep fighting after the item
   if (w.rng.next() > AIM[me.hero!.bot.difficulty].castChance) return false;
   if (target.hero) {
-    for (const slot of [2, 0]) {
+    for (const slot of [2, 0, 1]) {
       if (!ready(me, slot)) continue;
       const def = abilityDef(me, slot)!;
       if (def.targeting === 'passive' || def.targeting === 'ally') continue;
+      // Self-buffs (no radius): use them when a fight is on.
+      if (def.targeting === 'none' && def.radius === 0) {
+        if (d < 9) {
+          w.applyCommand({ type: 'cast', unitId: me.id, slot });
+          return true;
+        }
+        continue;
+      }
       const range = def.targeting === 'none' ? def.radius - 1 : def.castRange;
       if (d > range) continue;
       // Save ultimates for a real fight: weakened target, or several enemies clumped.
