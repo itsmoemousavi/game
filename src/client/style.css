@@ -21,9 +21,9 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 .hero-card ul { margin: 0; padding: 0; list-style: none; font-size: 12px; line-height: 1.5; }
 .hero-card li i { opacity: 0.6; }
 #select .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; }
-#lane-pick { display: flex; gap: 6px; }
-#lane-pick button { padding: 8px 14px; border-radius: 8px; border: 1px solid #2c3d31; background: #142019; }
-#lane-pick button.picked { border-color: #ffe066; }
+#lane-pick, #diff-pick { display: flex; gap: 6px; }
+#lane-pick button, #diff-pick button { padding: 8px 14px; border-radius: 8px; border: 1px solid #2c3d31; background: #142019; }
+#lane-pick button.picked, #diff-pick button.picked { border-color: #ffe066; }
 #btn-play { padding: 12px 28px; border-radius: 10px; border: 0; background: #3d8bfd; font-weight: 700; font-size: 16px; }
 
 /* ---------- in game ---------- */

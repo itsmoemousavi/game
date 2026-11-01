@@ -272,7 +272,21 @@ Numbers are in `src/sim/constants.ts`, `data/units.ts` and `objectives.ts`.
   - siege only when creeps tank the tower
   - back off from tower fire
   - retreat to the fountain below 30% HP
-- **Later:** ability use, item builds, grouping and pushing, difficulty levels (reaction time, aim error).
+- **Team plan** (shared by a team's bots, refreshed every 2 s):
+  - **Defend:** a building is under attack by heroes, or by several creeps on an inner building. Bots go there, teleporting if they're far away.
+  - **Push:** after 10 minutes, when they have more heroes alive, bots group up in the lane with the weakest enemy defenses and push together.
+  - **Farm:** otherwise each bot keeps its own lane.
+- **Gank:** chase a visible enemy hero below 40% health (50% on hard) within 30 m, unless it's under its towers.
+- **Difficulty** (picked on the hero-select screen, remembered):
+
+  | | Easy | Normal | Hard |
+  |---|---|---|---|
+  | Reacts every | 0.6 s | 0.25 s | 0.15 s |
+  | Spell aim error | ±3 m | ±1 m | none (leads moving targets) |
+  | Uses a spell when it can | 45% | 85% | always |
+  | Team plays and ganks | no | yes | yes, more aggressive |
+
+  In test matches hard bots beat easy bots every time (3 of 3).
 
 ## 8. Milestones
 
@@ -303,7 +317,6 @@ These were proposed and are parked for later:
 - **End-of-match scoreboard and stats:** damage, gold over time, items.
 - **Pings and quick-chat wheel:** "Attack", "Retreat", "Enemy missing".
 - **More heroes:** 6–8 for variety.
-- **Smarter bots:** ganking, grouping, defending, difficulty levels.
 - **Balance:** bots-only test matches currently take 37–52 min; the target is 15–20 min.
 
 ## 9. Things to plan for before the store release

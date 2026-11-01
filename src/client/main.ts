@@ -1,5 +1,5 @@
 import './style.css';
-import { DT, HEROES, HERO_IDS, HeroId, LANE_IDS, LaneId, PlayerSlot, Team, World } from '../sim';
+import { BotDifficulty, DT, HEROES, HERO_IDS, HeroId, LANE_IDS, LaneId, PlayerSlot, Team, World } from '../sim';
 import { Hud } from './hud';
 import { Input } from './input';
 import { ItemsUi } from './items-ui';
@@ -22,6 +22,12 @@ let myHeroId = 0;
 const myTeam: Team = 0;
 let pickedHero: HeroId = 'brakk';
 let pickedLane: LaneId = 'mid';
+let pickedDifficulty: BotDifficulty = 'normal';
+try {
+  pickedDifficulty = (localStorage.getItem('shrinefall-difficulty') as BotDifficulty) || 'normal';
+} catch {
+  /* storage unavailable */
+}
 
 // ------------------------------------------------------------- hero select
 
@@ -60,6 +66,23 @@ for (const l of LANE_IDS) {
   lanes.appendChild(b);
 }
 
+const diffs = $<HTMLElement>('#diff-pick');
+for (const d of ['easy', 'normal', 'hard'] as BotDifficulty[]) {
+  const b = document.createElement('button');
+  b.textContent = d[0].toUpperCase() + d.slice(1);
+  b.classList.toggle('picked', d === pickedDifficulty);
+  b.addEventListener('click', () => {
+    pickedDifficulty = d;
+    try {
+      localStorage.setItem('shrinefall-difficulty', d);
+    } catch {
+      /* storage unavailable */
+    }
+    diffs.querySelectorAll('button').forEach((x) => x.classList.toggle('picked', x === b));
+  });
+  diffs.appendChild(b);
+}
+
 $<HTMLButtonElement>('#btn-play').addEventListener('click', () => startMatch());
 
 // ------------------------------------------------------------- match setup
@@ -76,7 +99,7 @@ function buildSlots(): PlayerSlot[] {
       slots.push({ team, heroId: pickedHero, controller: 'human', lane: pickedLane });
     }
     while (slots.filter((s) => s.team === team).length < 3) {
-      slots.push({ team, heroId: heroes.shift()!, controller: 'bot', lane: lanePool.shift()! });
+      slots.push({ team, heroId: heroes.shift()!, controller: 'bot', lane: lanePool.shift()!, difficulty: pickedDifficulty });
     }
   }
   return slots;

@@ -46,7 +46,7 @@ const distToSeg = (px: number, py: number, ax: number, ay: number, bx: number, b
 };
 import { findPath } from './pathfinding';
 import { Rng } from './rng';
-import { botThink, botWhileDead } from './ai/bots';
+import { BOT_THINK_INTERVAL, BotDifficulty, botThink, botWhileDead } from './ai/bots';
 import { applyAttackPassives, botLearn, castAbility, damageAfterPassives, passiveArmor, resolveCast } from './abilities';
 
 export type UnitKind = 'hero' | 'creep' | 'neutral' | 'structure' | 'ward';
@@ -225,7 +225,7 @@ export interface HeroState {
   buybackCooldown: number;
   /** Set when a revive charm saves the hero: respawn here instead of the fountain. */
   reviveAt: Vec2 | null;
-  bot: { thinkTimer: number; retreating: boolean; buildIndex: number };
+  bot: { thinkTimer: number; retreating: boolean; buildIndex: number; difficulty: BotDifficulty };
 }
 
 export interface NeutralState {
@@ -363,6 +363,8 @@ export interface PlayerSlot {
   heroId: HeroId;
   controller: Controller;
   lane: LaneId;
+  /** Bot skill (default normal). */
+  difficulty?: BotDifficulty;
 }
 
 export interface WorldOptions {
@@ -755,7 +757,7 @@ export class World {
       attackHeld: false,
       buybackCooldown: 0,
       reviveAt: null,
-      bot: { thinkTimer: (index % 6) * 0.05, retreating: false, buildIndex: 0 },
+      bot: { thinkTimer: (index % 6) * 0.05, retreating: false, buildIndex: 0, difficulty: slot.difficulty ?? 'normal' },
     };
     this.applyHeroStats(u, true);
   }
@@ -896,7 +898,7 @@ export class World {
         if (u.hero.controller === 'bot') {
           u.hero.bot.thinkTimer -= DT;
           if (u.hero.bot.thinkTimer <= 0) {
-            u.hero.bot.thinkTimer = 0.25;
+            u.hero.bot.thinkTimer = BOT_THINK_INTERVAL[u.hero.bot.difficulty];
             botThink(this, u);
           }
         }

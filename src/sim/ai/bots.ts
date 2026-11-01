@@ -22,8 +22,63 @@ import { buyBlocker, inShop, itemBlocker, teleportTargets, tpBlocker } from '../
  *    teleport back to the lane after respawning / healing.
  *  - Bots only react to enemies they can actually see (fog of war).
  *  - Fight back if a jungle camp attacks them.
- * Coordinated team fights and ganking come in a later milestone.
+ *  - Team plan (shared by a team's bots, refreshed every 2 s):
+ *      defend: a building is under attack → go there (teleport if far);
+ *      push:   after 10 minutes, when we have more heroes alive → group up in the
+ *              lane with the weakest enemy defenses and push together;
+ *      farm:   otherwise each bot keeps its own lane.
+ *  - Gank: chase a visible, weakened enemy hero within ~30 m.
+ *  - Difficulty (easy / normal / hard): how fast bots react, how well they aim,
+ *    and whether they gank and group up.
  */
+
+export type BotDifficulty = 'easy' | 'normal' | 'hard';
+export const BOT_THINK_INTERVAL: Record<BotDifficulty, number> = { easy: 0.6, normal: 0.25, hard: 0.15 };
+/** Spell aim error in meters, and how likely a bot is to use a spell when it could. */
+const AIM: Record<BotDifficulty, { error: number; castChance: number }> = {
+  easy: { error: 3, castChance: 0.45 },
+  normal: { error: 1, castChance: 0.85 },
+  hard: { error: 0, castChance: 1 },
+};
+
+interface TeamPlan {
+  mode: 'farm' | 'push' | 'defend';
+  lane?: 'top' | 'mid' | 'bot';
+  structureId?: number;
+  until: number;
+}
+
+/** What a team's bots should be doing together. */
+function teamPlan(w: World, team: Team): TeamPlan {
+  const cache = (w as unknown as { botPlans?: Record<number, TeamPlan> }).botPlans ??= {};
+  const cur = cache[team];
+  if (cur && w.time < cur.until) return cur;
+  const until = w.time + 2;
+  // Defend a building that enemies are hitting (heroes, or several creeps on an inner building).
+  let defend: { s: Unit; threat: number } | null = null;
+  for (const s of w.units) {
+    if (!s.structure || !s.alive || s.team !== team || s.structure.tier === 'fountain') continue;
+    let threat = 0;
+    for (const e of w.units) {
+      if (!e.alive || e.team === team || e.team === 2 || e.structure || dist(e.x, e.y, s.x, s.y) > 14) continue;
+      threat += e.hero ? 3 : 1;
+    }
+    const important = s.structure.tier !== 'tower1' ? 2 : 0;
+    if (threat >= 3 && (!defend || threat + important > defend.threat)) defend = { s, threat: threat + important };
+  }
+  if (defend) return (cache[team] = { mode: 'defend', structureId: defend.s.id, lane: defend.s.structure!.lane ?? 'mid', until });
+  // Push together when we have the upper hand.
+  const alive = (t: Team) => w.units.filter((h) => h.hero && h.alive && h.team === t).length;
+  if (w.time > 600 && alive(team) >= 2 && alive(team) > alive((1 - team) as Team)) {
+    let best: { lane: 'top' | 'mid' | 'bot'; hp: number } | null = null;
+    for (const s of w.units) {
+      if (!s.structure || !s.alive || s.team === team || !s.structure.vulnerable || !s.structure.lane) continue;
+      if (!best || s.hp < best.hp) best = { lane: s.structure.lane, hp: s.hp };
+    }
+    if (best) return (cache[team] = { mode: 'push', lane: best.lane, until });
+  }
+  return (cache[team] = { mode: 'farm', until });
+}
 export function botThink(w: World, me: Unit) {
   const h = me.hero!;
   const hpRatio = me.hp / me.maxHp;
@@ -42,8 +97,13 @@ export function botThink(w: World, me: Unit) {
     return;
   }
 
-  const path = teamLanePath(w.map, me.team as Team, h.lane);
+  const diff = h.bot.difficulty;
+  const plan = diff === 'easy' ? { mode: 'farm' as const, until: 0 } : teamPlan(w, me.team as Team);
+  // Defending / pushing bots work in the plan's lane instead of their own.
+  const lane = plan.mode === 'farm' ? h.lane : plan.lane ?? h.lane;
+  const path = teamLanePath(w.map, me.team as Team, lane);
   const myProgress = projectOnPolyline(path, me);
+  if (plan.mode === 'defend' && defend(w, me, plan)) return;
   if (inShop(w, me) && hpRatio > 0.85 && teleportToLane(w, me, path)) return;
 
   // Under fire from a tower with nothing else to soak it? Step back.
@@ -56,7 +116,7 @@ export function botThink(w: World, me: Unit) {
     return;
   }
 
-  const target = chooseTarget(w, me, hpRatio);
+  const target = chooseTarget(w, me, hpRatio) ?? (diff !== 'easy' ? gankTarget(w, me, hpRatio) : undefined);
   if (target && useAbilities(w, me, target)) return;
   if (!target && (grabRune(w, me) || plantWard(w, me, path))) return;
   if (target) {
@@ -69,13 +129,13 @@ export function botThink(w: World, me: Unit) {
   // Follow our lane's front line.
   let front = -1;
   for (const c of w.units) {
-    if (!c.creep || !c.alive || c.team !== me.team || c.creep.lane !== h.lane) continue;
+    if (!c.creep || !c.alive || c.team !== me.team || c.creep.lane !== lane) continue;
     front = Math.max(front, projectOnPolyline(path, c));
   }
   if (front < 0) {
     // No creeps: hold near our furthest living tower in this lane.
     for (const t of w.units) {
-      if (t.structure && t.alive && t.team === me.team && t.structure.lane === h.lane && t.attackInterval > 0) {
+      if (t.structure && t.alive && t.team === me.team && t.structure.lane === lane && t.attackInterval > 0) {
         front = Math.max(front, projectOnPolyline(path, t) + 4);
       }
     }
@@ -180,8 +240,16 @@ function supportAllies(w: World, me: Unit): boolean {
 
 function cast(w: World, me: Unit, slot: number, t: Unit) {
   const def = abilityDef(me, slot)!;
-  if (def.targeting === 'enemy') w.applyCommand({ type: 'cast', unitId: me.id, slot, targetId: t.id });
-  else w.applyCommand({ type: 'cast', unitId: me.id, slot, x: t.x, y: t.y });
+  const aim = AIM[me.hero!.bot.difficulty];
+  if (def.targeting === 'enemy') {
+    w.applyCommand({ type: 'cast', unitId: me.id, slot, targetId: t.id });
+    return;
+  }
+  // Aim error (easy bots miss more); hard bots lead moving targets a little.
+  const lead = me.hero!.bot.difficulty === 'hard' ? 0.25 * w.speedOf(t) : 0;
+  const ex = (w.rng.next() - 0.5) * 2 * aim.error;
+  const ey = (w.rng.next() - 0.5) * 2 * aim.error;
+  w.applyCommand({ type: 'cast', unitId: me.id, slot, x: t.x + Math.cos(t.facing) * lead + ex, y: t.y + Math.sin(t.facing) * lead + ey });
 }
 
 /** Item buttons: cloak up when hurt in a fight, blink onto a hero we want to fight. */
@@ -205,6 +273,7 @@ function useItems(w: World, me: Unit, target: Unit, d: number): boolean {
 function useAbilities(w: World, me: Unit, target: Unit): boolean {
   const d = dist(me.x, me.y, target.x, target.y);
   if (useItems(w, me, target, d)) return false; // keep fighting after the item
+  if (w.rng.next() > AIM[me.hero!.bot.difficulty].castChance) return false;
   if (target.hero) {
     for (const slot of [2, 0]) {
       if (!ready(me, slot)) continue;
@@ -329,4 +398,37 @@ export function botWhileDead(w: World, me: Unit) {
   const base = w.map.shrines[me.team as Team];
   const threat = w.units.some((e) => e.alive && e.team !== me.team && e.team !== 2 && (e.hero || e.creep) && dist(e.x, e.y, base.x, base.y) < 28);
   if (threat && me.hero!.respawnTimer > 8) w.applyCommand({ type: 'buyback', unitId: me.id });
+}
+
+/** Go help a building under attack: teleport if far, otherwise walk. Returns true if acting. */
+function defend(w: World, me: Unit, plan: TeamPlan): boolean {
+  const s = w.unit(plan.structureId);
+  if (!s || !s.alive) return false;
+  const d = dist(me.x, me.y, s.x, s.y);
+  if (d < 16) return false; // close enough: fight normally
+  if (d > 60 && !tpBlocker(me)) {
+    w.applyCommand({ type: 'teleport', unitId: me.id, targetId: s.id });
+    return true;
+  }
+  if (d > 75) return false; // too far to matter on foot
+  w.applyCommand({ type: 'moveTo', unitId: me.id, x: s.x, y: s.y });
+  return true;
+}
+
+/** A visible, weakened enemy hero worth chasing (not under its towers). */
+function gankTarget(w: World, me: Unit, hpRatio: number): Unit | undefined {
+  const brave = me.hero!.bot.difficulty === 'hard' ? 0.5 : 0.4;
+  if (hpRatio < 0.6) return undefined;
+  return w.units
+    .filter(
+      (e) =>
+        e.hero &&
+        e.alive &&
+        e.team !== me.team &&
+        w.canSee(me.team, e) &&
+        e.hp / e.maxHp < brave &&
+        dist(e.x, e.y, me.x, me.y) < 30 &&
+        isSafe(w, me, e.x, e.y),
+    )
+    .sort((a, b) => a.hp - b.hp)[0];
 }
