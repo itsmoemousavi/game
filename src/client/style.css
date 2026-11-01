@@ -125,3 +125,18 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 .tp-head { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; font-size: 13px; }
 #tp-close { margin-left: auto; padding: 4px 10px; border-radius: 8px; border: 0; background: #5a2a2a; }
 #tp-canvas { display: block; border-radius: 6px; touch-action: none; }
+
+/* ---------- objectives UI ---------- */
+#respawn { pointer-events: none; }
+#btn-buyback { pointer-events: auto; margin-left: 8px; padding: 4px 10px; border-radius: 8px; border: 0; background: #ffd23f; color: #111; font-weight: 800; font-size: 13px; }
+#btn-buyback.off { opacity: 0.45; }
+#btn-glyph { position: absolute; left: 10px; top: 190px; width: 40px; height: 40px; border-radius: 50%; border: 2px solid #8cc4ff; background: rgba(20,40,70,0.85); font-size: 18px; display: grid; place-items: center; touch-action: none; }
+#btn-glyph .cd { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 50%; background: rgba(0,0,0,0.65); font-size: 11px; font-weight: 800; }
+#btn-glyph .cd:empty { display: none; }
+#btn-mute { position: absolute; right: max(10px, env(safe-area-inset-right)); top: max(6px, env(safe-area-inset-top)); width: 34px; height: 34px; border-radius: 50%; border: 0; background: rgba(0,0,0,0.5); font-size: 16px; }
+#buffs { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(max(4px, env(safe-area-inset-bottom)) + 98px); display: flex; gap: 4px; pointer-events: none; }
+#buffs span { padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 700; color: #111; }
+#toasts { position: absolute; left: 50%; top: 86px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; }
+#toasts div { padding: 4px 12px; border-radius: 8px; background: rgba(0,0,0,0.7); font-size: 13px; font-weight: 600; white-space: nowrap; animation: toast 3.2s forwards; }
+@keyframes toast { 0% { opacity: 0; transform: translateY(-6px); } 8% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; } }
+#itembar .item.placing { border-color: #facc15; animation: pulse 0.5s infinite alternate; }

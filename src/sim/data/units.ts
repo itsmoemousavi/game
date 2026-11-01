@@ -115,4 +115,50 @@ export const NEUTRALS: Record<'brute' | 'imp', CombatStats> = {
   },
 };
 
+/** The river boss: tough, hits hard, drops a revive charm for the team that kills it. */
+export const BOSS: CombatStats = {
+  hp: 6500,
+  armor: 8,
+  damage: 80,
+  attackInterval: 1.3,
+  attackRange: 1.8,
+  projectileSpeed: 0,
+  moveSpeed: 5,
+  radius: 2,
+  acquireRange: 0,
+  bountyGold: 250,
+  bountyXp: 400,
+};
+
+export const WARDS: Record<'observer' | 'sentry', CombatStats> = {
+  observer: {
+    hp: 200,
+    armor: 0,
+    damage: 0,
+    attackInterval: 0,
+    attackRange: 0,
+    projectileSpeed: 0,
+    moveSpeed: 0,
+    radius: 0.6,
+    acquireRange: 0,
+    bountyGold: 50,
+    bountyXp: 50,
+    vision: [16, 12],
+  },
+  sentry: {
+    hp: 200,
+    armor: 0,
+    damage: 0,
+    attackInterval: 0,
+    attackRange: 0,
+    projectileSpeed: 0,
+    moveSpeed: 0,
+    radius: 0.6,
+    acquireRange: 0,
+    bountyGold: 25,
+    bountyXp: 25,
+    vision: [3, 3],
+  },
+};
+
 export const HERO_VISION: [number, number] = [17, 10];

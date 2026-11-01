@@ -36,6 +36,9 @@ export class Input {
   private drag: { id: number; slot: number; ox: number; oy: number; moved: boolean } | null = null;
   /** Finger/mouse held on the minimap: camera peeks there until released. */
   private peek: number | null = null;
+  /** Inventory slot of a ward waiting to be placed: the next tap on the field places it. */
+  wardSlot: number | null = null;
+  onWardPlaced: () => void = () => {};
   /** Dragging the field to look around (while dead). */
   private camDrag: { id: number; x: number; y: number } | null = null;
   private lastDir = { dx: 0, dy: 0 };
@@ -183,6 +186,16 @@ export class Input {
         this.peek = e.pointerId;
         this.renderer.lookAt(wx, wy);
       }
+      return;
+    }
+
+    // Placing a ward: this tap chooses the spot (the hero walks into range if needed).
+    if (this.wardSlot !== null) {
+      const p = this.renderer.screenToWorld(sx, sy);
+      this.queue.push({ type: 'placeWard', unitId: this.heroId(), slot: this.wardSlot, x: p.x, y: p.y });
+      this.wardSlot = null;
+      this.renderer.wardMode = null;
+      this.onWardPlaced();
       return;
     }
 

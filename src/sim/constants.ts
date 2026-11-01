@@ -34,6 +34,42 @@ export const CAMP_FIRST_SPAWN = 30;
 export const CAMP_RESPAWN = 60;
 export const NEUTRAL_LEASH = 11;
 
+/** Power-ups (runes): first at 1:00, then every 2 minutes, at one of the two river spots. */
+export const RUNE_FIRST = 60;
+export const RUNE_INTERVAL = 120;
+/** The boss returns this long after it dies. */
+export const BOSS_RESPAWN = 300;
+/** Revive charm from the boss lasts this long; reviving takes REVIVE_DELAY. */
+export const CHARM_DURATION = 300;
+export const REVIVE_DELAY = 3;
+
+export const BUYBACK_COOLDOWN = 300;
+export const buybackCost = (level: number, minutes: number) => Math.round(150 + level * 30 + minutes * 8);
+
+/** Team tower shield ("glyph"): all your buildings invulnerable for a few seconds. */
+export const GLYPH_COOLDOWN = 300;
+export const GLYPH_DURATION = 5;
+
+/**
+ * Backdoor protection (inner towers, barracks, shrine towers, shrine — not tier-1 towers):
+ * with no enemy creeps nearby they take much less damage, and regenerate for a while after
+ * being hit that way.
+ */
+export const BACKDOOR_RADIUS = 18;
+export const BACKDOOR_DAMAGE_MULT = 0.25;
+export const BACKDOOR_REGEN = 40;
+
+/** Denying: last-hit your own creeps below this HP fraction (towers below DENY_TOWER). */
+export const DENY_CREEP = 0.5;
+export const DENY_TOWER = 0.1;
+/** Enemy heroes still get this share of XP from a denied creep (and no gold). */
+export const DENY_XP_SHARE = 0.3;
+
+export const WARD_DURATION = 360;
+export const WARD_CAST_RANGE = 7;
+/** Sentry wards reveal invisible enemies (wards, invisible heroes) in this radius. */
+export const TRUE_SIGHT_RADIUS = 10;
+
 export type Team = 0 | 1;
 /** Side a unit belongs to: a team, or 2 for neutral jungle monsters. */
 export type Side = Team | 2;

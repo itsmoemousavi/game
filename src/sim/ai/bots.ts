@@ -1,6 +1,6 @@
 import type { Team } from '../constants';
 import { teamLanePath } from '../map';
-import { dist, pointAlong, projectOnPolyline } from '../math';
+import { dist, pointAlong, polylineLength, projectOnPolyline } from '../math';
 import type { Unit, World } from '../world';
 import { abilityDef, botLearn, castBlocker } from '../abilities';
 import { BUILDS, ITEMS, TELEPORT } from '../data/items';
@@ -31,6 +31,7 @@ export function botThink(w: World, me: Unit) {
   if (h.channel) return; // teleporting
   if (inShop(w, me)) shop(w, me);
   if (hpRatio < 0.45) useSalve(w, me);
+  maybeGlyph(w, me);
   if (supportAllies(w, me)) return;
 
   if (hpRatio < 0.3) h.bot.retreating = true;
@@ -57,6 +58,7 @@ export function botThink(w: World, me: Unit) {
 
   const target = chooseTarget(w, me, hpRatio);
   if (target && useAbilities(w, me, target)) return;
+  if (!target && (grabRune(w, me) || plantWard(w, me, path))) return;
   if (target) {
     if (me.hero!.order.type !== 'attack' || me.hero!.order.targetId !== target.id) {
       w.applyCommand({ type: 'attack', unitId: me.id, targetId: target.id });
@@ -117,8 +119,13 @@ function chooseTarget(w: World, me: Unit, hpRatio: number): Unit | undefined {
     me.x,
     me.y,
     scan,
-    (e) => w.canSee(me.team, e) && (e.kind !== 'neutral' || e.targetId === me.id),
+    (e) => w.canSee(me.team, e) && e.kind !== 'ward' && (e.kind !== 'neutral' || e.targetId === me.id),
   );
+  // Own creeps we can deny (only worth it when this hit kills).
+  const denies = w.units.filter(
+    (c) => c.creep && w.canDeny(me, c) && c.hp <= me.damage * 1.1 && dist(c.x, c.y, me.x, me.y) <= scan,
+  );
+  enemies.push(...denies);
   if (!enemies.length) return undefined;
 
   const alliedHeroes = w.units.filter((u) => u.hero && u.alive && u.team === me.team && dist(u.x, u.y, me.x, me.y) < 15).length;
@@ -140,6 +147,8 @@ function chooseTarget(w: World, me: Unit, hpRatio: number): Unit | undefined {
       if (hpRatio < 0.45 || enemyHeroes > alliedHeroes + 1) continue;
       const theirRatio = e.hp / e.maxHp;
       score = 70 + (1 - theirRatio) * 60 + (hpRatio - theirRatio) * 30;
+    } else if (e.creep && e.team === me.team) {
+      score = 80; // deny
     } else if (e.creep) {
       const killable = e.hp <= me.damage * 1.3;
       score = 50 + (killable ? 40 : 0) - (e.hp / e.maxHp) * 20;
@@ -213,6 +222,10 @@ function useAbilities(w: World, me: Unit, target: Unit): boolean {
 function shop(w: World, me: Unit) {
   const h = me.hero!;
   if (h.tpCount === 0 && h.gold >= TELEPORT.cost) w.applyCommand({ type: 'buyTp', unitId: me.id });
+  // Supports keep an observer ward on them.
+  if (h.defId === 'orin' && h.gold > 400 && !h.items.some((s) => s?.id === 'observerWard')) {
+    w.applyCommand({ type: 'buy', unitId: me.id, itemId: 'observerWard' });
+  }
   const build = BUILDS[h.defId];
   for (let guard = 0; guard < 3 && h.bot.buildIndex < build.length; guard++) {
     const next = build[h.bot.buildIndex];
@@ -251,4 +264,47 @@ function teleportToLane(w: World, me: Unit, path: { x: number; y: number }[]): b
   if (dist(me.x, me.y, best.x, best.y) < 50) return false;
   w.applyCommand({ type: 'teleport', unitId: me.id, targetId: best.id });
   return true;
+}
+
+/** Pop the team tower shield when one of our towers is about to fall. */
+function maybeGlyph(w: World, me: Unit) {
+  if (w.glyphCooldown[me.team as Team] > 0) return;
+  const endangered = w.units.some(
+    (t) =>
+      t.structure &&
+      t.alive &&
+      t.team === me.team &&
+      t.structure.vulnerable &&
+      t.hp < t.maxHp * 0.3 &&
+      w.units.some((e) => e.alive && e.team !== me.team && e.team !== 2 && !e.structure && dist(e.x, e.y, t.x, t.y) < 12),
+  );
+  if (endangered) w.applyCommand({ type: 'glyph', unitId: me.id });
+}
+
+/** Detour for a power-up if one is close and no enemy hero is around. */
+function grabRune(w: World, me: Unit): boolean {
+  const r = w.runes.find((q) => dist(q.x, q.y, me.x, me.y) < 28 && w.vision.seesPoint(me.team as Team, q.x, q.y));
+  if (!r) return false;
+  const danger = w.units.some((e) => e.hero && e.alive && e.team !== me.team && w.canSee(me.team, e) && dist(e.x, e.y, r.x, r.y) < 12);
+  if (danger) return false;
+  w.applyCommand({ type: 'moveTo', unitId: me.id, x: r.x, y: r.y });
+  return true;
+}
+
+/** Plant an observer ward where our lane meets the river, if none of ours is there. */
+function plantWard(w: World, me: Unit, path: { x: number; y: number }[]): boolean {
+  const slot = me.hero!.items.findIndex((s) => s?.id === 'observerWard');
+  if (slot < 0) return false;
+  const spot = pointAlong(path, polylineLength(path) * 0.42);
+  const covered = w.units.some((u) => u.ward && u.alive && u.team === me.team && dist(u.x, u.y, spot.x, spot.y) < 15);
+  if (covered || dist(me.x, me.y, spot.x, spot.y) > 30) return false;
+  w.applyCommand({ type: 'placeWard', unitId: me.id, slot, x: spot.x, y: spot.y });
+  return true;
+}
+
+/** Dead bots: buy back if our base is under attack. */
+export function botWhileDead(w: World, me: Unit) {
+  const base = w.map.shrines[me.team as Team];
+  const threat = w.units.some((e) => e.alive && e.team !== me.team && e.team !== 2 && (e.hero || e.creep) && dist(e.x, e.y, base.x, base.y) < 28);
+  if (threat && me.hero!.respawnTimer > 8) w.applyCommand({ type: 'buyback', unitId: me.id });
 }

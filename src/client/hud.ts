@@ -1,4 +1,20 @@
-import { HEROES, MAX_LEVEL, TEAM_NAMES, Team, Unit, World, XP_TABLE, castBlocker, isNight, maxAbilityLevel, phaseTimeLeft } from '../sim';
+import {
+  HEROES,
+  MAX_LEVEL,
+  RUNE_INFO,
+  RuneKind,
+  TEAM_NAMES,
+  Team,
+  Unit,
+  World,
+  XP_TABLE,
+  buybackBlocker,
+  buybackCost,
+  castBlocker,
+  isNight,
+  maxAbilityLevel,
+  phaseTimeLeft,
+} from '../sim';
 
 const fmtTime = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 
@@ -32,6 +48,11 @@ export class Hud {
       'gameover',
       'gameover-title',
       'daynight',
+      'btn-buyback',
+      'buyback-cost',
+      'btn-glyph',
+      'buffs',
+      'toasts',
     ]) {
       this.el[id] = root.querySelector(`#${id}`)!;
     }
@@ -58,6 +79,37 @@ export class Hud {
     this.el.gameover.style.display = 'none';
   }
 
+  private teamKey = '';
+
+  /** Buyback, tower shield and active-effect chips. */
+  private updateTeamButtons(w: World, me: Unit, team: Team) {
+    const h = me.hero!;
+    const bb = buybackBlocker(w, me);
+    const cost = buybackCost(h.level, w.time / 60);
+    const gcd = Math.ceil(w.glyphCooldown[team]);
+    const buffs = me.buffs
+      .filter((b) => b.key === 'charm' || b.key === 'rune' || b.key === 'salve')
+      .map((b) => `${b.key}:${Math.ceil(b.t)}`)
+      .join();
+    const key = `${bb}|${cost}|${Math.ceil(h.buybackCooldown)}|${gcd}|${buffs}`;
+    if (key === this.teamKey) return;
+    this.teamKey = key;
+    this.el['buyback-cost'].textContent = bb === 'cooldown' ? `${Math.ceil(h.buybackCooldown)}s` : String(cost);
+    this.el['btn-buyback'].classList.toggle('off', bb !== null);
+    this.el['btn-glyph'].querySelector('.cd')!.textContent = gcd > 0 ? `${Math.floor(gcd / 60)}:${String(gcd % 60).padStart(2, '0')}` : '';
+    const chips: string[] = [];
+    for (const b of me.buffs) {
+      const secs = Math.ceil(b.t);
+      if (b.key === 'charm') chips.push(`<span style="background:#ffd23f">Revive ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}</span>`);
+      if (b.key === 'salve') chips.push(`<span style="background:#4ade80">Salve ${secs}</span>`);
+      if (b.key === 'rune') {
+        const kind: RuneKind = b.invisible ? 'invisibility' : b.damageMult ? 'doubleDamage' : b.moveSpeedPct ? 'haste' : 'regen';
+        chips.push(`<span style="background:${RUNE_INFO[kind].color}">${RUNE_INFO[kind].name} ${secs}</span>`);
+      }
+    }
+    this.el.buffs.innerHTML = chips.join('');
+  }
+
   /** Cooldowns, mana, levels and learn buttons. Cheap: only touches the DOM on change. */
   private updateAbilities(me: Unit) {
     const h = me.hero!;
@@ -82,9 +134,20 @@ export class Hud {
     });
   }
 
+  /** Short announcement under the top bar. */
+  toast(text: string, color = '#fff') {
+    const d = document.createElement('div');
+    d.textContent = text;
+    d.style.color = color;
+    this.el.toasts.appendChild(d);
+    while (this.el.toasts.children.length > 3) this.el.toasts.firstElementChild!.remove();
+    setTimeout(() => d.remove(), 3300);
+  }
+
   update(w: World, me: Unit, myTeam: Team) {
     const h = me.hero!;
     this.updateAbilities(me);
+    this.updateTeamButtons(w, me, myTeam);
     const key = [
       w.teamKills[0],
       w.teamKills[1],

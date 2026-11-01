@@ -1,4 +1,4 @@
-import { DAY_SECONDS, NIGHT_SECONDS, Team } from './constants';
+import { DAY_SECONDS, NIGHT_SECONDS, TRUE_SIGHT_RADIUS, Team } from './constants';
 import type { Unit, World } from './world';
 
 /**
@@ -10,8 +10,13 @@ import type { Unit, World } from './world';
  * from the viewer to it crosses no tree. The first trees along a line are lit, so you
  * see the edge of the forest but not through it. Buildings don't block sight.
  */
+/** Wards are always invisible; heroes are while an invisibility buff is active. */
+export const isInvisible = (u: Unit) => !!u.ward || u.buffs.some((b) => b.invisible);
+
 export class Vision {
   readonly grids: [Uint8Array, Uint8Array];
+  /** Where each team can see invisible things (sentry wards, fountain). */
+  readonly trueSight: [Uint8Array, Uint8Array];
   /** Per radius (in half-cells): offsets in range + the cells each sight line crosses. */
   private patterns = new Map<number, { dx: Int16Array; dy: Int16Array; lineStart: Int32Array; lineX: Int16Array; lineY: Int16Array }>();
 
@@ -21,17 +26,34 @@ export class Vision {
     private walkable: Uint8Array,
   ) {
     this.grids = [new Uint8Array(grid * grid), new Uint8Array(grid * grid)];
+    this.trueSight = [new Uint8Array(grid * grid), new Uint8Array(grid * grid)];
   }
 
   update(w: World) {
     const night = isNight(w.time);
     for (const team of [0, 1] as Team[]) {
       const g = this.grids[team];
+      const ts = this.trueSight[team];
       g.fill(0);
+      ts.fill(0);
       for (const u of w.units) {
         if (!u.alive || u.team !== team) continue;
         const r = night ? u.visionNight : u.visionDay;
         if (r > 0) this.reveal(g, u.x, u.y, r);
+        if (u.ward?.kind === 'sentry') this.disc(ts, u.x, u.y, TRUE_SIGHT_RADIUS);
+        if (u.structure?.tier === 'fountain') this.disc(ts, u.x, u.y, 16);
+      }
+    }
+  }
+
+  private disc(g: Uint8Array, x: number, y: number, r: number) {
+    const n = this.grid;
+    const c = this.cell;
+    for (let cy = Math.max(0, Math.floor((y - r) / c)); cy <= Math.min(n - 1, Math.floor((y + r) / c)); cy++) {
+      for (let cx = Math.max(0, Math.floor((x - r) / c)); cx <= Math.min(n - 1, Math.floor((x + r) / c)); cx++) {
+        const dx = (cx + 0.5) * c - x;
+        const dy = (cy + 0.5) * c - y;
+        if (dx * dx + dy * dy <= r * r) g[cy * n + cx] = 1;
       }
     }
   }
@@ -108,10 +130,16 @@ export class Vision {
     return this.grids[team][cy * this.grid + cx] === 1;
   }
 
-  /** Own units and buildings are always known; others only when inside vision. */
+  /** Own units and buildings are always known; others only inside vision (and true sight if invisible). */
   sees(team: Team, u: Unit): boolean {
     if (u.team === team || u.kind === 'structure') return true;
-    return this.seesPoint(team, u.x, u.y);
+    if (!this.seesPoint(team, u.x, u.y)) return false;
+    if (isInvisible(u)) {
+      const cx = Math.floor(u.x / this.cell);
+      const cy = Math.floor(u.y / this.cell);
+      return this.trueSight[team][cy * this.grid + cx] === 1;
+    }
+    return true;
   }
 }
 

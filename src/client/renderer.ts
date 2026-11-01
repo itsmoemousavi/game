@@ -1,4 +1,4 @@
-import { GameEvent, GameMap, HEROES, LANE_IDS, Side, Team, Unit, World, isNight } from '../sim';
+import { GameEvent, GameMap, HEROES, LANE_IDS, RUNE_INFO, Side, Team, Unit, WARD_CAST_RANGE, World, isInvisible, isNight } from '../sim';
 import type { Aim } from './input';
 
 /**
@@ -25,6 +25,10 @@ export class Renderer {
   private swings: { x: number; y: number; ang: number; reach: number; t: number; color: string }[] = [];
   private lunges = new Map<number, { ang: number; t: number }>();
   private blasts: { x: number; y: number; r: number; t: number; color: string }[] = [];
+  /** Floating text: "Denied!", "+38" gold... */
+  private floaters: { x: number; y: number; t: number; text: string; color: string }[] = [];
+  /** Inventory slot of a ward being placed (shows the placement range). */
+  wardMode: number | null = null;
   /** Free camera: set while dead, or while the player holds the minimap. */
   private lookTarget: { x: number; y: number } | null = null;
   private fogCanvas: HTMLCanvasElement;
@@ -67,8 +71,24 @@ export class Renderer {
   }
 
   /** Feed every simulation step's events (several steps can run per frame). */
-  pushEvents(w: World, events: GameEvent[]) {
+  pushEvents(w: World, events: GameEvent[], meId = -1) {
     for (const e of events) {
+      if (e.type === 'deny') {
+        const u = w.unit(e.unitId);
+        if (u) this.floaters.push({ x: u.x, y: u.y - 1, t: 1, text: '!', color: '#ffffff' });
+        if (u && e.killerId === meId) this.floaters.push({ x: u.x, y: u.y - 2.2, t: 1.2, text: 'Denied!', color: '#e5e7eb' });
+        continue;
+      }
+      if (e.type === 'gold' && e.unitId === meId && e.amount >= 20) {
+        const u = w.unit(meId);
+        if (u) this.floaters.push({ x: u.x, y: u.y - 2.4, t: 1, text: `+${Math.round(e.amount)}`, color: '#ffd23f' });
+        continue;
+      }
+      if (e.type === 'revive') {
+        const u = w.unit(e.unitId);
+        if (u) this.blasts.push({ x: u.x, y: u.y, r: 4, t: 0.6, color: '255,215,90' });
+        continue;
+      }
       if (e.type === 'attack') {
         const src = w.unit(e.sourceId);
         const tgt = w.unit(e.targetId);
@@ -160,8 +180,20 @@ export class Renderer {
       return p;
     };
 
-    for (const s of structures) this.drawStructure(s);
+    for (const s of structures) this.drawStructure(s, w.time);
     this.drawAreas(w, seesPoint);
+    this.drawRunes(w, viewTeam);
+    for (const u of w.units) if (u.ward && u.alive && sees(u)) this.drawWard(u, viewTeam);
+    if (this.wardMode !== null && focus?.alive) {
+      const p = lerp(focus);
+      ctx.strokeStyle = 'rgba(250,204,21,0.8)';
+      ctx.setLineDash([0.6, 0.4]);
+      ctx.lineWidth = 0.18;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, WARD_CAST_RANGE, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
     this.drawTeleports(w, viewTeam);
     for (const c of creeps) {
       const p = at(c);
@@ -190,6 +222,15 @@ export class Renderer {
       const p = at(h);
       const def = HEROES[h.hero!.defId];
       const isMe = h === focus;
+      // Invisible allies (incl. you) are drawn see-through; enemies wouldn't be drawn at all.
+      ctx.globalAlpha = isInvisible(h) ? 0.4 : 1;
+      if (h.buffs.some((b) => b.key === 'charm')) {
+        ctx.strokeStyle = 'rgba(255,215,90,0.8)';
+        ctx.lineWidth = 0.2;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, h.radius + 0.75 + Math.sin(w.time * 4) * 0.08, 0, Math.PI * 2);
+        ctx.stroke();
+      }
       ctx.fillStyle = 'rgba(0,0,0,0.35)';
       ctx.beginPath();
       ctx.ellipse(p.x, p.y + 0.35, h.radius * 1.1, h.radius * 0.6, 0, 0, Math.PI * 2);
@@ -219,6 +260,7 @@ export class Renderer {
       ctx.font = 'bold 0.8px system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(`${h.hero!.level} ${def.name}`, p.x, p.y - h.radius - 1.2);
+      ctx.globalAlpha = 1;
     }
 
     for (const u of [...creeps, ...heroes]) this.drawStatus(u, at(u), w.time);
@@ -299,6 +341,16 @@ export class Renderer {
       ctx.stroke();
     }
 
+    this.floaters = this.floaters.filter((f) => (f.t -= 1 / 60) > 0);
+    ctx.textAlign = 'center';
+    for (const f of this.floaters) {
+      ctx.globalAlpha = Math.min(1, f.t * 2);
+      ctx.fillStyle = f.color;
+      ctx.font = 'bold 1.1px system-ui, sans-serif';
+      ctx.fillText(f.text, f.x, f.y - (1 - f.t) * 1.5);
+    }
+    ctx.globalAlpha = 1;
+
     this.drawFog(w, viewTeam);
     if (aim && focus && focus.alive) this.drawAim(w, focus, lerp(focus), aim);
     ctx.restore();
@@ -364,8 +416,82 @@ export class Renderer {
     }
   }
 
+  private drawRunes(w: World, team: Team) {
+    const ctx = this.ctx;
+    for (const r of w.runes) {
+      if (!w.vision.seesPoint(team, r.x, r.y)) continue;
+      const info = RUNE_INFO[r.kind];
+      const pulse = 1 + Math.sin(w.time * 5) * 0.12;
+      ctx.fillStyle = info.color;
+      ctx.globalAlpha = 0.3;
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, 1.6 * pulse, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.moveTo(r.x, r.y - 1 * pulse);
+      ctx.lineTo(r.x + 0.7 * pulse, r.y);
+      ctx.lineTo(r.x, r.y + 1 * pulse);
+      ctx.lineTo(r.x - 0.7 * pulse, r.y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 0.1;
+      ctx.stroke();
+    }
+  }
+
+  private drawWard(u: Unit, viewTeam: Team) {
+    const ctx = this.ctx;
+    const sentry = u.ward!.kind === 'sentry';
+    const own = u.team === viewTeam;
+    ctx.globalAlpha = own ? 0.9 : 1;
+    ctx.fillStyle = sentry ? '#60a5fa' : '#facc15';
+    ctx.strokeStyle = TEAM_COLORS[u.team];
+    ctx.lineWidth = 0.2;
+    // A little eye.
+    ctx.beginPath();
+    ctx.ellipse(u.x, u.y, 0.8, 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#111';
+    ctx.beginPath();
+    ctx.arc(u.x, u.y, 0.22, 0, Math.PI * 2);
+    ctx.fill();
+    if (!own) this.hpBar(u.x, u.y - 1, 1.6, 0.25, u.hp / u.maxHp, TEAM_COLORS[u.team]);
+    ctx.globalAlpha = 1;
+  }
+
   private drawNeutral(c: Unit, p: { x: number; y: number }) {
     const ctx = this.ctx;
+    if (c.neutral?.boss) {
+      // The river boss: big, purple, crowned.
+      ctx.fillStyle = 'rgba(120,60,200,0.25)';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, c.radius + 1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#7c3aed';
+      ctx.strokeStyle = '#1e1033';
+      ctx.lineWidth = 0.25;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, c.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#ffd23f';
+      for (let i = -1; i <= 1; i++) {
+        ctx.beginPath();
+        ctx.moveTo(p.x + i * 0.7 - 0.3, p.y - c.radius + 0.2);
+        ctx.lineTo(p.x + i * 0.7, p.y - c.radius - 0.7);
+        ctx.lineTo(p.x + i * 0.7 + 0.3, p.y - c.radius + 0.2);
+        ctx.fill();
+      }
+      this.hpBar(p.x, p.y - c.radius - 1.3, 5, 0.5, c.hp / c.maxHp, '#a78bfa');
+      ctx.fillStyle = '#e9d5ff';
+      ctx.font = 'bold 0.8px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Warden', p.x, p.y - c.radius - 1.8);
+      return;
+    }
     ctx.fillStyle = TEAM_COLORS[2];
     ctx.strokeStyle = '#2b2116';
     ctx.lineWidth = 0.15;
@@ -607,7 +733,7 @@ export class Renderer {
     ctx.lineCap = 'butt';
   }
 
-  private drawStructure(s: Unit) {
+  private drawStructure(s: Unit, time: number) {
     const ctx = this.ctx;
     const st = s.structure!;
     const r = s.radius;
@@ -669,6 +795,21 @@ export class Renderer {
         ctx.fillText(st.tier === 'tower1' ? '1' : st.tier === 'tower2' ? '2' : 'S', s.x, s.y + 0.05);
         ctx.textBaseline = 'alphabetic';
       }
+    }
+    if (st.glyph > 0) {
+      ctx.fillStyle = `rgba(120,220,255,${0.25 + Math.sin(time * 10) * 0.08})`;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, r + 1.4, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (st.backdoor && time - st.backdoorHitAt < 1.5) {
+      // Backdoor protection soaking a hero-only attack.
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+      ctx.lineWidth = 0.25;
+      ctx.setLineDash([0.3, 0.3]);
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, r + 1.1, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
     if (!st.vulnerable) {
       // Protected: show a shield ring.

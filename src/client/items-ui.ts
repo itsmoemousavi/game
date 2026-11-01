@@ -31,11 +31,15 @@ export class ItemsUi {
   private pickerCanvas: HTMLCanvasElement;
   private lastKey = '';
   private shopKey = '';
+  /** Slot of the ward being placed, if any. */
+  placingSlot: number | null = null;
 
   constructor(
     private root: HTMLElement,
     private send: (c: Command) => void,
     private ctx: () => { w: World; me: Unit; team: Team; terrain: HTMLCanvasElement } | null,
+    /** Called when a ward slot is tapped (enter / leave ward placement mode). */
+    private onWard: (slot: number | null) => void = () => {},
   ) {
     root.querySelectorAll<HTMLElement>('[data-item]').forEach((el) => this.slots.push(el));
     this.tpSlot = root.querySelector('#tp-slot')!;
@@ -54,8 +58,13 @@ export class ItemsUi {
       tap(el, () => {
         const c = this.ctx();
         if (!c) return;
+        const item = c.me.hero!.items[i];
         if (this.shopOpen) this.send({ type: 'sell', unitId: c.me.id, slot: i });
-        else this.send({ type: 'useItem', unitId: c.me.id, slot: i });
+        else if (item?.id === 'observerWard' || item?.id === 'sentryWard') {
+          this.placingSlot = this.placingSlot === i ? null : i;
+          this.onWard(this.placingSlot);
+          this.lastKey = '';
+        } else this.send({ type: 'useItem', unitId: c.me.id, slot: i });
       }),
     );
     tap(this.tpSlot, () => {
@@ -127,7 +136,11 @@ export class ItemsUi {
     const { w, me } = c;
     const h = me.hero!;
     const atShop = inShop(w, me);
-    const key = `${h.items.map((s) => (s ? s.id + s.count : '-')).join()}|${h.tpCount}|${Math.ceil(h.tpCooldown)}|${!!h.channel}|${atShop}|${this.shopOpen}`;
+    if (this.placingSlot !== null && !h.items[this.placingSlot]?.id.endsWith('Ward')) {
+      this.placingSlot = null; // ward used up
+      this.onWard(null);
+    }
+    const key = `${h.items.map((s) => (s ? s.id + s.count : '-')).join()}|${h.tpCount}|${Math.ceil(h.tpCooldown)}|${!!h.channel}|${atShop}|${this.shopOpen}|${this.placingSlot}`;
     if (key !== this.lastKey) {
       this.lastKey = key;
       h.items.forEach((s, i) => {
@@ -136,6 +149,7 @@ export class ItemsUi {
         el.classList.toggle('empty', !d);
         el.classList.toggle('usable', !!d?.consumable);
         el.classList.toggle('selling', !!d && this.shopOpen);
+        el.classList.toggle('placing', this.placingSlot === i);
         el.style.background = d ? d.icon : '';
         el.querySelector('.lbl')!.textContent = d ? d.short : '';
         el.querySelector('.cnt')!.textContent = s && s.count > 1 ? String(s.count) : '';

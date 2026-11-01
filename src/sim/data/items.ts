@@ -14,7 +14,9 @@ export type ItemId =
   | 'arcaneAmplifier'
   | 'lifedrinker'
   | 'crownOfAscension'
-  | 'healingSalve';
+  | 'healingSalve'
+  | 'observerWard'
+  | 'sentryWard';
 
 export interface ItemStats {
   damage?: number;
@@ -59,6 +61,26 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     stats: {},
     consumable: { maxStack: 3 },
     summary: 'Use: restores 350 health over 8 seconds. Stacks up to 3.',
+  },
+  observerWard: {
+    id: 'observerWard',
+    name: 'Observer Ward',
+    short: 'Ward',
+    cost: 75,
+    icon: '#facc15',
+    stats: {},
+    consumable: { maxStack: 2 },
+    summary: 'Use, then tap the ground nearby: an invisible ward that gives vision for 6 minutes. Stacks up to 2.',
+  },
+  sentryWard: {
+    id: 'sentryWard',
+    name: 'Sentry Ward',
+    short: 'Sentry',
+    cost: 50,
+    icon: '#60a5fa',
+    stats: {},
+    consumable: { maxStack: 2 },
+    summary: 'Use, then tap the ground nearby: reveals invisible enemies and wards around it for 6 minutes.',
   },
   swiftBoots: {
     id: 'swiftBoots',

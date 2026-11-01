@@ -26,7 +26,9 @@ npx vite-node scripts/simulate.ts [seed] [minutes]   # headless all-bot match lo
 | Move | Drag anywhere on the left half (virtual joystick) | Arrow keys, or right-click the ground |
 | Attack | **Attack** button (auto-target, heroes first) or tap an enemy | Space, or click an enemy |
 | Abilities | **Hold** Q/W/R: arrow appears · **drag** any direction to aim · release to cast · release on ✕ Cancel to abort | Q / W / R cast at the cursor |
-| Items | Tap an item to use it (salves) · 🛒 opens the shop (buy at base) · **TP** slot: tap, then pick a friendly building | same (click) |
+| Items | Tap an item to use it (salves) · **ward**: tap its slot, then tap the ground · 🛒 opens the shop (buy at base) · **TP** slot: tap, then pick a friendly building | same (click) |
+| Deny | Tap one of your own creeps below half health (or your own tower below 10%) | Click it |
+| Team | 🛡 under the minimap: tower shield · **Buy back** in the respawn banner · 🔊 mute | same (click) |
 | Learn ability | Tap the yellow **+** next to the button | Ctrl + Q / W / R |
 | Camera | Hold/drag the minimap to look; release to return · while dead, drag anywhere to look around | Hold minimap to look, right-click minimap to walk there, wheel to zoom |
 
@@ -39,10 +41,11 @@ src/sim/        deterministic game simulation (no rendering), reusable on a futu
   data/         heroes, creeps, structures (all balance numbers)
   abilities.ts  how every ability works (numbers live in data/heroes.ts)
   inventory.ts  shop, items, teleport (numbers live in data/items.ts)
-  vision.ts     fog of war, day/night
+  vision.ts     fog of war (trees block sight), day/night, invisibility
+  objectives.ts power-ups, boss, wards, buyback, tower shield, backdoor protection
   ai/bots.ts    bot heroes
   map.ts        map, lanes, maze, structure placement
   world.ts      units, combat, creep waves, protection rules, win condition
-src/client/     2D renderer, touch/keyboard input, HUD, landscape lock (renderer to be replaced by 3D later)
+src/client/     2D renderer, touch/keyboard input, HUD, sound effects (audio.ts), landscape lock (renderer to be replaced by 3D later)
 tests/          vitest suites
 ```

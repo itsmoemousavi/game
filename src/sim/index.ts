@@ -13,3 +13,7 @@ export type { ItemId, ItemDef } from './data/items';
 export { buyBlocker, inShop, teleportTargets, tpBlocker } from './inventory';
 export type { ItemSlot } from './inventory';
 export { effectiveCooldown } from './abilities';
+export { RUNE_INFO } from './objectives';
+export type { Rune, RuneKind } from './objectives';
+export { buybackBlocker } from './objectives';
+export { isInvisible } from './vision';

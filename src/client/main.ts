@@ -3,6 +3,9 @@ import { DT, HEROES, HERO_IDS, HeroId, LANE_IDS, LaneId, PlayerSlot, Team, World
 import { Hud } from './hud';
 import { Input } from './input';
 import { ItemsUi } from './items-ui';
+import { Sfx } from './audio';
+import { playEvents } from './sound-events';
+import { GameEvent, HEROES as HERO_DEFS, RUNE_INFO, RuneKind, TEAM_NAMES } from '../sim';
 import { Renderer } from './renderer';
 import { enterImmersive, setupLandscape } from './screen';
 
@@ -85,11 +88,68 @@ const hud = new Hud(app, () => {
   world = null;
 });
 
+const sfx = new Sfx();
 const itemsUi = new ItemsUi(
   app,
   (cmd) => world?.enqueue(cmd),
   () => (world && renderer ? { w: world, me: world.unit(myHeroId)!, team: myTeam, terrain: renderer.terrain } : null),
+  (slot) => {
+    if (input) input.wardSlot = slot;
+    if (renderer) renderer.wardMode = slot;
+  },
 );
+
+// Team buttons.
+const onTap = (sel: string, fn: () => void) =>
+  $<HTMLElement>(sel).addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    fn();
+  });
+onTap('#btn-glyph', () => world?.enqueue({ type: 'glyph', unitId: myHeroId }));
+onTap('#btn-buyback', () => world?.enqueue({ type: 'buyback', unitId: myHeroId }));
+const muteBtn = $<HTMLElement>('#btn-mute');
+const syncMute = () => (muteBtn.textContent = sfx.muted ? '🔇' : '🔊');
+syncMute();
+onTap('#btn-mute', () => {
+  sfx.unlock();
+  sfx.setMuted(!sfx.muted);
+  syncMute();
+});
+// Any UI tap gets a soft click (and keeps the audio context alive on iOS).
+app.addEventListener('pointerdown', (e) => {
+  if ((e.target as HTMLElement).closest('button')) sfx.play('click', 0.6);
+});
+
+/** Announcements for big moments. */
+function announce(w: World, events: GameEvent[]) {
+  const name = (id: number) => {
+    const u = w.unit(id);
+    return u?.hero ? HERO_DEFS[u.hero.defId].name : 'Someone';
+  };
+  for (const e of events) {
+    if (e.type === 'bossKilled') {
+      hud.toast(e.team === 2 ? 'The Warden fell' : `${TEAM_NAMES[e.team]} slew the Warden — revive charm!`, '#c4b5fd');
+    } else if (e.type === 'rune') {
+      const u = w.unit(e.unitId);
+      if (u?.team === myTeam) hud.toast(`${name(e.unitId)} picked up ${RUNE_INFO[e.kind as RuneKind].name}`, RUNE_INFO[e.kind as RuneKind].color);
+    } else if (e.type === 'glyph') {
+      hud.toast(e.team === myTeam ? 'Tower shield activated!' : 'Enemy activated their tower shield', '#8cc4ff');
+    } else if (e.type === 'buyback') {
+      hud.toast(`${name(e.unitId)} bought back!`, '#ffd23f');
+    } else if (e.type === 'revive') {
+      hud.toast(`${name(e.unitId)} revived by the charm`, '#ffd23f');
+    } else if (e.type === 'death') {
+      const u = w.unit(e.unitId);
+      if (u?.structure && u.structure.tier !== 'fountain') {
+        const tier = { tower1: 'tier-1 tower', tower2: 'tier-2 tower', barracks: 'barracks', shrineTower: 'shrine tower', shrine: 'Shrine' }[u.structure.tier as string];
+        hud.toast(`${TEAM_NAMES[u.team as Team]} ${u.structure.lane ?? ''} ${tier} destroyed`, u.team === myTeam ? '#ff7b7f' : '#6fb0ff');
+      } else if (u?.hero && w.unit(e.killerId)?.hero) {
+        hud.toast(`${name(e.killerId!)} killed ${name(e.unitId)}`, u.team === myTeam ? '#ff7b7f' : '#6fb0ff');
+      }
+    }
+  }
+}
 
 function startMatch() {
   select.classList.add('hidden');
@@ -99,12 +159,24 @@ function startMatch() {
   renderer = new Renderer(canvas, world.map);
   input?.destroy();
   input = new Input(canvas, renderer, () => world!, () => myHeroId, app);
+  input.onWardPlaced = () => {
+    itemsUi.placingSlot = null;
+  };
+  sfx.unlock();
+  const mm = renderer.minimapRect();
+  $<HTMLElement>('#btn-glyph').style.top = `${mm.y + mm.size + 10}px`;
   hud.setHero(world.unit(myHeroId)!);
   itemsUi.reset();
   void enterImmersive();
 }
 
-setupLandscape($<HTMLElement>('#root'), () => renderer?.resize());
+setupLandscape($<HTMLElement>('#root'), () => {
+  renderer?.resize();
+  if (renderer) {
+    const mm = renderer.minimapRect();
+    $<HTMLElement>('#btn-glyph').style.top = `${mm.y + mm.size + 10}px`;
+  }
+});
 
 // ------------------------------------------------------------- loop
 
@@ -117,7 +189,9 @@ function frame(now: number) {
     while (acc >= DT) {
       input.flush(world);
       world.step();
-      renderer.pushEvents(world, world.events);
+      renderer.pushEvents(world, world.events, myHeroId);
+      playEvents(sfx, world, world.events, myHeroId, myTeam, { x: renderer.camX, y: renderer.camY });
+      announce(world, world.events);
       acc -= DT;
     }
     const me = world.unit(myHeroId)!;

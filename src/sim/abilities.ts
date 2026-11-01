@@ -142,6 +142,7 @@ function execute(w: World, u: Unit, slot: number, def: AbilityDef, x: number, y:
   const h = u.hero!;
   const st = h.abilities[slot];
   const lvl = st.level;
+  w.breakInvisibility(u);
   u.mana -= def.manaCost[lvl - 1];
   st.cooldown = effectiveCooldown(u, def, lvl);
   const m = ultMult(u, def);

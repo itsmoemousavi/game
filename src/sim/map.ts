@@ -29,6 +29,10 @@ export interface GameMap {
   structures: StructureSpawn[];
   /** Neutral jungle camp spots (both halves). */
   camps: Vec2[];
+  /** The two river spots where power-ups appear. */
+  runeSpots: [Vec2, Vec2];
+  /** Where the boss lives (a pit beside the river). */
+  bossPit: Vec2;
 }
 
 /**
@@ -84,6 +88,11 @@ const JUNGLE_PATHS: [Vec2, Vec2][] = [
   [{ x: 64, y: 140 }, { x: 40, y: 158 }],
   [{ x: 64, y: 140 }, { x: 52, y: 104 }],
 ];
+/** Power-up spots: river junctions where jungle paths meet (mirror images of each other). */
+const RUNE_SPOT: Vec2 = { x: 68, y: 68 };
+/** Boss pit on the river (the river line y = x is equally far from both bases). */
+const BOSS_PIT: Vec2 = { x: 150, y: 150 };
+
 const RIVER: [Vec2, Vec2] = [
   { x: 20, y: 20 },
   { x: 180, y: 180 },
@@ -120,6 +129,8 @@ export function createMap(): GameMap {
     for (let i = 1; i < p.length; i++) carveSeg(p[i - 1], p[i], LANE_WIDTH);
   }
   carveSeg(RIVER[0], RIVER[1], 10);
+  carveCircle(BOSS_PIT, 7);
+  carveCircle(RUNE_SPOT, 4.5);
   carveCircle(BASE0, BASE_RADIUS);
   for (const room of JUNGLE_ROOMS) carveCircle(room.c, room.r);
   for (const [a, b] of JUNGLE_PATHS) carveSeg(a, b, JUNGLE_WIDTH);
@@ -208,6 +219,8 @@ export function createMap(): GameMap {
     fountains: [FOUNTAIN0, mirror(FOUNTAIN0)],
     structures,
     camps: [...JUNGLE_ROOMS.map((r) => r.c), ...JUNGLE_ROOMS.map((r) => mirror(r.c))],
+    runeSpots: [RUNE_SPOT, mirror(RUNE_SPOT)],
+    bossPit: BOSS_PIT,
   };
 }
 

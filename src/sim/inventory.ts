@@ -70,6 +70,7 @@ export function buyItem(w: World, u: Unit, id: ItemId): boolean {
   if (stack) stack.count++;
   else h.items[h.items.indexOf(null)] = { id, count: 1 };
   w.applyHeroStats(u);
+  w.events.push({ type: 'purchase', unitId: u.id });
   return true;
 }
 
@@ -103,6 +104,7 @@ export function buyTeleport(w: World, u: Unit): boolean {
   if (!u.alive || !inShop(w, u) || h.gold < TELEPORT.cost) return false;
   h.gold -= TELEPORT.cost;
   h.tpCount++;
+  w.events.push({ type: 'purchase', unitId: u.id });
   return true;
 }
 

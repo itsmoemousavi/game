@@ -166,6 +166,28 @@ Item numbers are in `src/sim/data/items.ts`.
 - Creeps walk straight while the way is open and path around towers, barracks and trees when it isn't.
 - Dashes (Shield Charge) go through buildings.
 
+## 6c. Map objectives & team mechanics (implemented, milestone 5)
+
+Numbers are in `src/sim/constants.ts`, `data/units.ts` and `objectives.ts`.
+
+| Feature | How it works |
+|---|---|
+| **Denying** | Last-hit your own creeps below 50% HP, or your own towers below 10%. The enemy gets no gold and only 30% of the XP; a denied tower pays the enemy half. Shows a floating "!" and "Denied!". |
+| **Wards** | Observer Ward (75 gold): invisible, 16 m day / 12 m night vision for 6 min. Sentry Ward (50 gold): reveals invisible enemies (wards, invisible heroes) within 10 m. Tap the ward slot, then tap the ground; the hero walks into range (7 m). Killing an enemy ward pays gold. Fountains also reveal invisible units. |
+| **River power-ups** | First at 1:00, then every 2 min, at one of two river junctions. Walk over it to take it. **Haste** (max speed 15 s), **Double Damage** (25 s), **Regeneration** (15 s), **Invisibility** (20 s; attacking or casting reveals you), **Bounty** (gold for you, half for teammates). |
+| **The Warden (boss)** | Lives in a pit on the river. 6500 HP, hits hard, leashes home. Killing it: 150 gold to each player on that team, XP, and a **revive charm** (5 min) on the killer. If the holder dies, they get back up on the spot after 3 s. Respawns 5 min after dying. |
+| **Buyback** | While dead: pay 150 + 30×level + 8×minutes gold to respawn now. 5 min cooldown. Button in the respawn banner. |
+| **Tower shield** | 🛡 button under the minimap: all your buildings invulnerable for 5 s. Shared team cooldown of 5 min. |
+| **Backdoor protection** | Tier-2 towers, barracks, shrine towers and the Shrine take 75% less damage when no enemy creeps are within 18 m, and regenerate for a short while after such a hit. Tier-1 towers are not protected. |
+
+**Sound effects:**
+- All sounds are synthesized in code (Web Audio API, `src/client/audio.ts`), so there are no audio files to license.
+- Covered: attacks (melee swing, ranged shot, tower), each ability, explosions, deaths, collapsing buildings, gold, level up, teleport, deny, power-up, buyback, tower shield, ward, boss, revive, purchases, UI taps, victory/defeat.
+- Your own actions play at full volume; everything else fades with distance from the camera and is silent if your team can't see it.
+- 🔊 button to mute; the choice is remembered.
+
+**Announcements:** short toasts for hero kills, destroyed buildings, the boss, power-ups your team picks up, buybacks, the tower shield and revives.
+
 ## 7. Bots
 
 - Bots use the same commands as players, so a bot slot can later be handed to an online player.
@@ -176,6 +198,7 @@ Item numbers are in `src/sim/data/items.ts`.
   - Orin heals hurt allies
   - buy items along a fixed build when at base, always carry a TP, teleport back to their lane after healing, use salves when hurt
   - only react to enemies they can see; fight back against jungle camps
+  - deny their own creeps, grab nearby power-ups, use the tower shield when a tower is about to fall, buy back when the base is under attack; Orin keeps an observer ward and plants it where its lane meets the river
   - lane assignment
   - follow the creep wave
   - last-hit / harass
@@ -195,6 +218,21 @@ Item numbers are in `src/sim/data/items.ts`.
 7. Capacitor packaging, on-device performance tests (low-end Android), test builds via TestFlight / Play internal testing
 8. 3D renderer (Three.js), art direction, animations
 9. Phase 2: online multiplayer (authoritative server, matchmaking, reconnect), accounts
+
+Milestone 5 (done): denying, wards, river power-ups, the Warden boss + revive charm, buyback, tower shield, backdoor protection, sound effects.
+
+## 8b. Backlog: ideas agreed to revisit
+
+These were proposed and are parked for later:
+- **High ground:** bases on a ledge; attacking uphill can miss and needs vision.
+- **Talents at levels 10 and 15:** pick one of two bonuses per hero.
+- **Item recipes and active items:** components combine into bigger items; items with a button (for example a short blink, or brief spell immunity), all original designs.
+- **Kill feed polish, announcer voice, kill streaks and bounties:** extra gold for ending a streak, as a comeback mechanic.
+- **End-of-match scoreboard and stats:** damage, gold over time, items.
+- **Pings and quick-chat wheel:** "Attack", "Retreat", "Enemy missing".
+- **More heroes:** 6–8 for variety.
+- **Smarter bots:** ganking, grouping, defending, difficulty levels.
+- **Balance:** bots-only test matches currently take 37–52 min; the target is 15–20 min.
 
 ## 9. Things to plan for before the store release
 
