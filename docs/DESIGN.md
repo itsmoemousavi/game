@@ -183,6 +183,31 @@ Goal: 15–20 minute matches. Bots-only test matches went from 33–53 min to **
 | Respawn time | 4 + 2×level → 3 + 1.5×level seconds |
 | Bots | group up and push from minute 6 when not outnumbered |
 
+### Hero balance (no hero is a "must pick")
+
+Goal: picking a hero should not make a team stronger; team composition and play should decide matches. Measured with `npx vite-node scripts/hero-winrates.ts [firstSeed] [matches]`: random 3v3 lineups of bots (normal difficulty), each hero's win rate across all matches it appeared in.
+
+| Hero | Before | After (108 matches) |
+|---|---|---|
+| Vexa | 86% | 45% |
+| Brakk | 69% | 50% |
+| Orin | 53% | 45% |
+| Kaela | 33% | 57% |
+| Syl | 31% | 45% |
+| Grom | 28% | 56% |
+
+With ~108 matches a hero's win rate still swings about ±5% from luck alone, so everything is now inside the expected noise band around 50%. Average bots-only match: ~22 min.
+
+Main changes (all numbers live in `src/sim/data/heroes.ts`):
+- **Vexa:** Hunter's Rhythm crits no longer apply to buildings (she was doing 3× anyone's building damage); attack range 10 → 7, lower base damage, damage/attack speed/health per level, weaker crit, Piercing Arrow and Arrow Storm.
+- **Brakk:** Iron Hide blocks 5/8/11/14 (was 10/18/26/34) with less low-health armor; less health, damage; Earthsplitter weaker and shorter stun.
+- **Orin:** more health and armor, faster attacks, stronger Fireball and Mending Flame, Cataclysm lands after 1.2 s (was 1.5 s) and hits harder.
+- **Kaela:** more health and armor, stronger Tidal Wave (more damage, 40% slow, 8 s cooldown), stronger Brine Veil heal, Maelstrom more damage and shorter cooldown.
+- **Syl:** more health, armor, damage and attack speed; stronger Shadow Lunge and Execution.
+- **Grom:** more health, armor and damage; stronger Root Snare and Overgrowth.
+
+Re-run the script after any hero or item change and keep every hero within about 45–55%.
+
 ### Streaks, bounties, announcer, match stats (implemented)
 
 - **First Blood:** the first hero kill of the match pays +100 gold.
@@ -372,7 +397,7 @@ Milestone 5 (done): denying, wards, river power-ups, the Warden boss + revive ch
 Done or dropped: high ground (done), talents (dropped for now), Android build (not now).
 
 These were proposed and are parked for later:
-- **Balance:** bots-only test matches currently take 37–52 min; the target is 15–20 min.
+- **Balance:** bots-only test matches take ~22 min (target 15–20 min with humans); hero win rates are balanced (see Hero balance).
 
 ## 9. Things to plan for before the store release
 

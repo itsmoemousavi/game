@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HERO_IDS, LANE_IDS, PlayerSlot, TICK_RATE, Team, Unit, World, XP_TABLE } from '../src/sim';
+import { HERO_IDS, HEROES, LANE_IDS, PlayerSlot, TICK_RATE, Team, Unit, World, XP_TABLE } from '../src/sim';
 
 /** All six heroes human-controlled (so they stay idle) and moved into an empty jungle room. */
 function arena() {
@@ -139,7 +139,7 @@ describe('abilities', () => {
     w.applyCommand({ type: 'attack', unitId: v.id, targetId: e.id });
     run(w, 7);
     expect(hits.length).toBeGreaterThanOrEqual(4);
-    expect(hits[3]).toBeCloseTo(hits[0] * 1.4);
+    expect(hits[3]).toBeCloseTo(hits[0] * HEROES.vexa.abilities[1].values.critMult[0]);
   });
 
   it('Fireball flies where it is aimed, explodes on the first enemy and splashes nearby enemies', () => {
@@ -223,7 +223,7 @@ describe('abilities', () => {
     b.hp = before;
     learn(w, b, 1);
     w.dealDamage(v.id, b, 50, 'attack');
-    expect(before - b.hp).toBeLessThan(plain - 5);
+    expect(before - b.hp).toBeLessThan(plain - 3);
   });
 
   it('spells never damage structures', () => {

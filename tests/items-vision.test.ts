@@ -314,7 +314,7 @@ describe('uphill attacks', () => {
     const v = hero(1, 'vexa');
     const b = hero(0, 'brakk');
     const shrine = w.map.shrines[0];
-    place(b, shrine.x + 13, shrine.y - 13); // on the plateau edge
+    place(b, shrine.x + 17, shrine.y - 17); // on the plateau edge
     place(v, shrine.x + 21, shrine.y - 21); // below, in range
     b.maxHp = b.hp = 1e6;
     v.maxHp = v.hp = 1e6; // (the base towers shoot at her)

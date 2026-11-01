@@ -107,12 +107,12 @@ describe('power-ups', () => {
     const v = hero(0, 'vexa');
     const foe = hero(1, 'brakk');
     place(v, 40, 40);
-    place(foe, 49, 49); // just outside Vexa's attack range, inside her vision
+    place(foe, 46, 46); // just outside Vexa's attack range, inside her vision
     w.addBuff(v, { key: 'rune', t: 20, invisible: true });
     run(w, 0.2);
     expect(w.canSee(1, v)).toBe(false);
     w.applyCommand({ type: 'attack', unitId: v.id, targetId: foe.id });
-    run(w, 0.3);
+    run(w, 0.8);
     expect(w.canSee(1, v)).toBe(true);
   });
 });
@@ -303,7 +303,7 @@ describe('jungle camps & boss fight back', () => {
     const v = hero(0, 'vexa');
     v.damage = 1200; // speed the test up
     v.maxHp = v.hp = 50000; // and survive the fight
-    place(v, boss.x - 11, boss.y - 3); // outside the pit, in attack range
+    place(v, boss.x - 8.5, boss.y - 2); // outside the pit, in attack range
     run(w, 0.2);
     w.applyCommand({ type: 'attack', unitId: v.id, targetId: boss.id });
     run(w, 2);
