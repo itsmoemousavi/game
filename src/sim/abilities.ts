@@ -377,11 +377,12 @@ function execute(w: World, u: Unit, slot: number, def: AbilityDef, x: number, y:
 // ------------------------------------------------------------------ passives
 
 /** Called on every attack; returns the damage this attack deals. */
-export function applyAttackPassives(w: World, u: Unit): number {
+export function applyAttackPassives(w: World, u: Unit, target?: Unit): number {
   if (!u.hero) return u.damage;
   u.hero.attackCount++;
   const lvl = abilityLevel(u, 'huntersRhythm');
-  if (lvl > 0 && u.hero.attackCount % 4 === 0) {
+  // Critical hits don't work on buildings (keeps Vexa from out-pushing everyone).
+  if (lvl > 0 && u.hero.attackCount % 4 === 0 && target?.kind !== 'structure') {
     const def = HEROES.vexa.abilities[1];
     w.addBuff(u, { key: 'huntersRhythm', t: 1.5, moveSpeedPct: val(def, 'speedPct', lvl) });
     u.hero.lastCrit = true;

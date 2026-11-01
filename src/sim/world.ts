@@ -1325,7 +1325,7 @@ export class World {
     this.events.push({ type: 'attack', sourceId: u.id, targetId: t.id });
     this.breakInvisibility(u);
     this.reveal(u);
-    let damage = applyAttackPassives(this, u);
+    let damage = applyAttackPassives(this, u, t);
     const crit = !!u.hero?.lastCrit;
     // High ground: attacks from lower ground onto higher ground miss 25% of the time.
     const miss = heightAt(this.map, u.x, u.y) < heightAt(this.map, t.x, t.y) && this.rng.next() < UPHILL_MISS_CHANCE;
