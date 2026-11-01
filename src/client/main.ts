@@ -108,14 +108,54 @@ const onTap = (sel: string, fn: () => void) =>
   });
 onTap('#btn-glyph', () => world?.enqueue({ type: 'glyph', unitId: myHeroId }));
 onTap('#btn-buyback', () => world?.enqueue({ type: 'buyback', unitId: myHeroId }));
-const muteBtn = $<HTMLElement>('#btn-mute');
-const syncMute = () => (muteBtn.textContent = sfx.muted ? '🔇' : '🔊');
-syncMute();
-onTap('#btn-mute', () => {
-  sfx.unlock();
-  sfx.setMuted(!sfx.muted);
-  syncMute();
+// ------------------------------------------------------------- settings
+
+interface Settings {
+  autoAttack: boolean;
+  sound: boolean;
+}
+const settings: Settings = { autoAttack: true, sound: true };
+try {
+  Object.assign(settings, JSON.parse(localStorage.getItem('shrinefall-settings') ?? '{}'));
+} catch {
+  /* storage unavailable */
+}
+const saveSettings = () => {
+  try {
+    localStorage.setItem('shrinefall-settings', JSON.stringify(settings));
+  } catch {
+    /* storage unavailable */
+  }
+};
+const autoBox = $<HTMLInputElement>('#set-autoattack');
+const soundBox = $<HTMLInputElement>('#set-sound');
+autoBox.checked = settings.autoAttack;
+soundBox.checked = settings.sound;
+sfx.setMuted(!settings.sound);
+autoBox.addEventListener('change', () => {
+  settings.autoAttack = autoBox.checked;
+  saveSettings();
+  world?.enqueue({ type: 'setAutoAttack', unitId: myHeroId, enabled: settings.autoAttack });
 });
+soundBox.addEventListener('change', () => {
+  settings.sound = soundBox.checked;
+  saveSettings();
+  sfx.setMuted(!settings.sound);
+});
+
+const settingsPanel = $<HTMLElement>('#settings');
+const statsPanel = $<HTMLElement>('#stats');
+onTap('#btn-settings', () => settingsPanel.classList.toggle('hidden'));
+onTap('#portrait', () => statsPanel.classList.toggle('hidden'));
+document.querySelectorAll<HTMLElement>('[data-close]').forEach((b) =>
+  b.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    $<HTMLElement>(`#${b.dataset.close}`).classList.add('hidden');
+  }),
+);
+// Panels swallow touches so they don't move the hero underneath.
+for (const p of [settingsPanel, statsPanel]) p.addEventListener('pointerdown', (e) => e.stopPropagation());
 // Every gesture (re)unlocks audio: iOS only starts/resumes sound inside a user gesture,
 // and may suspend it again after a call, a notification or switching apps.
 for (const ev of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) {
@@ -171,6 +211,9 @@ function startMatch() {
   const mm = renderer.minimapRect();
   $<HTMLElement>('#btn-glyph').style.top = `${mm.y + mm.size + 10}px`;
   hud.setHero(world.unit(myHeroId)!);
+  world.applyCommand({ type: 'setAutoAttack', unitId: myHeroId, enabled: settings.autoAttack });
+  settingsPanel.classList.add('hidden');
+  statsPanel.classList.add('hidden');
   itemsUi.reset();
   void enterImmersive();
 }
@@ -204,6 +247,7 @@ function frame(now: number) {
     if (me.alive && renderer.freeCamera && !input.peeking) renderer.follow();
     renderer.render(world, acc / DT, me, myTeam, input.aim);
     hud.update(world, me, myTeam);
+    if (!statsPanel.classList.contains('hidden')) hud.updateStats(world, me);
     itemsUi.update();
   } else acc = 0;
   requestAnimationFrame(frame);

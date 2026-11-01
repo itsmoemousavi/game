@@ -203,3 +203,60 @@ describe('walk + attack (multi-touch)', () => {
     expect(b.hero!.attackHeld).toBe(false);
   });
 });
+
+describe('visibility & auto attack', () => {
+  it('an attacker hidden in the fog becomes visible for a moment', () => {
+    const { w, hero } = humans();
+    const v = hero(1, 'vexa');
+    const b = hero(0, 'brakk');
+    place(b, 40, 40);
+    place(v, 49, 49); // in Brakk's vision...
+    run(w, 0.2);
+    w.time = 181; // ...but at night (10 m vision) she'd be hidden at 12.7 m
+    place(v, 49, 49);
+    run(w, 0.2);
+    expect(w.canSee(0, v)).toBe(false);
+    v.visionNight = 20; // (test) Vexa can see Brakk; Brakk can't see her
+    run(w, 0.2);
+    w.applyCommand({ type: 'attack', unitId: v.id, targetId: b.id });
+    run(w, 1);
+    expect(b.hp).toBeLessThan(b.maxHp);
+    expect(w.canSee(0, v)).toBe(true);
+  });
+
+  it('an invisible hero does not auto-attack (stays hidden)', () => {
+    const { w, hero } = humans();
+    const v = hero(0, 'vexa');
+    const foe = hero(1, 'brakk');
+    place(v, 40, 40);
+    place(foe, 44, 44);
+    w.addBuff(v, { key: 'rune', t: 20, invisible: true });
+    run(w, 2);
+    expect(foe.hp).toBe(foe.maxHp);
+    expect(w.canSee(1, v)).toBe(false);
+  });
+
+  it('auto attack can be switched off', () => {
+    const { w, hero } = humans();
+    const v = hero(0, 'vexa');
+    const foe = hero(1, 'brakk');
+    w.applyCommand({ type: 'setAutoAttack', unitId: v.id, enabled: false });
+    w.applyCommand({ type: 'setAutoAttack', unitId: foe.id, enabled: false });
+    place(v, 40, 40);
+    place(foe, 44, 44);
+    run(w, 2);
+    expect(foe.hp).toBe(foe.maxHp);
+  });
+
+  it('assists go to every other enemy hero that recently hurt the victim', () => {
+    const { w, hero } = humans();
+    const victim = hero(1, 'orin');
+    const helper = hero(0, 'brakk');
+    const killer = hero(0, 'vexa');
+    w.dealDamage(helper.id, victim, 100, 'spell');
+    w.dealDamage(killer.id, victim, 99999, 'spell');
+    expect(killer.hero!.kills).toBe(1);
+    expect(helper.hero!.assists).toBe(1);
+    expect(killer.hero!.assists).toBe(0);
+  });
+});

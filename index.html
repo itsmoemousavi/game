@@ -27,12 +27,12 @@
       <div id="topbar">
         <span class="team t0" id="score-0">0</span>
         <span id="clock">0:00</span>
-        <span id="daynight" title="Day / night">☀</span>
+        <span id="daynight" title="Day">☀</span>
         <span class="team t1" id="score-1">0</span>
       </div>
 
       <div id="herobar">
-        <div id="portrait">B</div>
+        <div id="portrait" title="Hero stats">B<i>i</i></div>
         <div class="bars">
           <div class="bar hp"><div id="hp-fill"></div><span id="hp-text"></span></div>
           <div class="bar mana"><div id="mana-fill"></div><span id="mana-text"></span></div>
@@ -87,9 +87,18 @@
 
       <div id="hint">Arrows / right-click: move · click enemy or Space: attack · Q W R: cast at cursor · Ctrl+Q/W/R or "+": learn · hold minimap: look · right-click minimap: walk · wheel: zoom</div>
 
-      <div id="respawn"><span id="killed-by"></span>Respawning in <b id="respawn-time">0</b> · drag to look around <button id="btn-buyback">Buy back <b id="buyback-cost">0</b></button></div>
+      <div id="respawn"><span id="killed-by"></span>Respawning in <b id="respawn-time">0</b> <button id="btn-buyback">Buy back <b id="buyback-cost">0</b></button></div>
       <button id="btn-glyph" title="Tower shield: all your buildings invulnerable for 5 seconds (team cooldown 5 min)">🛡<span class="cd"></span></button>
-      <button id="btn-mute" title="Sound on/off">🔊</button>
+      <button id="btn-settings" title="Settings">⚙</button>
+      <div id="settings" class="panel hidden">
+        <div class="panel-head"><b>Settings</b><button class="close" data-close="settings">✕</button></div>
+        <label class="toggle"><span>Auto attack<small>Attack enemies that come into range while you stand still</small></span><input type="checkbox" id="set-autoattack" checked /></label>
+        <label class="toggle"><span>Game sound<small>The phone's silent switch also mutes the game</small></span><input type="checkbox" id="set-sound" checked /></label>
+      </div>
+      <div id="stats" class="panel hidden">
+        <div class="panel-head"><b id="stats-title">Stats</b><button class="close" data-close="stats">✕</button></div>
+        <div id="stats-body"></div>
+      </div>
       <div id="buffs"></div>
       <div id="toasts"></div>
       <div id="killfeed"></div>

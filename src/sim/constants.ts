@@ -10,6 +10,8 @@ export const GRID = MAP_SIZE / CELL;
 export const FIRST_WAVE_TIME = 3;
 export const CREEP_WAVE_INTERVAL = 30;
 export const MELEE_PER_WAVE = 3;
+/** Lane creeps gain this much HP and damage every 5 minutes (like Dota's creep upgrades). */
+export const CREEP_GROWTH_PER_5MIN = 0.12;
 export const RANGED_PER_WAVE = 1;
 
 export const STARTING_GOLD = 600;

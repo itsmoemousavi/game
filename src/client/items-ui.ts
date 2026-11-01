@@ -20,8 +20,8 @@ import { toLocal } from './screen';
  * Item bar (6 slots + teleport slot), shop panel and teleport destination picker.
  *
  * Item slot tap: use a consumable (salve). While the shop is open, tapping an item sells it.
- * TP slot tap: with scrolls → choose a destination on the big map; with 0 scrolls at base →
- * buy one; otherwise open the shop.
+ * TP slot tap: with scrolls → choose a destination on the big map; with 0 scrolls →
+ * open the shop (teleports are only bought there).
  */
 export class ItemsUi {
   private slots: HTMLElement[] = [];
@@ -71,8 +71,8 @@ export class ItemsUi {
       const c = this.ctx();
       if (!c) return;
       const h = c.me.hero!;
+      // Teleports are only bought in the shop; with none left this opens the shop.
       if (h.tpCount > 0) this.openPicker();
-      else if (inShop(c.w, c.me)) this.send({ type: 'buyTp', unitId: c.me.id });
       else this.toggleShop(true);
     });
     tap(root.querySelector('#btn-shop')!, () => this.toggleShop());

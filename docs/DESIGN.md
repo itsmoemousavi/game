@@ -194,7 +194,22 @@ Numbers are in `src/sim/constants.ts`, `data/units.ts` and `objectives.ts`.
 
 **Attack controls:** Attack is press-and-hold, and works together with the joystick (multi-touch). While held, your hero hits the best enemy in range (heroes first), and keeps walking where the joystick points when nothing is in range. Without the joystick, holding Attack walks to the nearest enemy. A quick tap still gets at least one hit in.
 
-**Sound on iPhone:** iOS mutes web sounds when the ring/silent switch is on. The game marks itself as media playback (and keeps a silent track playing) so sound works either way; audio is re-enabled on every tap.
+**Sound:** on by default. The phone's silent switch mutes it, and so does the Sound setting.
+
+**Settings (⚙, top right):** Auto attack (idle heroes hit enemies that come into range) and Game sound, both remembered between games.
+
+**Hero stats (tap the portrait ⓘ):**
+- **Attack:** damage, attack speed and time, range, lifesteal, spell damage, cooldown reduction.
+- **Defense:** armor (with its damage reduction), move speed, health and mana with their regen.
+- **Match:** K/D/A, last hits and denies, gold, gold per minute, XP, teleports.
+
+**Visibility rules:**
+- **Attacking or casting reveals you for 1.5 s**, even from fog, so ranged creeps and heroes shooting from the dark are seen.
+- **Invisible heroes never auto-attack**, so they stay hidden until the player attacks on purpose.
+
+**Assists:** every enemy hero that damaged the victim in the last 12 s gets an assist and some gold.
+
+**Creep growth:** lane creeps gain 12% HP and damage every 5 minutes (like Dota's creep upgrades), so late games can't stall forever.
 
 ## 7. Bots
 

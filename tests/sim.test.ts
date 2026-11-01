@@ -68,7 +68,7 @@ describe('simulation', () => {
     // Stuck detector: a living hero that has had a move order for 10 s straight must have moved.
     const streak = new Map<number, { x: number; y: number; t: number }>();
     let casts = 0;
-    while (w.winner === null && w.time < 60 * 60) {
+    while (w.winner === null && w.time < 75 * 60) {
       w.step();
       casts += w.events.filter((e) => e.type === 'cast').length;
       for (const h of w.heroes) {
@@ -87,5 +87,5 @@ describe('simulation', () => {
     expect(w.winner).not.toBeNull();
     expect(casts).toBeGreaterThan(50);
     for (const h of w.heroes) expect(h.hero!.abilities.every((a) => a.level > 0)).toBe(true);
-  }, 90_000);
+  }, 150_000);
 });

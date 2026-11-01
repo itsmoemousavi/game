@@ -9,6 +9,7 @@ import {
   RANGED_PER_WAVE,
   STARTING_GOLD,
   CAMP_FIRST_SPAWN,
+  CREEP_GROWTH_PER_5MIN,
   CHARM_DURATION,
   DENY_CREEP,
   DENY_TOWER,
@@ -30,7 +31,7 @@ import { HEROES, HeroId, maxAbilityLevel } from './data/heroes';
 import { CREEPS, CombatStats, HERO_VISION, NEUTRALS, STRUCTURES, SUPER_CREEP_MULT } from './data/units';
 import { ItemId, ItemStats } from './data/items';
 import { ItemSlot, buyItem, buyTeleport, emptyInventory, itemBonuses, sellItem, startTeleport, updateChannel, useItem } from './inventory';
-import { Vision } from './vision';
+import { Vision, isInvisible } from './vision';
 import { Rune, activateGlyph, buyback, placeWard, spawnBoss, updateObjectives } from './objectives';
 import { GameMap, LaneId, StructureTier, createMap, fits, isWalkable, lineClear, teamLanePath } from './map';
 import { Vec2, dist, distV } from './math';
@@ -69,6 +70,8 @@ export type Command =
    * is in range keep following the joystick (or, with no joystick, chase the nearest enemy).
    */
   | { type: 'attackHold'; unitId: number; held: boolean }
+  /** Player setting: automatically attack enemies that come into range while idle. */
+  | { type: 'setAutoAttack'; unitId: number; enabled: boolean }
   | { type: 'stop'; unitId: number }
   /** Use ability `slot` (0 = Q, 1 = W, 2 = R). Give targetId for unit-target abilities, x/y otherwise. */
   | { type: 'cast'; unitId: number; slot: number; targetId?: number; x?: number; y?: number }
@@ -183,7 +186,15 @@ export interface HeroState {
   gold: number;
   kills: number;
   deaths: number;
+  assists: number;
   lastHits: number;
+  denies: number;
+  /** All gold earned this match (for gold-per-minute). */
+  goldEarned: number;
+  /** Auto-attack enemies in range while idle (player setting). */
+  autoAttack: boolean;
+  /** Enemy heroes that recently damaged this hero (for assists): heroId → time. */
+  damagedBy: Map<number, number>;
   respawnTimer: number;
   order: Order;
   abilities: AbilityState[];
@@ -277,6 +288,8 @@ export interface Unit {
   repathAt: number;
   /** Seconds of stun left: no moving, attacking or casting. */
   stunTimer: number;
+  /** Attacking or casting reveals the unit (even from the fog) until this time. */
+  revealUntil: number;
   /** Seconds the unit is busy casting (cannot act). */
   castLock: number;
   buffs: Buff[];
@@ -381,7 +394,14 @@ export class World {
   /** Whether `team` can currently see unit `u` (fog of war). */
   canSee(team: Side, u: Unit): boolean {
     if (team === 2) return true;
+    // Attacking or casting gives away your position for a moment, even from the fog.
+    if (u.revealUntil > this.time && !isInvisible(u)) return true;
     return this.vision.sees(team, u);
+  }
+
+  /** Mark a unit as revealed (it just attacked or cast something). */
+  reveal(u: Unit, seconds = 1.5) {
+    u.revealUntil = Math.max(u.revealUntil, this.time + seconds);
   }
 
   // ---------------------------------------------------------------- queries
@@ -489,6 +509,9 @@ export class World {
         h.order = t ? { type: 'attack', targetId: t.id } : { type: 'idle' };
         break;
       }
+      case 'setAutoAttack':
+        h.autoAttack = cmd.enabled;
+        break;
       case 'attackHold':
         h.attackHeld = cmd.held;
         if (cmd.held && h.order.type !== 'dir') {
@@ -635,6 +658,7 @@ export class World {
       pathGoal: null,
       repathAt: 0,
       stunTimer: 0,
+      revealUntil: -1,
       castLock: 0,
       buffs: [],
       dash: null,
@@ -675,7 +699,12 @@ export class World {
       gold: STARTING_GOLD,
       kills: 0,
       deaths: 0,
+      assists: 0,
       lastHits: 0,
+      denies: 0,
+      goldEarned: 0,
+      autoAttack: true,
+      damagedBy: new Map(),
       respawnTimer: 0,
       order: { type: 'idle' },
       abilities: [0, 1, 2].map(() => ({ level: 0, cooldown: 0 })),
@@ -763,6 +792,10 @@ export class World {
             y: start.y - (dy / l) * back + (dx / l) * side,
           };
           const u = this.newUnit('creep', team, pos, CREEPS[type]);
+          // Creeps grow stronger as the match goes on, so games can't stall forever.
+          const grow = 1 + CREEP_GROWTH_PER_5MIN * Math.floor(this.time / 300);
+          u.maxHp = u.hp = Math.round(u.hp * grow);
+          u.damage = Math.round(u.damage * grow);
           if (enemyRaxDown) {
             u.maxHp = u.hp = Math.round(u.hp * SUPER_CREEP_MULT.hp);
             u.damage = Math.round(u.damage * SUPER_CREEP_MULT.damage);
@@ -854,6 +887,7 @@ export class World {
   private updateHeroUpkeep(u: Unit) {
     const h = u.hero!;
     h.gold += PASSIVE_GOLD_PER_SEC * DT;
+    h.goldEarned += PASSIVE_GOLD_PER_SEC * DT;
     for (const a of h.abilities) if (a.cooldown > 0) a.cooldown = Math.max(0, a.cooldown - DT);
     if (h.tpCooldown > 0) h.tpCooldown = Math.max(0, h.tpCooldown - DT);
     if (!u.alive) {
@@ -942,7 +976,12 @@ export class World {
         break;
       }
       case 'idle': {
-        // Auto-attack anything already in range, without chasing.
+        // Auto-attack anything already in range, without chasing (unless turned off,
+        // or invisible: an invisible hero never gives itself away by itself).
+        if (!h.autoAttack || isInvisible(u)) {
+          u.targetId = null;
+          break;
+        }
         let t = this.unit(u.targetId);
         if (!this.canAttack(u, t) || !this.inReach(u, t)) {
           t = this.enemiesNear(u, u.x, u.y, u.attackRange + u.radius + 0.3, (e) => e.kind !== 'neutral' && e.kind !== 'ward' && this.canSee(u.team, e)).sort(
@@ -1176,6 +1215,7 @@ export class World {
     u.attackTimer = u.attackInterval;
     this.events.push({ type: 'attack', sourceId: u.id, targetId: t.id });
     this.breakInvisibility(u);
+    this.reveal(u);
     let damage = applyAttackPassives(this, u);
     for (const b of u.buffs) if (b.damageMult) damage *= b.damageMult;
     if (u.projectileSpeed > 0) {
@@ -1214,6 +1254,7 @@ export class World {
     }
     if (amount <= 0) return;
     target.hp -= amount;
+    if (target.hero && src?.hero && src.team !== target.team) target.hero.damagedBy.set(src.id, this.time);
     if (kind === 'attack' && src?.hero && src.hero.bonus.lifestealPct > 0) {
       this.heal(src, (amount * src.hero.bonus.lifestealPct) / 100);
     }
@@ -1250,7 +1291,10 @@ export class World {
     this.events.push({ type: 'death', unitId: u.id, killerId: killer?.id ?? null });
     const killerHero = killer?.kind === 'hero' && killer.team !== u.team ? killer : undefined;
     const denied = killer?.kind === 'hero' && killer.team === u.team && !u.hero;
-    if (denied) this.events.push({ type: 'deny', unitId: u.id, killerId: killer!.id });
+    if (denied) {
+      killer!.hero!.denies++;
+      this.events.push({ type: 'deny', unitId: u.id, killerId: killer!.id });
+    }
 
     if (u.hero) {
       const h = u.hero;
@@ -1268,6 +1312,14 @@ export class World {
         killerHero.hero!.kills++;
         this.giveGold(killerHero, 150 + h.level * 10);
       }
+      // Assists: every other enemy hero that hurt this hero in the last 12 seconds.
+      for (const [id, at] of h.damagedBy) {
+        const a = this.unit(id);
+        if (!a?.hero || a === killerHero || this.time - at > 12) continue;
+        a.hero.assists++;
+        this.giveGold(a, 40 + h.level * 4);
+      }
+      h.damagedBy.clear();
       this.shareXp(u, 100 + h.level * 25);
     } else if (u.creep) {
       if (killerHero) {
@@ -1311,6 +1363,7 @@ export class World {
 
   giveGold(h: Unit, amount: number) {
     h.hero!.gold += amount;
+    h.hero!.goldEarned += amount;
     this.events.push({ type: 'gold', unitId: h.id, amount });
   }
 

@@ -5,10 +5,8 @@
  *
  * Browsers only allow audio after a user gesture, so `unlock()` is called on taps.
  *
- * iPhone gotcha: Web Audio is silenced by the ring/silent switch unless the page is
- * treated as media playback. We set `navigator.audioSession.type = 'playback'` where
- * supported and also loop a silent <audio> clip, which switches the session to playback
- * on older iOS versions too.
+ * The game respects the phone's silent switch: on iPhone, Web Audio is muted while the
+ * ring/silent switch is on, which is what we want. The in-game Sound setting mutes it too.
  */
 export type SoundName =
   | 'swing'
@@ -138,23 +136,9 @@ export class Sfx {
     }
   }
 
-  private keepAlive: HTMLAudioElement | null = null;
-
   /** Must be called from a user gesture (tap/click). Cheap to call repeatedly. */
   unlock() {
-    if (this.ctx && this.ctx.state === 'running' && this.keepAlive && !this.keepAlive.paused) return;
-    try {
-      const nav = navigator as Navigator & { audioSession?: { type: string } };
-      if (nav.audioSession) nav.audioSession.type = 'playback';
-    } catch {
-      /* not supported */
-    }
-    if (!this.keepAlive) {
-      this.keepAlive = new Audio(silentWav());
-      this.keepAlive.loop = true;
-      this.keepAlive.setAttribute('playsinline', '');
-    }
-    void this.keepAlive.play().catch(() => {});
+    if (this.ctx && this.ctx.state === 'running') return;
     if (!this.ctx) {
       const C = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!C) return;
@@ -227,30 +211,4 @@ export class Sfx {
     src.start(t, Math.random() * 0.5);
     src.stop(t + dur + 0.02);
   }
-}
-
-/** A short silent WAV as a data URI (used to keep the iOS audio session in playback mode). */
-function silentWav(): string {
-  const rate = 8000;
-  const samples = 800; // 0.1 s
-  const buf = new ArrayBuffer(44 + samples);
-  const v = new DataView(buf);
-  const str = (o: number, t: string) => [...t].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
-  str(0, 'RIFF');
-  v.setUint32(4, 36 + samples, true);
-  str(8, 'WAVE');
-  str(12, 'fmt ');
-  v.setUint32(16, 16, true);
-  v.setUint16(20, 1, true); // PCM
-  v.setUint16(22, 1, true); // mono
-  v.setUint32(24, rate, true);
-  v.setUint32(28, rate, true);
-  v.setUint16(32, 1, true);
-  v.setUint16(34, 8, true); // 8-bit
-  str(36, 'data');
-  v.setUint32(40, samples, true);
-  for (let i = 0; i < samples; i++) v.setUint8(44 + i, 128); // silence
-  let bin = '';
-  new Uint8Array(buf).forEach((b) => (bin += String.fromCharCode(b)));
-  return `data:audio/wav;base64,${btoa(bin)}`;
 }

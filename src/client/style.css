@@ -133,7 +133,7 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #btn-glyph { position: absolute; left: 10px; top: 190px; width: 40px; height: 40px; border-radius: 50%; border: 2px solid #8cc4ff; background: rgba(20,40,70,0.85); font-size: 18px; display: grid; place-items: center; touch-action: none; }
 #btn-glyph .cd { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 50%; background: rgba(0,0,0,0.65); font-size: 11px; font-weight: 800; }
 #btn-glyph .cd:empty { display: none; }
-#btn-mute { position: absolute; right: max(10px, env(safe-area-inset-right)); top: max(6px, env(safe-area-inset-top)); width: 34px; height: 34px; border-radius: 50%; border: 0; background: rgba(0,0,0,0.5); font-size: 16px; }
+
 #buffs { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(max(4px, env(safe-area-inset-bottom)) + 98px); display: flex; gap: 4px; pointer-events: none; }
 #buffs span { padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 700; color: #111; }
 #toasts { position: absolute; left: 50%; top: 86px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; }
@@ -149,3 +149,20 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 @keyframes feed { 0% { opacity: 0; transform: translateX(10px); } 4% { opacity: 1; transform: none; } 85% { opacity: 1; } 100% { opacity: 0; } }
 #killed-by:empty { display: none; }
 #killed-by { margin-right: 6px; color: #ffd0d0; }
+
+/* ---------- settings / stats ---------- */
+#btn-settings { position: absolute; right: max(10px, env(safe-area-inset-right)); top: max(6px, env(safe-area-inset-top)); width: 34px; height: 34px; border-radius: 50%; border: 0; background: rgba(0,0,0,0.5); font-size: 18px; color: #e8eee9; }
+#portrait { position: relative; pointer-events: auto; cursor: pointer; }
+#portrait i { position: absolute; right: -3px; bottom: -3px; width: 16px; height: 16px; border-radius: 50%; background: #2b5f9e; color: #fff; font-size: 11px; font-style: italic; font-weight: 800; font-family: Georgia, serif; display: grid; place-items: center; border: 1px solid #fff; }
+.panel { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(14,22,17,0.96); border: 2px solid #3a5242; border-radius: 12px; padding: 10px 14px; z-index: 7; max-height: 88%; overflow-y: auto; }
+#settings { width: min(380px, 80%); }
+#stats { width: min(520px, 84%); }
+.panel-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 15px; }
+.panel-head .close { margin-left: auto; padding: 4px 10px; border-radius: 8px; border: 0; background: #5a2a2a; }
+.toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid #23342a; }
+.toggle small { display: block; font-size: 11px; opacity: 0.6; }
+.toggle input { width: 22px; height: 22px; accent-color: #3d8bfd; }
+#stats-body { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 18px; font-size: 13px; }
+#stats-body h4 { grid-column: 1 / -1; margin: 6px 0 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.55; }
+#stats-body div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px dotted #2a3a30; padding: 2px 0; }
+#stats-body b { color: #ffe9a8; font-variant-numeric: tabular-nums; }

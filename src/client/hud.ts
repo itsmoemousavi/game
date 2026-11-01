@@ -168,6 +168,58 @@ export class Hud {
     void w;
   }
 
+  private statsKey = '';
+
+  /** Hero stats panel (tap the portrait). */
+  updateStats(w: World, me: Unit) {
+    const h = me.hero!;
+    const def = HEROES[h.defId];
+    const b = h.bonus;
+    const armor = w.armorOf(me);
+    const reduction = (0.06 * armor) / (1 + 0.06 * Math.abs(armor));
+    let dmgMult = 1;
+    for (const x of me.buffs) if (x.damageMult) dmgMult *= x.damageMult;
+    let regenBuff = 0;
+    let manaBuff = 0;
+    for (const x of me.buffs) {
+      regenBuff += x.healPerSec ?? 0;
+      manaBuff += x.manaPerSec ?? 0;
+    }
+    const f1 = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
+    const rows: [string, string][] = [];
+    const sec = (t: string) => rows.push(['#', t]);
+    sec('Attack');
+    rows.push(['Damage', `${Math.round(me.damage * dmgMult)}${dmgMult > 1 ? ' (×2 rune)' : ''}`]);
+    rows.push(['Attack speed', `${f1(1 / me.attackInterval)} /s`]);
+    rows.push(['Attack time', `${f1(me.attackInterval)} s`]);
+    rows.push(['Attack range', `${f1(me.attackRange)} m${me.projectileSpeed ? '' : ' (melee)'}`]);
+    rows.push(['Lifesteal', `${b.lifestealPct}%`]);
+    rows.push(['Spell damage', `+${b.spellAmpPct}%`]);
+    rows.push(['Cooldowns', `−${b.cdrPct}%${b.ultUpgrade ? ' · Ultimate upgraded' : ''}`]);
+    sec('Defense & movement');
+    rows.push(['Armor', `${f1(armor)} (−${Math.round(reduction * 100)}% attack damage)`]);
+    rows.push(['Move speed', `${f1(w.speedOf(me))} m/s`]);
+    rows.push(['Health', `${Math.ceil(me.hp)} / ${Math.round(me.maxHp)}`]);
+    rows.push(['Health regen', `${f1(me.hpRegen + regenBuff)} /s`]);
+    rows.push(['Mana', `${Math.floor(me.mana)} / ${Math.round(me.maxMana)}`]);
+    rows.push(['Mana regen', `${f1(me.manaRegen + manaBuff)} /s`]);
+    sec('Match');
+    rows.push(['K / D / A', `${h.kills} / ${h.deaths} / ${h.assists}`]);
+    rows.push(['Last hits / Denies', `${h.lastHits} / ${h.denies}`]);
+    rows.push(['Gold', `${Math.floor(h.gold)}`]);
+    rows.push(['Gold per minute', `${w.time > 30 ? Math.round(h.goldEarned / (w.time / 60)) : 0}`]);
+    rows.push(['Level', `${h.level}${h.level < MAX_LEVEL ? ` (${Math.floor(h.xp)} / ${XP_TABLE[h.level]} XP)` : ' (max)'}`]);
+    rows.push(['Teleports', `${h.tpCount}`]);
+    const key = rows.map((r) => r[1]).join('|');
+    if (key === this.statsKey) return;
+    this.statsKey = key;
+    const root = this.el.toasts.ownerDocument;
+    root.getElementById('stats-title')!.textContent = `${def.name} ${def.title} · Level ${h.level}`;
+    root.getElementById('stats-body')!.innerHTML = rows
+      .map(([k, v]) => (k === '#' ? `<h4>${v}</h4>` : `<div><span>${k}</span><b>${v}</b></div>`))
+      .join('');
+  }
+
   /** Short announcement under the top bar. */
   toast(text: string, color = '#fff') {
     const d = document.createElement('div');
@@ -216,7 +268,7 @@ export class Hud {
 
     this.el.respawn.style.display = !me.alive && w.winner === null ? 'block' : 'none';
     const night = isNight(w.time);
-    this.el.daynight.textContent = night ? '☾ Night' : '☀ Day';
+    this.el.daynight.textContent = night ? '☾' : '☀';
     if (me.alive) this.el['killed-by'].textContent = '';
     this.el.daynight.classList.toggle('night', night);
     this.el.daynight.title = night ? 'Night: everyone sees less' : 'Day';
