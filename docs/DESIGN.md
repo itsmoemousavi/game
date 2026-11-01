@@ -158,6 +158,20 @@ Buying a combined item uses up the parts you own, and you pay the difference; th
 
 Item slots show their cooldown. Bots use Warded Cloak when hurt in a fight and Shadow Step to jump onto heroes.
 
+### Balance pass (match length)
+
+Goal: 15–20 minute matches. Bots-only test matches went from 33–53 min to **20–27 min**; bots defend very consistently, so matches with a human should run shorter.
+
+| Change | Before → after |
+|---|---|
+| Building health | Tier-1 1800 → 1400, tier-2 2200 → 1700, barracks 2000 → 1500, shrine towers 2600 → 1700, Shrine 4500 → 3000 |
+| Building gold for the team | slightly higher (tier-1 140, tier-2 180, shrine towers 220) |
+| Creep growth | +12% → +30% health and damage every 5 minutes |
+| Passive gold | 2 → 3 per second |
+| XP table | about 15% faster (level 6 around minute 5) |
+| Respawn time | 4 + 2×level → 3 + 1.5×level seconds |
+| Bots | group up and push from minute 6 when not outnumbered |
+
 ## 6b. Fog of war, day & night, jungle
 
 **Fog of war:**

@@ -11,11 +11,11 @@ export const FIRST_WAVE_TIME = 3;
 export const CREEP_WAVE_INTERVAL = 30;
 export const MELEE_PER_WAVE = 3;
 /** Lane creeps gain this much HP and damage every 5 minutes (like Dota's creep upgrades). */
-export const CREEP_GROWTH_PER_5MIN = 0.12;
+export const CREEP_GROWTH_PER_5MIN = 0.3;
 export const RANGED_PER_WAVE = 1;
 
 export const STARTING_GOLD = 600;
-export const PASSIVE_GOLD_PER_SEC = 2;
+export const PASSIVE_GOLD_PER_SEC = 3;
 export const XP_SHARE_RADIUS = 30;
 export const FOUNTAIN_HEAL_RADIUS = 16;
 export const MAX_LEVEL = 15;
@@ -23,7 +23,8 @@ export const MAX_LEVEL = 15;
 export const ULTIMATE_LEVEL = 6;
 
 /** Cumulative XP required to reach level index+1 (index 0 = level 1). */
-export const XP_TABLE = [0, 230, 600, 1080, 1660, 2260, 2980, 3730, 4510, 5320, 6160, 7030, 7930, 8860, 9820];
+/** Tuned for 15–20 minute matches (level 6 around minute 5, max level around minute 18). */
+export const XP_TABLE = [0, 200, 500, 900, 1350, 1850, 2400, 3000, 3650, 4350, 5100, 5900, 6750, 7650, 8600];
 
 /** Day/night cycle: night shrinks vision (fog of war). Matches start at dawn. */
 export const DAY_SECONDS = 180;

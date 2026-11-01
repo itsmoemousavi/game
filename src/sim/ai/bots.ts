@@ -24,7 +24,7 @@ import { buyBlocker, inShop, itemBlocker, teleportTargets, tpBlocker } from '../
  *  - Fight back if a jungle camp attacks them.
  *  - Team plan (shared by a team's bots, refreshed every 2 s):
  *      defend: a building is under attack → go there (teleport if far);
- *      push:   after 10 minutes, when we have more heroes alive → group up in the
+ *      push:   after 6 minutes, when we're not outnumbered → group up in the
  *              lane with the weakest enemy defenses and push together;
  *      farm:   otherwise each bot keeps its own lane.
  *  - Gank: chase a visible, weakened enemy hero within ~30 m.
@@ -40,6 +40,9 @@ const AIM: Record<BotDifficulty, { error: number; castChance: number }> = {
   normal: { error: 1, castChance: 0.85 },
   hard: { error: 0, castChance: 1 },
 };
+
+/** Bots start grouping up to push after this many seconds (when not outnumbered). */
+const PUSH_AFTER = 360;
 
 interface TeamPlan {
   mode: 'farm' | 'push' | 'defend';
@@ -69,7 +72,7 @@ function teamPlan(w: World, team: Team): TeamPlan {
   if (defend) return (cache[team] = { mode: 'defend', structureId: defend.s.id, lane: defend.s.structure!.lane ?? 'mid', until });
   // Push together when we have the upper hand.
   const alive = (t: Team) => w.units.filter((h) => h.hero && h.alive && h.team === t).length;
-  if (w.time > 600 && alive(team) >= 2 && alive(team) > alive((1 - team) as Team)) {
+  if (w.time > PUSH_AFTER && alive(team) >= 2 && alive(team) >= alive((1 - team) as Team)) {
     let best: { lane: 'top' | 'mid' | 'bot'; hp: number } | null = null;
     for (const s of w.units) {
       if (!s.structure || !s.alive || s.team === team || !s.structure.vulnerable || !s.structure.lane) continue;

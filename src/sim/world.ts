@@ -1366,7 +1366,7 @@ export class World {
     if (u.hero) {
       const h = u.hero;
       h.deaths++;
-      h.respawnTimer = 4 + h.level * 2;
+      h.respawnTimer = 3 + h.level * 1.5;
       h.order = { type: 'idle' };
       h.channel = null;
       if (charm) {

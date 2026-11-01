@@ -239,25 +239,28 @@ describe('movement around buildings', () => {
     const slots: PlayerSlot[] = [];
     for (const team of [0, 1] as Team[]) HERO_IDS.forEach((heroId, i) => slots.push({ team, heroId, controller: 'bot', lane: LANE_IDS[i] }));
     const w = new World({ seed: 9, slots });
-    const seen = new Map<number, { x: number; y: number; t: number }>();
+    // Per creep: where it was when it last had nothing to do (no fight, no crowd).
+    const idleSince = new Map<number, { x: number; y: number; t: number }>();
     for (let i = 0; i < 12 * 60 * TICK_RATE; i++) {
       w.step();
-      if (w.tick % (5 * TICK_RATE) !== 0) continue;
       for (const c of w.units) {
         if (!c.creep || !c.alive) continue;
-        const prev = seen.get(c.id);
-        // A creep with nothing to fight that hasn't reached the end of its route must be moving.
-        if (prev && c.targetId === null && c.creep.wp < c.creep.path.length && c.stunTimer <= 0) {
-          const near = w.units.some((s) => s.structure && s.alive && Math.hypot(s.x - c.x, s.y - c.y) < s.radius + 3);
+        const busy =
+          c.targetId !== null ||
+          c.stunTimer > 0 ||
+          c.creep.wp >= c.creep.path.length ||
           // Waiting behind other units (a creep queue at a fight) isn't being stuck on a building.
-          const crowded = w.units.some((o) => o !== c && o.alive && !o.structure && Math.hypot(o.x - c.x, o.y - c.y) < 3);
-          if (crowded) {
-            seen.set(c.id, { x: c.x, y: c.y, t: w.time });
-            continue;
-          }
-          if (near) expect(Math.hypot(c.x - prev.x, c.y - prev.y), `creep stuck at ${c.x.toFixed(1)},${c.y.toFixed(1)}`).toBeGreaterThan(1);
+          w.units.some((o) => o !== c && o.alive && !o.structure && Math.hypot(o.x - c.x, o.y - c.y) < 3);
+        const prev = idleSince.get(c.id);
+        if (busy || !prev) {
+          idleSince.set(c.id, { x: c.x, y: c.y, t: w.time });
+          continue;
         }
-        seen.set(c.id, { x: c.x, y: c.y, t: w.time });
+        if (w.time - prev.t < 5) continue;
+        // Idle for 5 s next to a building: it must have made progress.
+        const near = w.units.some((s) => s.structure && s.alive && Math.hypot(s.x - c.x, s.y - c.y) < s.radius + 3);
+        if (near) expect(Math.hypot(c.x - prev.x, c.y - prev.y), `creep stuck at ${c.x.toFixed(1)},${c.y.toFixed(1)}`).toBeGreaterThan(1);
+        idleSince.set(c.id, { x: c.x, y: c.y, t: w.time });
       }
     }
   }, 60_000);
