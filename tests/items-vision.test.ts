@@ -12,6 +12,7 @@ import {
   World,
   effectiveCooldown,
   isNight,
+  lineClear,
 } from '../src/sim';
 
 function humans() {
@@ -149,14 +150,70 @@ describe('fog of war & day/night', () => {
     const { w, hero } = humans();
     const me = hero(0, 'vexa');
     const foe = hero(1, 'brakk');
-    place(me, 52, 104);
-    place(foe, 52, 90); // 14 m away: inside day vision (17), outside night vision (10)
+    // Along the open river, 14 m apart, away from towers: inside day vision (17), outside night vision (10).
+    place(me, 40, 40);
+    place(foe, 50, 50);
     run(w, 0.2);
     expect(w.canSee(0, foe)).toBe(true);
     w.time = DAY_SECONDS + 1;
     expect(isNight(w.time)).toBe(true);
     run(w, 0.2);
     expect(w.canSee(0, foe)).toBe(false);
+  });
+});
+
+describe('trees block sight', () => {
+  it('cannot see through the forest, but can see along an open lane at the same distance', () => {
+    const { w, hero } = humans();
+    const me = hero(0, 'vexa');
+    const foe = hero(1, 'brakk');
+    // Jungle room (52,104) and a point 12 m north-west of it, through solid forest.
+    place(me, 52, 104);
+    place(foe, 52 - 8.5, 104 - 8.5);
+    run(w, 0.2);
+    expect(lineClear(w.map, me, foe)).toBe(false); // trees in between
+    expect(w.canSee(0, foe)).toBe(false);
+    // Same 12 m but along the open corridor toward the river.
+    place(foe, 52 + 12 * 0.41, 104 - 12 * 0.91);
+    run(w, 0.2);
+    expect(w.canSee(0, foe)).toBe(true);
+  });
+});
+
+describe('movement around buildings', () => {
+  it('creeps never get stuck on towers or barracks over a long game', () => {
+    const slots: PlayerSlot[] = [];
+    for (const team of [0, 1] as Team[]) HERO_IDS.forEach((heroId, i) => slots.push({ team, heroId, controller: 'bot', lane: LANE_IDS[i] }));
+    const w = new World({ seed: 9, slots });
+    const seen = new Map<number, { x: number; y: number; t: number }>();
+    for (let i = 0; i < 12 * 60 * TICK_RATE; i++) {
+      w.step();
+      if (w.tick % (5 * TICK_RATE) !== 0) continue;
+      for (const c of w.units) {
+        if (!c.creep || !c.alive) continue;
+        const prev = seen.get(c.id);
+        // A creep with nothing to fight that hasn't reached the end of its route must be moving.
+        if (prev && c.targetId === null && c.creep.wp < c.creep.path.length && c.stunTimer <= 0) {
+          const near = w.units.some((s) => s.structure && s.alive && Math.hypot(s.x - c.x, s.y - c.y) < s.radius + 3);
+          if (near) expect(Math.hypot(c.x - prev.x, c.y - prev.y), `creep stuck at ${c.x.toFixed(1)},${c.y.toFixed(1)}`).toBeGreaterThan(1);
+        }
+        seen.set(c.id, { x: c.x, y: c.y, t: w.time });
+      }
+    }
+  }, 60_000);
+
+  it('Shield Charge dashes past buildings instead of stopping at them', () => {
+    const { w, hero } = humans();
+    const b = hero(0, 'brakk');
+    const t1 = w.structures.find((s) => s.team === 0 && s.structure!.tier === 'tower1' && s.structure!.lane === 'mid')!;
+    // Stand 4 m before our own mid tower and charge straight through it along the lane.
+    const dir = { x: Math.SQRT1_2, y: -Math.SQRT1_2 };
+    place(b, t1.x - dir.x * 4, t1.y - dir.y * 4);
+    w.applyCommand({ type: 'learn', unitId: b.id, slot: 0 });
+    w.applyCommand({ type: 'cast', unitId: b.id, slot: 0, x: t1.x + dir.x * 10, y: t1.y + dir.y * 10 });
+    run(w, 0.6);
+    const along = (b.x - t1.x) * dir.x + (b.y - t1.y) * dir.y;
+    expect(along).toBeGreaterThan(2); // ended up beyond the tower
   });
 });
 

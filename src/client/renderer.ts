@@ -72,9 +72,10 @@ export class Renderer {
       if (e.type === 'attack') {
         const src = w.unit(e.sourceId);
         const tgt = w.unit(e.targetId);
-        if (!src || !tgt || src.projectileSpeed !== 0 || src.kind === 'structure') continue;
+        // Swing effect for melee heroes only (creeps and camps would just add noise).
+        if (!src || !tgt || src.projectileSpeed !== 0 || src.kind !== 'hero') continue;
         const ang = Math.atan2(tgt.y - src.y, tgt.x - src.x);
-        const color = src.kind === 'hero' ? '#ffffff' : 'rgba(255,255,255,0.7)';
+        const color = '#ffffff';
         this.swings.push({ x: src.x, y: src.y, ang, reach: src.radius + src.attackRange + tgt.radius * 0.5, t: 0.2, color });
         this.lunges.set(src.id, { ang, t: 0.16 });
       } else if (e.type === 'explosion') {

@@ -5,12 +5,21 @@ import type { Unit, World } from './world';
  * Fog of war. Each team has a coarse grid (same cells as the walk grid) of what it
  * can currently see. Vision comes from the team's living heroes, creeps and buildings
  * and shrinks at night. Enemy units outside it are hidden from players and bots.
- * (Trees don't block sight yet; that can come later.)
+ *
+ * Trees (wall cells) block line of sight: a cell is visible only if the straight line
+ * from the viewer to it crosses no tree. The first trees along a line are lit, so you
+ * see the edge of the forest but not through it. Buildings don't block sight.
  */
 export class Vision {
   readonly grids: [Uint8Array, Uint8Array];
+  /** Per radius (in half-cells): offsets in range + the cells each sight line crosses. */
+  private patterns = new Map<number, { dx: Int16Array; dy: Int16Array; lineStart: Int32Array; lineX: Int16Array; lineY: Int16Array }>();
 
-  constructor(private grid: number, private cell: number) {
+  constructor(
+    private grid: number,
+    private cell: number,
+    private walkable: Uint8Array,
+  ) {
     this.grids = [new Uint8Array(grid * grid), new Uint8Array(grid * grid)];
   }
 
@@ -29,19 +38,67 @@ export class Vision {
 
   private reveal(g: Uint8Array, x: number, y: number, r: number) {
     const n = this.grid;
-    const c = this.cell;
-    const c0 = Math.max(0, Math.floor((x - r) / c));
-    const c1 = Math.min(n - 1, Math.floor((x + r) / c));
-    const r0 = Math.max(0, Math.floor((y - r) / c));
-    const r1 = Math.min(n - 1, Math.floor((y + r) / c));
-    const r2 = r * r;
-    for (let cy = r0; cy <= r1; cy++) {
-      const dy = (cy + 0.5) * c - y;
-      for (let cx = c0; cx <= c1; cx++) {
-        const dx = (cx + 0.5) * c - x;
-        if (dx * dx + dy * dy <= r2) g[cy * n + cx] = 1;
+    const ox = Math.floor(x / this.cell);
+    const oy = Math.floor(y / this.cell);
+    if (ox < 0 || oy < 0 || ox >= n || oy >= n) return;
+    const p = this.pattern(r);
+    const walk = this.walkable;
+    g[oy * n + ox] = 1;
+    outer: for (let i = 0; i < p.dx.length; i++) {
+      const tx = ox + p.dx[i];
+      const ty = oy + p.dy[i];
+      if (tx < 0 || ty < 0 || tx >= n || ty >= n) continue;
+      for (let k = p.lineStart[i]; k < p.lineStart[i + 1]; k++) {
+        const lx = ox + p.lineX[k];
+        const ly = oy + p.lineY[k];
+        if (lx < 0 || ly < 0 || lx >= n || ly >= n || !walk[ly * n + lx]) continue outer;
+      }
+      g[ty * n + tx] = 1;
+    }
+  }
+
+  /** Cells within radius `r` (meters) and, for each, the cells strictly between it and the origin. */
+  private pattern(r: number) {
+    const key = Math.round((r / this.cell) * 2);
+    let p = this.patterns.get(key);
+    if (p) return p;
+    const rc = key / 2;
+    const dx: number[] = [];
+    const dy: number[] = [];
+    const lineStart: number[] = [0];
+    const lineX: number[] = [];
+    const lineY: number[] = [];
+    const R = Math.ceil(rc);
+    for (let y = -R; y <= R; y++) {
+      for (let x = -R; x <= R; x++) {
+        if ((x === 0 && y === 0) || x * x + y * y > rc * rc) continue;
+        dx.push(x);
+        dy.push(y);
+        // Sample the segment between cell centres; record each distinct cell crossed.
+        const steps = Math.max(Math.abs(x), Math.abs(y)) * 2;
+        let px = 0;
+        let py = 0;
+        for (let s = 1; s < steps; s++) {
+          const cx = Math.round((x * s) / steps);
+          const cy = Math.round((y * s) / steps);
+          if ((cx === px && cy === py) || (cx === x && cy === y) || (cx === 0 && cy === 0)) continue;
+          px = cx;
+          py = cy;
+          lineX.push(cx);
+          lineY.push(cy);
+        }
+        lineStart.push(lineX.length);
       }
     }
+    p = {
+      dx: Int16Array.from(dx),
+      dy: Int16Array.from(dy),
+      lineStart: Int32Array.from(lineStart),
+      lineX: Int16Array.from(lineX),
+      lineY: Int16Array.from(lineY),
+    };
+    this.patterns.set(key, p);
+    return p;
   }
 
   seesPoint(team: Team, x: number, y: number): boolean {

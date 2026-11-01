@@ -141,7 +141,7 @@ Item numbers are in `src/sim/data/items.ts`.
 - Enemies outside vision are hidden on screen and on the minimap, and can't be targeted.
 - Bots play by the same rules.
 - Buildings are always visible.
-- Trees don't block sight yet; that could come later.
+- **Trees block sight:** you see the edge of the forest but not through it, so the jungle maze is full of blind corners. Buildings don't block sight.
 
 **Day and night:**
 - 3 min day, 2 min night.
@@ -159,8 +159,12 @@ Item numbers are in `src/sim/data/items.ts`.
 - While dead, drag anywhere to look around (for example, to see who needs help).
 
 **Combat feedback:**
-- Melee attacks show a swing arc, a small lunge and an impact spark.
+- Melee **heroes** show a swing arc, a small lunge and an impact spark (creeps don't, to keep lanes readable).
 - Fireball explosions and teleport arrivals flash.
+
+**Movement around buildings:**
+- Creeps walk straight while the way is open and path around towers, barracks and trees when it isn't.
+- Dashes (Shield Charge) go through buildings.
 
 ## 7. Bots
 

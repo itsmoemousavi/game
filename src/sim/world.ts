@@ -231,8 +231,6 @@ export interface Unit {
   path: Vec2[] | null;
   pathGoal: Vec2 | null;
   repathAt: number;
-  /** Which way we're steering around a structure (0 = not avoiding). */
-  avoidSide: number;
   /** Seconds of stun left: no moving, attacking or casting. */
   stunTimer: number;
   /** Seconds the unit is busy casting (cannot act). */
@@ -314,7 +312,7 @@ export class World {
     this.map = opts.map ?? createMap();
     this.nav = { ...this.map, walkable: new Uint8Array(this.map.walkable) };
     this.rng = new Rng(opts.seed);
-    this.vision = new Vision(this.map.grid, this.map.cell);
+    this.vision = new Vision(this.map.grid, this.map.cell, this.map.walkable);
     for (const s of this.map.structures) this.spawnStructure(s.team, s.tier, s.lane, s.pos);
     this.refreshVulnerability();
     this.rebuildNav();
@@ -530,7 +528,6 @@ export class World {
       path: null,
       pathGoal: null,
       repathAt: 0,
-      avoidSide: 0,
       stunTimer: 0,
       castLock: 0,
       buffs: [],
@@ -916,7 +913,7 @@ export class World {
     const step = Math.min(d.remaining, d.speed * DT);
     const bx = u.x;
     const by = u.y;
-    this.stepMove(u, d.dx, d.dy, step);
+    this.stepMove(u, d.dx, d.dy, step, true);
     const moved = Math.hypot(u.x - bx, u.y - by);
     d.remaining -= step;
     for (const e of this.units) {
@@ -1219,17 +1216,16 @@ export class World {
 
   /**
    * Move up to `d` meters in direction (dx, dy), sliding along walls.
-   * `avoid` bends straight-line movers (creeps) around structures; path-followers
-   * don't need it because the nav grid already routes around them.
+   * `throughBuildings` (dashes) only respects trees/walls; the unit is pushed out of
+   * any building it ends up overlapping by the collision pass.
    */
-  stepMove(u: Unit, dx: number, dy: number, d: number, avoid = false) {
+  stepMove(u: Unit, dx: number, dy: number, d: number, throughBuildings = false) {
     const l = Math.hypot(dx, dy);
     if (l === 0 || d <= 0) return;
     dx /= l;
     dy /= l;
-    if (avoid) [dx, dy] = this.avoidStructures(u, dx, dy);
     u.facing = Math.atan2(dy, dx);
-    const nav = this.nav;
+    const nav = throughBuildings ? this.map : this.nav;
     // If we're already squeezed against a wall/footprint, only require the centre to be
     // walkable so the unit can always work itself free.
     const ok = fits(nav, u.x, u.y, u.radius)
@@ -1252,37 +1248,20 @@ export class World {
     }
   }
 
-  /** Bend a movement direction around any living structure directly ahead. */
-  private avoidStructures(u: Unit, dx: number, dy: number): [number, number] {
-    let blocked = false;
-    for (const s of this.units) {
-      if (s.kind !== 'structure' || !s.alive) continue;
-      const rx = s.x - u.x;
-      const ry = s.y - u.y;
-      const clearance = s.radius + u.radius + 0.3;
-      const d = Math.hypot(rx, ry);
-      if (d > clearance + 2.5) continue;
-      const ahead = rx * dx + ry * dy;
-      if (ahead <= 0) continue;
-      const side = rx * dy - ry * dx; // perpendicular offset of the obstacle from our heading
-      if (Math.abs(side) >= clearance) continue;
-      // Steer along a tangent; keep the same side until clear (no jitter).
-      blocked = true;
-      if (u.avoidSide === 0) u.avoidSide = side >= 0 ? 1 : -1;
-      const sgn = u.avoidSide;
-      const tx = (-ry / d) * sgn;
-      const ty = (rx / d) * sgn;
-      return [tx, ty];
-    }
-    if (!blocked) u.avoidSide = 0;
-    return [dx, dy];
-  }
-
-  /** Straight-line steering (used by creeps, which live in open lanes). */
+  /**
+   * Creep / neutral movement: walk straight while the way ahead is open, and fall back
+   * to pathfinding around towers, barracks and trees when it isn't.
+   */
   private steerTo(u: Unit, x: number, y: number) {
     const d = dist(u.x, u.y, x, y);
     if (d < 0.05) return;
-    this.stepMove(u, x - u.x, y - u.y, Math.min(d, this.speedOf(u) * DT), true);
+    const look = Math.min(d, 10);
+    const ahead = { x: u.x + ((x - u.x) / d) * look, y: u.y + ((y - u.y) / d) * look };
+    if (!u.path && lineClear(this.nav, u, ahead, u.radius * 0.8)) {
+      this.stepMove(u, x - u.x, y - u.y, Math.min(d, this.speedOf(u) * DT));
+      return;
+    }
+    if (this.navigate(u, x, y, 0) || (u.path && lineClear(this.nav, u, { x, y }, u.radius * 0.8))) u.path = null;
   }
 
   /** Path-following movement (heroes). Returns true on arrival. */
@@ -1344,6 +1323,7 @@ export class World {
         this.nudge(b, nx * push, ny * push);
       }
       for (const s of solids) {
+        if (a.dash) continue; // dashing through; pushed out once the dash ends
         const dx = a.x - s.x;
         const dy = a.y - s.y;
         const min = a.radius + s.radius;
