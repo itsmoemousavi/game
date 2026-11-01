@@ -36,6 +36,13 @@ export class Input {
   private drag: { id: number; slot: number; ox: number; oy: number; moved: boolean } | null = null;
   /** Finger/mouse held on the minimap: camera peeks there until released. */
   private peek: number | null = null;
+  /** Settings: joystick on the right half (left-handed), joystick radius in px. */
+  leftHanded = false;
+  joyRadius = 55;
+  /** Long-press info card for an ability (null hides it). */
+  onTip: (slot: number | null) => void = () => {};
+  private tip: { pointer: number; timer: ReturnType<typeof setTimeout> | null; shown: boolean } | null = null;
+
   /** Inventory slot of a ward waiting to be placed: the next tap on the field places it. */
   wardSlot: number | null = null;
   onWardPlaced: () => void = () => {};
@@ -122,6 +129,24 @@ export class Input {
       this.queue.push({ type: 'attackHold', unitId: this.heroId(), held: false });
       this.attackRelease = null;
     }, wait);
+  }
+
+  /** Joystick radius in px (settings: S / M / L). */
+  setJoystickSize(radius: number) {
+    this.joyRadius = radius;
+    const size = radius * 2 + 10;
+    this.joyBase.style.width = this.joyBase.style.height = `${size}px`;
+    this.joyBase.style.margin = `${-size / 2}px 0 0 ${-size / 2}px`;
+    const knob = Math.round(radius * 0.9);
+    this.joyKnob.style.width = this.joyKnob.style.height = `${knob}px`;
+    this.joyKnob.style.left = this.joyKnob.style.top = `${(size - knob) / 2 - 2}px`;
+  }
+
+  private hideTip() {
+    if (!this.tip) return;
+    if (this.tip.timer) clearTimeout(this.tip.timer);
+    if (this.tip.shown) this.onTip(null);
+    this.tip = null;
   }
 
   get peeking() {
@@ -231,7 +256,8 @@ export class Input {
     }
 
     if (e.pointerType === 'touch' || e.pointerType === 'pen') {
-      if (sx < this.canvas.clientWidth * 0.5 && !this.joy) {
+      const onJoySide = this.leftHanded ? sx > this.canvas.clientWidth * 0.5 : sx < this.canvas.clientWidth * 0.5;
+      if (onJoySide && !this.joy) {
         this.joy = { id: e.pointerId, ox: sx, oy: sy, dx: 0, dy: 0 };
         this.showJoystick(sx, sy, 0, 0);
       } else {
@@ -245,7 +271,28 @@ export class Input {
   private onAbilityDown(e: PointerEvent, slot: number) {
     const w = this.world();
     const me = w.unit(this.heroId());
-    if (!me || castBlocker(me, slot) !== null) return;
+    if (!me) return;
+    // Long-press (without dragging) shows the ability's info card instead of casting.
+    // Passive / not-yet-learned abilities show it straight away.
+    const blocked = castBlocker(me, slot);
+    this.hideTip();
+    if (blocked === 'passive' || blocked === 'unlearned') {
+      this.tip = { pointer: e.pointerId, timer: null, shown: true };
+      this.onTip(slot);
+      return;
+    }
+    this.tip = {
+      pointer: e.pointerId,
+      timer: setTimeout(() => {
+        if (this.tip && (!this.drag || !this.drag.moved)) {
+          this.tip.shown = true;
+          this.aim = null;
+          this.onTip(slot);
+        }
+      }, 450),
+      shown: false,
+    };
+    if (blocked !== null) return;
     const { x, y } = toLocal(e.clientX, e.clientY);
     this.drag = { id: e.pointerId, slot, ox: x, oy: y, moved: false };
     // Show the arrow right away, pointing where a quick-cast would go.
@@ -306,7 +353,7 @@ export class Input {
     if (this.joy && e.pointerId === this.joy.id) {
       let dx = local.x - this.joy.ox;
       let dy = local.y - this.joy.oy;
-      const max = 55;
+      const max = this.joyRadius;
       const l = Math.hypot(dx, dy);
       if (l > max) {
         dx = (dx / l) * max;
@@ -323,6 +370,7 @@ export class Input {
       if (!this.drag.moved && Math.hypot(dx, dy) > TAP_SLOP) {
         this.drag.moved = true;
         this.cancelZone.classList.add('show');
+        this.hideTip(); // dragging means aiming, not reading
       }
       if (this.drag.moved) this.updateAim(dx, dy, this.overCancel(e));
     }
@@ -340,8 +388,20 @@ export class Input {
       this.joy = null;
       this.joyBase.style.display = 'none';
     }
+    let tipWasShown = false;
+    if (this.tip && this.tip.pointer === e.pointerId) {
+      tipWasShown = this.tip.shown;
+      this.hideTip();
+    }
     if (this.drag && e.pointerId === this.drag.id) {
       const { slot, moved } = this.drag;
+      if (tipWasShown && !moved) {
+        // It was a long-press to read the info card: don't cast.
+        this.drag = null;
+        this.aim = null;
+        this.cancelZone.classList.remove('show');
+        return;
+      }
       const aim = this.aim;
       this.drag = null;
       this.aim = null;

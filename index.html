@@ -24,7 +24,7 @@
     <div id="app" class="hidden">
       <canvas id="game"></canvas>
 
-      <div id="topbar">
+      <div id="topbar" title="Scoreboard">
         <span class="team t0" id="score-0">0</span>
         <span id="clock">0:00</span>
         <span id="daynight" title="Day">☀</span>
@@ -54,6 +54,7 @@
         <button class="item empty" data-item="5"><span class="lbl"></span><span class="cnt"></span></button>
         <button class="item tp none" id="tp-slot"><span class="lbl">TP</span><span class="cnt">0</span><span class="cd"></span></button>
         <button id="btn-shop" title="Shop">🛒</button>
+        <button id="btn-quickbuy" title="Quick-buy the next recommended item"><span class="lbl"></span><span class="cost"></span></button>
       </div>
 
       <div id="shop" class="hidden">
@@ -90,10 +91,28 @@
       <div id="respawn"><span id="killed-by"></span>Respawning in <b id="respawn-time">0</b> <button id="btn-buyback">Buy back <b id="buyback-cost">0</b></button></div>
       <button id="btn-glyph" title="Tower shield: all your buildings invulnerable for 5 seconds (team cooldown 5 min)">🛡<span class="cd"></span></button>
       <button id="btn-settings" title="Settings">⚙</button>
+      <button id="btn-pause" title="Pause">⏸</button>
+      <div id="pause" class="hidden">
+        <div class="box">
+          <h2>Paused</h2>
+          <button id="btn-resume">Resume</button>
+          <button id="btn-surrender">Surrender</button>
+        </div>
+      </div>
+      <div id="scoreboard" class="panel hidden">
+        <div class="panel-head"><b>Scoreboard</b><button class="close" data-close="scoreboard">✕</button></div>
+        <div id="score-body"></div>
+      </div>
+      <div id="ability-tip" class="hidden"></div>
       <div id="settings" class="panel hidden">
         <div class="panel-head"><b>Settings</b><button class="close" data-close="settings">✕</button></div>
         <label class="toggle"><span>Auto attack<small>Attack enemies that come into range while you stand still</small></span><input type="checkbox" id="set-autoattack" checked /></label>
         <label class="toggle"><span>Game sound<small>The phone's silent switch also mutes the game</small></span><input type="checkbox" id="set-sound" checked /></label>
+        <label class="toggle"><span>Auto-learn abilities<small>Spend skill points automatically (ultimate first)</small></span><input type="checkbox" id="set-autolearn" /></label>
+        <label class="toggle"><span>Left-handed layout<small>Joystick on the right, buttons on the left</small></span><input type="checkbox" id="set-lefty" /></label>
+        <label class="toggle"><span>Vibration<small>Buzz when you're hit, get a kill or die (Android)</small></span><input type="checkbox" id="set-vibrate" checked /></label>
+        <div class="toggle"><span>Joystick size</span><span class="seg" id="set-joy"><button data-v="S">S</button><button data-v="M">M</button><button data-v="L">L</button></span></div>
+        <div class="toggle"><span>Camera zoom<small>Drag to see more or less of the map</small></span><input type="range" id="set-zoom" min="0.7" max="1.4" step="0.05" value="1" /></div>
       </div>
       <div id="stats" class="panel hidden">
         <div class="panel-head"><b id="stats-title">Stats</b><button class="close" data-close="stats">✕</button></div>

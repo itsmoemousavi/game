@@ -40,6 +40,8 @@ export class ItemsUi {
     private ctx: () => { w: World; me: Unit; team: Team; terrain: HTMLCanvasElement } | null,
     /** Called when a ward slot is tapped (enter / leave ward placement mode). */
     private onWard: (slot: number | null) => void = () => {},
+    /** Short hint message (e.g. "Go back to your base to buy"). */
+    private onHint: (text: string) => void = () => {},
   ) {
     root.querySelectorAll<HTMLElement>('[data-item]').forEach((el) => this.slots.push(el));
     this.tpSlot = root.querySelector('#tp-slot')!;
@@ -76,6 +78,15 @@ export class ItemsUi {
       else this.toggleShop(true);
     });
     tap(root.querySelector('#btn-shop')!, () => this.toggleShop());
+    tap(root.querySelector('#btn-quickbuy')!, () => {
+      const c = this.ctx();
+      if (!c) return;
+      const next = nextRecommended(c.me);
+      if (!next) return;
+      if (!inShop(c.w, c.me)) this.onHint('Go back to your base to buy');
+      else if (c.me.hero!.gold < ITEMS[next].cost) this.onHint(`Need ${Math.ceil(ITEMS[next].cost - c.me.hero!.gold)} more gold`);
+      else this.send({ type: 'buy', unitId: c.me.id, itemId: next });
+    });
     tap(root.querySelector('#shop-close')!, () => this.toggleShop(false));
     tap(root.querySelector('#shop-tp')!, () => {
       const c = this.ctx();
@@ -161,6 +172,20 @@ export class ItemsUi {
       this.tpSlot.classList.toggle('none', h.tpCount === 0);
       this.tpSlot.classList.toggle('channel', !!h.channel);
       this.tpSlot.title = `Teleport (${TELEPORT.cost} gold each). Tap to choose an allied building.`;
+    }
+    // Quick-buy button: next item of the recommended build.
+    const next = nextRecommended(me);
+    const qb = this.root.querySelector<HTMLElement>('#btn-quickbuy')!;
+    const qk = `${next}|${atShop}|${h.gold >= (next ? ITEMS[next].cost : 0)}`;
+    if (qb.dataset.key !== qk) {
+      qb.dataset.key = qk;
+      qb.classList.toggle('none', !next);
+      if (next) {
+        qb.querySelector('.lbl')!.textContent = ITEMS[next].short;
+        qb.querySelector('.cost')!.textContent = String(ITEMS[next].cost);
+        qb.title = `Quick-buy: ${ITEMS[next].name} (${ITEMS[next].cost})`;
+        qb.classList.toggle('off', !atShop || h.gold < ITEMS[next].cost);
+      }
     }
     if (this.shopOpen) {
       const sk = `${Math.floor(h.gold)}|${atShop}|${h.items.map((s) => s?.id ?? '-').join()}`;
@@ -253,4 +278,17 @@ function localRect(el: HTMLElement) {
   const a = toLocal(r.left, r.top);
   const b = toLocal(r.right, r.bottom);
   return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) };
+}
+
+/** Next item in the hero's recommended build that they don't own yet. */
+export function nextRecommended(me: Unit): ItemId | null {
+  const h = me.hero!;
+  const seen = new Map<ItemId, number>();
+  for (const id of BUILDS[h.defId]) {
+    const want = (seen.get(id) ?? 0) + 1;
+    seen.set(id, want);
+    const owned = ITEMS[id].consumable ? (h.items.some((s) => s?.id === id) ? want : 0) : h.items.filter((s) => s?.id === id).length;
+    if (owned < want) return id;
+  }
+  return null;
 }

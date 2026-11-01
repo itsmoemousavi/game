@@ -46,7 +46,7 @@ const distToSeg = (px: number, py: number, ax: number, ay: number, bx: number, b
 import { findPath } from './pathfinding';
 import { Rng } from './rng';
 import { botThink, botWhileDead } from './ai/bots';
-import { applyAttackPassives, castAbility, damageAfterPassives, passiveArmor, resolveCast } from './abilities';
+import { applyAttackPassives, botLearn, castAbility, damageAfterPassives, passiveArmor, resolveCast } from './abilities';
 
 export type UnitKind = 'hero' | 'creep' | 'neutral' | 'structure' | 'ward';
 export type Controller = 'human' | 'bot';
@@ -72,6 +72,10 @@ export type Command =
   | { type: 'attackHold'; unitId: number; held: boolean }
   /** Player setting: automatically attack enemies that come into range while idle. */
   | { type: 'setAutoAttack'; unitId: number; enabled: boolean }
+  /** Player setting: spend skill points automatically (ultimate first). */
+  | { type: 'setAutoLearn'; unitId: number; enabled: boolean }
+  /** Give up: the other team wins. */
+  | { type: 'surrender'; unitId: number }
   | { type: 'stop'; unitId: number }
   /** Use ability `slot` (0 = Q, 1 = W, 2 = R). Give targetId for unit-target abilities, x/y otherwise. */
   | { type: 'cast'; unitId: number; slot: number; targetId?: number; x?: number; y?: number }
@@ -193,6 +197,10 @@ export interface HeroState {
   goldEarned: number;
   /** Auto-attack enemies in range while idle (player setting). */
   autoAttack: boolean;
+  /** Spend skill points automatically (player setting). */
+  autoLearn: boolean;
+  /** Whether the last attack was a critical hit. */
+  lastCrit: boolean;
   /** Enemy heroes that recently damaged this hero (for assists): heroId → time. */
   damagedBy: Map<number, number>;
   respawnTimer: number;
@@ -314,6 +322,7 @@ export interface Projectile {
   damage: number;
   /** Spell projectiles deal spell damage (and may explode). */
   spell?: { kind: 'fireball'; aoe: number };
+  crit?: boolean;
 }
 
 export type GameEvent =
@@ -333,7 +342,9 @@ export type GameEvent =
   | { type: 'ward'; unitId: number }
   | { type: 'bossKilled'; killerId: number | null; team: Side }
   | { type: 'revive'; unitId: number }
-  | { type: 'purchase'; unitId: number };
+  | { type: 'purchase'; unitId: number }
+  /** Notable damage (spells, critical hits) for floating numbers. */
+  | { type: 'damage'; sourceId: number; targetId: number; amount: number; kind: DamageKind; crit: boolean };
 
 export type DamageKind = 'attack' | 'spell';
 
@@ -480,7 +491,7 @@ export class World {
     if (!u || !u.hero) return;
     const h = u.hero;
     // Shopping works while dead (you respawn at the fountain); everything else needs a living hero.
-    const whileDead = ['buy', 'sell', 'buyTp', 'learn', 'buyback', 'glyph'];
+    const whileDead = ['buy', 'sell', 'buyTp', 'learn', 'buyback', 'glyph', 'surrender', 'setAutoAttack', 'setAutoLearn'];
     if (!u.alive && !whileDead.includes(cmd.type)) return;
     if (h.channel && (cmd.type === 'moveDir' || cmd.type === 'moveTo' || cmd.type === 'attack' || cmd.type === 'attackNearest' || cmd.type === 'cast' || cmd.type === 'stop')) {
       if (cmd.type !== 'moveDir' || Math.hypot(cmd.dx, cmd.dy) >= 0.15) h.channel = null;
@@ -511,6 +522,15 @@ export class World {
       }
       case 'setAutoAttack':
         h.autoAttack = cmd.enabled;
+        break;
+      case 'setAutoLearn':
+        h.autoLearn = cmd.enabled;
+        break;
+      case 'surrender':
+        if (this.winner === null) {
+          this.winner = otherTeam(u.team as Team);
+          this.events.push({ type: 'gameOver', winner: this.winner });
+        }
         break;
       case 'attackHold':
         h.attackHeld = cmd.held;
@@ -704,6 +724,8 @@ export class World {
       denies: 0,
       goldEarned: 0,
       autoAttack: true,
+      autoLearn: false,
+      lastCrit: false,
       damagedBy: new Map(),
       respawnTimer: 0,
       order: { type: 'idle' },
@@ -890,6 +912,7 @@ export class World {
     h.goldEarned += PASSIVE_GOLD_PER_SEC * DT;
     for (const a of h.abilities) if (a.cooldown > 0) a.cooldown = Math.max(0, a.cooldown - DT);
     if (h.tpCooldown > 0) h.tpCooldown = Math.max(0, h.tpCooldown - DT);
+    if (h.autoLearn && h.skillPoints > 0) botLearn(this, u);
     if (!u.alive) {
       h.respawnTimer -= DT;
       if (h.respawnTimer <= 0) {
@@ -1070,7 +1093,7 @@ export class World {
               this.dealDamage(p.sourceId, e, p.damage, 'spell');
             }
           }
-        } else this.dealDamage(p.sourceId, t, p.damage, 'attack');
+        } else this.dealDamage(p.sourceId, t, p.damage, 'attack', { crit: p.crit });
         continue;
       }
       p.x += ((t.x - p.x) / d) * step;
@@ -1090,7 +1113,7 @@ export class World {
       b.t -= DT;
       if (b.healPerSec) this.heal(u, b.healPerSec * DT);
       if (b.manaPerSec) u.mana = Math.min(u.maxMana, u.mana + b.manaPerSec * DT);
-      if (b.damagePerSec && b.sourceId !== undefined) this.dealDamage(b.sourceId, u, b.damagePerSec * DT, 'spell');
+      if (b.damagePerSec && b.sourceId !== undefined) this.dealDamage(b.sourceId, u, b.damagePerSec * DT, 'spell', { dot: true });
       if (!u.alive) return;
     }
     u.buffs = u.buffs.filter((b) => b.t > 0);
@@ -1161,7 +1184,7 @@ export class World {
       for (const e of this.units) {
         if (!e.alive || e.team === z.team || e.kind === 'structure') continue;
         if (dist(e.x, e.y, z.x, z.y) > z.radius + e.radius) continue;
-        this.dealDamage(z.sourceId, e, z.dps * DT, 'spell');
+        this.dealDamage(z.sourceId, e, z.dps * DT, 'spell', { dot: true });
         if (z.slowPct > 0) this.addBuff(e, { key: `slow:${z.kind}`, t: 0.3, slowPct: z.slowPct });
       }
     }
@@ -1217,6 +1240,7 @@ export class World {
     this.breakInvisibility(u);
     this.reveal(u);
     let damage = applyAttackPassives(this, u);
+    const crit = !!u.hero?.lastCrit;
     for (const b of u.buffs) if (b.damageMult) damage *= b.damageMult;
     if (u.projectileSpeed > 0) {
       this.projectiles.push({
@@ -1230,9 +1254,10 @@ export class World {
         targetId: t.id,
         speed: u.projectileSpeed,
         damage,
+        crit,
       });
     } else {
-      this.dealDamage(u.id, t, damage, 'attack');
+      this.dealDamage(u.id, t, damage, 'attack', { crit });
     }
     return true;
   }
@@ -1240,7 +1265,7 @@ export class World {
   /**
    * Attacks are reduced by armor. Spells ignore armor but cannot hurt structures.
    */
-  dealDamage(sourceId: number, target: Unit, raw: number, kind: DamageKind = 'attack') {
+  dealDamage(sourceId: number, target: Unit, raw: number, kind: DamageKind = 'attack', opts: { crit?: boolean; dot?: boolean } = {}) {
     if (!target.alive) return;
     if (target.structure && (!target.structure.vulnerable || kind === 'spell' || target.structure.glyph > 0)) return;
     const src = this.unit(sourceId);
@@ -1255,6 +1280,9 @@ export class World {
     if (amount <= 0) return;
     target.hp -= amount;
     if (target.hero && src?.hero && src.team !== target.team) target.hero.damagedBy.set(src.id, this.time);
+    if ((kind === 'spell' && !opts.dot) || opts.crit) {
+      this.events.push({ type: 'damage', sourceId, targetId: target.id, amount, kind, crit: !!opts.crit });
+    }
     if (kind === 'attack' && src?.hero && src.hero.bonus.lifestealPct > 0) {
       this.heal(src, (amount * src.hero.bonus.lifestealPct) / 100);
     }

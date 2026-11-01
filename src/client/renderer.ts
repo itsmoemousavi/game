@@ -26,7 +26,7 @@ export class Renderer {
   private lunges = new Map<number, { ang: number; t: number }>();
   private blasts: { x: number; y: number; r: number; t: number; color: string }[] = [];
   /** Floating text: "Denied!", "+38" gold... */
-  private floaters: { x: number; y: number; t: number; text: string; color: string }[] = [];
+  private floaters: { x: number; y: number; t: number; text: string; color: string; big?: boolean }[] = [];
   /** Inventory slot of a ward being placed (shows the placement range). */
   wardMode: number | null = null;
   /** Free camera: set while dead, or while the player holds the minimap. */
@@ -82,6 +82,15 @@ export class Renderer {
       if (e.type === 'gold' && e.unitId === meId && e.amount >= 20) {
         const u = w.unit(meId);
         if (u) this.floaters.push({ x: u.x, y: u.y - 2.4, t: 1, text: `+${Math.round(e.amount)}`, color: '#ffd23f' });
+        continue;
+      }
+      if (e.type === 'damage') {
+        const t = w.unit(e.targetId);
+        if (!t || (e.sourceId !== meId && e.targetId !== meId && !e.crit)) continue;
+        const color = e.crit ? '#ff5d5d' : e.targetId === meId ? '#ff9b9b' : '#c4b5fd';
+        const text = `${Math.round(e.amount)}${e.crit ? '!' : ''}`;
+        const jitter = ((e.targetId * 7 + this.floaters.length * 13) % 10) / 10 - 0.5;
+        this.floaters.push({ x: t.x + jitter, y: t.y - 1.6, t: 0.9, text, color, big: e.crit });
         continue;
       }
       if (e.type === 'revive') {
@@ -215,7 +224,15 @@ export class Renderer {
       }
       ctx.fill();
       ctx.stroke();
-      if (c.hp < c.maxHp) this.hpBar(p.x, p.y - c.radius - 0.5, 1.8, 0.28, c.hp / c.maxHp, TEAM_COLORS[c.team]);
+      if (c.hp < c.maxHp) {
+        // Last-hit helper: a bright frame when your next hit kills (or denies) this creep.
+        if (focus?.alive && this.oneHitKills(w, focus, c)) {
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 0.14;
+          ctx.strokeRect(p.x - 1.05, p.y - c.radius - 0.5 - 0.25, 2.1, 0.5);
+        }
+        this.hpBar(p.x, p.y - c.radius - 0.5, 1.8, 0.28, c.hp / c.maxHp, TEAM_COLORS[c.team]);
+      }
     }
 
     for (const h of heroes) {
@@ -346,7 +363,10 @@ export class Renderer {
     for (const f of this.floaters) {
       ctx.globalAlpha = Math.min(1, f.t * 2);
       ctx.fillStyle = f.color;
-      ctx.font = 'bold 1.1px system-ui, sans-serif';
+      ctx.font = `bold ${f.big ? 1.5 : 1.05}px system-ui, sans-serif`;
+      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+      ctx.lineWidth = 0.18;
+      ctx.strokeText(f.text, f.x, f.y - (1 - f.t) * 1.5);
       ctx.fillText(f.text, f.x, f.y - (1 - f.t) * 1.5);
     }
     ctx.globalAlpha = 1;
@@ -360,6 +380,16 @@ export class Renderer {
     }
 
     this.drawMinimap(w, focus, viewTeam);
+  }
+
+  private oneHitKills(w: World, me: Unit, c: Unit): boolean {
+    if (c.team === me.team && !w.canDeny(me, c)) return false;
+    let dmg = me.damage;
+    for (const b of me.buffs) if (b.damageMult) dmg *= b.damageMult;
+    const armor = w.armorOf(c);
+    dmg *= 1 - (0.06 * armor) / (1 + 0.06 * Math.abs(armor));
+    if (c.structure?.backdoor) return false;
+    return c.hp <= dmg;
   }
 
   /** Darken everything outside the team's vision (smoothly upscaled from the vision grid). */

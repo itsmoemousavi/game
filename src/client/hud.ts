@@ -1,5 +1,9 @@
 import {
+  AbilityDef,
   HEROES,
+  ITEMS,
+  TELEPORT,
+  effectiveCooldown,
   MAX_LEVEL,
   RUNE_INFO,
   RuneKind,
@@ -218,6 +222,88 @@ export class Hud {
     root.getElementById('stats-body')!.innerHTML = rows
       .map(([k, v]) => (k === '#' ? `<h4>${v}</h4>` : `<div><span>${k}</span><b>${v}</b></div>`))
       .join('');
+  }
+
+  private scoreKey = '';
+
+  /** Scoreboard (tap the top bar): both teams' heroes, K/D/A, farm, net worth and items. */
+  updateScoreboard(w: World, myTeam: Team, meId: number) {
+    const rows = w.heroes.map((u) => {
+      const h = u.hero!;
+      const worth = Math.floor(h.gold) + h.items.reduce((s, it) => s + (it ? ITEMS[it.id].cost * it.count : 0), 0) + h.tpCount * TELEPORT.cost;
+      return { u, h, worth };
+    });
+    const key = rows
+      .map((r) => `${r.h.level}${r.h.kills}${r.h.deaths}${r.h.assists}${r.h.lastHits}${r.h.denies}${Math.floor(r.worth / 10)}${r.u.alive}${Math.ceil(r.h.respawnTimer)}${r.h.items.map((i) => i?.id ?? '-').join()}`)
+      .join('|');
+    if (key === this.scoreKey) return;
+    this.scoreKey = key;
+    const esc = (t: string) => t.replace(/[<>&]/g, '');
+    let html = '<table><tr><th>Hero</th><th>K / D / A</th><th>LH / DN</th><th>Net worth</th><th>Items</th></tr>';
+    for (const team of [myTeam, (1 - myTeam) as Team]) {
+      const total = rows.filter((r) => r.u.team === team).reduce((s, r) => s + r.worth, 0);
+      html += `<tr><td class="team" colspan="5" style="color:${team === 0 ? '#6fb0ff' : '#ff7b7f'}">${TEAM_NAMES[team]}${team === myTeam ? ' (you)' : ''} · ${w.teamKills[team]} kills · ${total} worth</td></tr>`;
+      for (const r of rows.filter((x) => x.u.team === team).sort((a, b) => b.worth - a.worth)) {
+        const def = HEROES[r.h.defId];
+        const items = r.h.items
+          .map((it) => (it ? `<i style="background:${ITEMS[it.id].icon}">${esc(ITEMS[it.id].short)}</i>` : '<i class="empty"></i>'))
+          .join('');
+        const status = r.u.alive ? '' : ` <span class="dead">☠ ${Math.ceil(r.h.respawnTimer)}s</span>`;
+        html += `<tr class="${r.u.id === meId ? 'me' : ''}">
+          <td><span class="hero"><span class="dot" style="background:${def.color}">${r.h.level}</span>${esc(def.name)}${r.h.controller === 'bot' ? ' <small>(bot)</small>' : ''}${status}</span></td>
+          <td>${r.h.kills} / ${r.h.deaths} / ${r.h.assists}</td>
+          <td>${r.h.lastHits} / ${r.h.denies}</td>
+          <td>${r.worth}</td>
+          <td><span class="items">${items}</span>${team === myTeam ? ` <small>TP ${r.h.tpCount}</small>` : ''}</td>
+        </tr>`;
+      }
+    }
+    this.el.toasts.ownerDocument.getElementById('score-body')!.innerHTML = html + '</table>';
+  }
+
+  /** Ability info card (long-press an ability button). */
+  showAbilityTip(me: Unit, slot: number | null) {
+    const tip = this.el.toasts.ownerDocument.getElementById('ability-tip')!;
+    if (slot === null) {
+      tip.classList.add('hidden');
+      return;
+    }
+    const h = me.hero!;
+    const def: AbilityDef = HEROES[h.defId].abilities[slot];
+    const lvl = h.abilities[slot].level;
+    const levels = def.manaCost.length;
+    const perLevel = (vals: number[], fmt = (v: number) => String(Math.round(v * 10) / 10)) =>
+      vals.map((v, i) => (i === lvl - 1 ? `<span class="cur">${fmt(v)}</span>` : fmt(v))).join(' / ');
+    const labels: Record<string, string> = {
+      damage: 'Damage',
+      stun: 'Stun (s)',
+      block: 'Damage blocked per attack',
+      lowHpArmor: 'Armor below 50% HP',
+      windup: 'Wind-up (s)',
+      critMult: 'Critical multiplier',
+      speedPct: 'Speed bonus %',
+      dps: 'Damage per second',
+      slowPct: 'Slow %',
+      duration: 'Duration (s)',
+      heal: 'Total heal',
+      delay: 'Delay (s)',
+      burnDps: 'Burn damage per second',
+      burnDuration: 'Burn duration (s)',
+    };
+    const kind =
+      def.targeting === 'passive'
+        ? 'Passive'
+        : { none: 'Active · around you', direction: 'Active · aimed direction', point: 'Active · aimed area', enemy: 'Active · enemy', ally: 'Active · ally' }[def.targeting];
+    let html = `<h3>${def.name}${def.ultimate ? ' <small>(Ultimate)</small>' : ''}</h3><div class="tag">${kind} · Level ${lvl}/${levels}</div><p>${def.summary}</p>`;
+    for (const [k, vals] of Object.entries(def.values)) html += `<div class="row"><b>${labels[k] ?? k}</b><span>${perLevel(vals)}</span></div>`;
+    if (def.targeting !== 'passive') {
+      html += `<div class="row"><b>Mana</b><span>${perLevel(def.manaCost)}</span></div>`;
+      html += `<div class="row"><b>Cooldown (s)</b><span>${perLevel(def.cooldown.map((_, i) => effectiveCooldown(me, def, i + 1)))}</span></div>`;
+      if (def.castRange) html += `<div class="row"><b>Range</b><span>${def.castRange} m</span></div>`;
+      if (def.radius && def.targeting !== 'direction') html += `<div class="row"><b>Radius</b><span>${def.radius} m</span></div>`;
+    }
+    tip.innerHTML = html;
+    tip.classList.remove('hidden');
   }
 
   /** Short announcement under the top bar. */

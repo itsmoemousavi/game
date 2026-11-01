@@ -29,7 +29,9 @@ npx vite-node scripts/simulate.ts [seed] [minutes]   # headless all-bot match lo
 | Items | Tap an item to use it (salves) · **ward**: tap its slot, then tap the ground · 🛒 opens the shop (buy at base) · **TP** slot: tap, then pick a friendly building (teleports are bought in the shop) | same (click) |
 | Deny | Tap one of your own creeps below half health (or your own tower below 10%) | Click it |
 | Team | 🛡 under the minimap: tower shield · **Buy back** in the respawn banner | same (click) |
-| Info | Tap your **portrait (ⓘ)** for hero stats · **⚙** (top right): auto attack and sound on/off | same (click) |
+| Info | Tap the **top bar** for the scoreboard · tap your **portrait (ⓘ)** for hero stats · **long-press** an ability for its details | same (click / hold) |
+| Menu | **⏸** pause (resume / surrender) · **⚙** settings: auto attack, sound, auto-learn, left-handed, vibration, joystick size, camera zoom | same (click) |
+| Shopping | The button next to 🛒 quick-buys the next recommended item (at base) | same (click) |
 | Learn ability | Tap the yellow **+** next to the button | Ctrl + Q / W / R |
 | Camera | Hold/drag the minimap to look; release to return · while dead, drag anywhere to look around | Hold minimap to look, right-click minimap to walk there, wheel to zoom |
 

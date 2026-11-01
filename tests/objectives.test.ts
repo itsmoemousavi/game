@@ -260,3 +260,38 @@ describe('visibility & auto attack', () => {
     expect(killer.hero!.assists).toBe(0);
   });
 });
+
+describe('settings & match controls', () => {
+  it('surrender ends the match for the other team', () => {
+    const { w, hero } = humans();
+    w.applyCommand({ type: 'surrender', unitId: hero(0, 'vexa').id });
+    expect(w.winner).toBe(1);
+  });
+
+  it('auto-learn spends skill points (ultimate first)', () => {
+    const { w, hero } = humans();
+    const o = hero(0, 'orin');
+    w.applyCommand({ type: 'setAutoLearn', unitId: o.id, enabled: true });
+    w.giveXp(o, 2300); // level 6
+    run(w, 0.1);
+    expect(o.hero!.skillPoints).toBe(0);
+    expect(o.hero!.abilities[2].level).toBe(1);
+  });
+
+  it('spells and critical hits emit damage events for floating numbers', () => {
+    const { w, hero } = humans();
+    const v = hero(0, 'vexa');
+    const e = hero(1, 'brakk');
+    const events: string[] = [];
+    place(v, 46, 104);
+    place(e, 52, 104);
+    run(w, 0.2);
+    w.applyCommand({ type: 'learn', unitId: v.id, slot: 0 });
+    w.applyCommand({ type: 'cast', unitId: v.id, slot: 0, x: 60, y: 104 });
+    for (let i = 0; i < 30; i++) {
+      w.step();
+      for (const ev of w.events) if (ev.type === 'damage') events.push(ev.kind);
+    }
+    expect(events).toContain('spell');
+  });
+});

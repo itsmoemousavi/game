@@ -97,6 +97,7 @@ const itemsUi = new ItemsUi(
     if (input) input.wardSlot = slot;
     if (renderer) renderer.wardMode = slot;
   },
+  (text) => hud.toast(text, '#ffd23f'),
 );
 
 // Team buttons.
@@ -113,8 +114,14 @@ onTap('#btn-buyback', () => world?.enqueue({ type: 'buyback', unitId: myHeroId }
 interface Settings {
   autoAttack: boolean;
   sound: boolean;
+  autoLearn: boolean;
+  leftHanded: boolean;
+  vibrate: boolean;
+  joystick: 'S' | 'M' | 'L';
+  zoom: number;
 }
-const settings: Settings = { autoAttack: true, sound: true };
+const settings: Settings = { autoAttack: true, sound: true, autoLearn: false, leftHanded: false, vibrate: true, joystick: 'M', zoom: 1 };
+const JOY_RADIUS = { S: 42, M: 55, L: 72 };
 try {
   Object.assign(settings, JSON.parse(localStorage.getItem('shrinefall-settings') ?? '{}'));
 } catch {
@@ -142,11 +149,84 @@ soundBox.addEventListener('change', () => {
   saveSettings();
   sfx.setMuted(!settings.sound);
 });
+const bindToggle = (sel: string, key: 'autoLearn' | 'leftHanded' | 'vibrate', apply: () => void) => {
+  const box = $<HTMLInputElement>(sel);
+  box.checked = settings[key];
+  box.addEventListener('change', () => {
+    settings[key] = box.checked;
+    saveSettings();
+    apply();
+  });
+};
+/** Push the current settings into the running game. */
+function applySettings() {
+  app.classList.toggle('lefty', settings.leftHanded);
+  if (input) {
+    input.leftHanded = settings.leftHanded;
+    input.setJoystickSize(JOY_RADIUS[settings.joystick]);
+  }
+  renderer?.setZoomFactor(settings.zoom);
+  world?.enqueue({ type: 'setAutoLearn', unitId: myHeroId, enabled: settings.autoLearn });
+  document.querySelectorAll<HTMLElement>('#set-joy button').forEach((b) => b.classList.toggle('on', b.dataset.v === settings.joystick));
+}
+bindToggle('#set-autolearn', 'autoLearn', applySettings);
+bindToggle('#set-lefty', 'leftHanded', applySettings);
+bindToggle('#set-vibrate', 'vibrate', () => {});
+document.querySelectorAll<HTMLElement>('#set-joy button').forEach((b) =>
+  b.addEventListener('click', () => {
+    settings.joystick = b.dataset.v as Settings['joystick'];
+    saveSettings();
+    applySettings();
+  }),
+);
+const zoomInput = $<HTMLInputElement>('#set-zoom');
+zoomInput.value = String(settings.zoom);
+zoomInput.addEventListener('input', () => {
+  settings.zoom = Number(zoomInput.value);
+  saveSettings();
+  renderer?.setZoomFactor(settings.zoom);
+});
+
+/** Short vibration (Android; iPhones ignore it). */
+let lastBuzz = 0;
+function buzz(pattern: number | number[], minGap = 250) {
+  if (!settings.vibrate || !navigator.vibrate) return;
+  const now = performance.now();
+  if (now - lastBuzz < minGap) return;
+  lastBuzz = now;
+  navigator.vibrate(pattern);
+}
+
+// ------------------------------------------------------------- pause / surrender
+let paused = false;
+const pauseEl = $<HTMLElement>('#pause');
+const surrenderBtn = $<HTMLElement>('#btn-surrender');
+function setPaused(p: boolean) {
+  paused = p;
+  pauseEl.classList.toggle('hidden', !p);
+  surrenderBtn.classList.remove('confirm');
+  surrenderBtn.textContent = 'Surrender';
+}
+setPaused(false);
 
 const settingsPanel = $<HTMLElement>('#settings');
 const statsPanel = $<HTMLElement>('#stats');
+const scorePanel = $<HTMLElement>('#scoreboard');
 onTap('#btn-settings', () => settingsPanel.classList.toggle('hidden'));
 onTap('#portrait', () => statsPanel.classList.toggle('hidden'));
+onTap('#topbar', () => scorePanel.classList.toggle('hidden'));
+onTap('#btn-pause', () => setPaused(true));
+onTap('#btn-resume', () => setPaused(false));
+onTap('#btn-surrender', () => {
+  if (!surrenderBtn.classList.contains('confirm')) {
+    surrenderBtn.classList.add('confirm');
+    surrenderBtn.textContent = 'Tap again to surrender';
+    return;
+  }
+  world?.applyCommand({ type: 'surrender', unitId: myHeroId });
+  if (world) hud.update(world, world.unit(myHeroId)!, myTeam);
+  setPaused(false);
+});
 document.querySelectorAll<HTMLElement>('[data-close]').forEach((b) =>
   b.addEventListener('pointerdown', (e) => {
     e.preventDefault();
@@ -155,7 +235,7 @@ document.querySelectorAll<HTMLElement>('[data-close]').forEach((b) =>
   }),
 );
 // Panels swallow touches so they don't move the hero underneath.
-for (const p of [settingsPanel, statsPanel]) p.addEventListener('pointerdown', (e) => e.stopPropagation());
+for (const p of [settingsPanel, statsPanel, scorePanel, pauseEl]) p.addEventListener('pointerdown', (e) => e.stopPropagation());
 // Every gesture (re)unlocks audio: iOS only starts/resumes sound inside a user gesture,
 // and may suspend it again after a call, a notification or switching apps.
 for (const ev of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) {
@@ -214,6 +294,10 @@ function startMatch() {
   world.applyCommand({ type: 'setAutoAttack', unitId: myHeroId, enabled: settings.autoAttack });
   settingsPanel.classList.add('hidden');
   statsPanel.classList.add('hidden');
+  scorePanel.classList.add('hidden');
+  setPaused(false);
+  input.onTip = (slot) => hud.showAbilityTip(world!.unit(myHeroId)!, slot);
+  applySettings();
   itemsUi.reset();
   void enterImmersive();
 }
@@ -233,6 +317,7 @@ let last = performance.now();
 function frame(now: number) {
   acc += Math.min(0.25, (now - last) / 1000);
   last = now;
+  if (paused) acc = 0;
   if (world && renderer && input) {
     while (acc >= DT) {
       input.flush(world);
@@ -240,6 +325,12 @@ function frame(now: number) {
       renderer.pushEvents(world, world.events, myHeroId);
       playEvents(sfx, world, world.events, myHeroId, myTeam, { x: renderer.camX, y: renderer.camY });
       announce(world, world.events);
+      for (const e of world.events) {
+        if (e.type === 'attack' && e.targetId === myHeroId && world.unit(e.sourceId)?.kind === 'hero') buzz(20);
+        else if (e.type === 'damage' && e.targetId === myHeroId) buzz(35);
+        else if (e.type === 'death' && e.unitId === myHeroId) buzz([90, 40, 140], 0);
+        else if (e.type === 'death' && e.killerId === myHeroId && world.unit(e.unitId)?.hero) buzz([40, 30, 40], 0);
+      }
       acc -= DT;
     }
     const me = world.unit(myHeroId)!;
@@ -248,6 +339,7 @@ function frame(now: number) {
     renderer.render(world, acc / DT, me, myTeam, input.aim);
     hud.update(world, me, myTeam);
     if (!statsPanel.classList.contains('hidden')) hud.updateStats(world, me);
+    if (!scorePanel.classList.contains('hidden')) hud.updateScoreboard(world, myTeam, myHeroId);
     itemsUi.update();
   } else acc = 0;
   requestAnimationFrame(frame);

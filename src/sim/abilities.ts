@@ -278,8 +278,10 @@ export function applyAttackPassives(w: World, u: Unit): number {
   if (lvl > 0 && u.hero.attackCount % 4 === 0) {
     const def = HEROES.vexa.abilities[1];
     w.addBuff(u, { key: 'huntersRhythm', t: 1.5, moveSpeedPct: val(def, 'speedPct', lvl) });
+    u.hero.lastCrit = true;
     return u.damage * val(def, 'critMult', lvl);
   }
+  u.hero.lastCrit = false;
   return u.damage;
 }
 

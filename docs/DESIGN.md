@@ -196,7 +196,27 @@ Numbers are in `src/sim/constants.ts`, `data/units.ts` and `objectives.ts`.
 
 **Sound:** on by default. The phone's silent switch mutes it, and so does the Sound setting.
 
-**Settings (⚙, top right):** Auto attack (idle heroes hit enemies that come into range) and Game sound, both remembered between games.
+**Settings (⚙, top right):** remembered between games.
+- **Auto attack:** idle heroes hit enemies that come into range.
+- **Game sound.**
+- **Auto-learn abilities:** ultimate first, then whichever of Q/W is lower.
+- **Left-handed layout:** joystick on the right, buttons on the left.
+- **Vibration** on hits, kills and deaths (Android; iPhones ignore it).
+- **Joystick size:** S / M / L.
+- **Camera zoom.**
+
+**Pause (⏸):** freezes the game (offline), with Resume and Surrender (tap twice to confirm; the other team wins).
+
+**Scoreboard (tap the top bar):** both teams with level, K/D/A, last hits/denies, net worth, items, respawn timers, and your team's teleports.
+
+**Ability details (long-press an ability):**
+- **Shows:** what it does, its values at every level (your current level highlighted), mana, cooldown (after cooldown reduction), range and radius.
+- **Long-press doesn't cast:** a quick tap or a drag still does.
+- **Passive or unlearned abilities** show their details on a plain tap.
+
+**Damage numbers:** your spell damage (purple), spell damage you take (red), and critical hits (big red "!"). A white frame around a creep's health bar means your next hit kills it, for last-hitting and denying.
+
+**Quick-buy:** the button next to the shop shows the next item of your hero's recommended build and buys it in one tap (at base).
 
 **Hero stats (tap the portrait ⓘ):**
 - **Attack:** damage, attack speed and time, range, lifesteal, spell damage, cooldown reduction.
