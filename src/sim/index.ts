@@ -18,3 +18,4 @@ export type { Rune, RuneKind } from './objectives';
 export { buybackBlocker } from './objectives';
 export { isInvisible } from './vision';
 export type { BotDifficulty } from './ai/bots';
+export { Rng } from './rng';
