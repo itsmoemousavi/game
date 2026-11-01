@@ -16,7 +16,12 @@ export type ItemId =
   | 'crownOfAscension'
   | 'healingSalve'
   | 'observerWard'
-  | 'sentryWard';
+  | 'sentryWard'
+  | 'twinBlades'
+  | 'titanHeart'
+  | 'archmageStaff'
+  | 'wardedCloak'
+  | 'shadowStep';
 
 export interface ItemStats {
   damage?: number;
@@ -48,6 +53,13 @@ export interface ItemDef {
   stats: ItemStats;
   /** Consumables are used from the slot and stack in one slot. */
   consumable?: { maxStack: number };
+  /**
+   * Built from these items (owned ones are used up when you buy this; you pay the rest).
+   * `cost` is always the full price.
+   */
+  recipe?: ItemId[];
+  /** Item with a button. */
+  active?: { kind: 'blink' | 'immunity'; cooldown: number; range?: number; duration?: number };
   summary: string;
 }
 
@@ -81,6 +93,57 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     stats: {},
     consumable: { maxStack: 2 },
     summary: 'Use, then tap the ground nearby: reveals invisible enemies and wards around it for 6 minutes.',
+  },
+  twinBlades: {
+    id: 'twinBlades',
+    name: 'Twin Blades',
+    short: 'Twin',
+    cost: 1250,
+    icon: '#e2e8f0',
+    stats: { damage: 30, attackSpeedPct: 30 },
+    recipe: ['ironBlade', 'quickGloves'],
+    summary: '+30 damage, +30% attack speed. Built from Iron Blade + Quick Gloves.',
+  },
+  titanHeart: {
+    id: 'titanHeart',
+    name: 'Titan Heart',
+    short: 'Titan',
+    cost: 1400,
+    icon: '#b91c1c',
+    stats: { hp: 650, hpRegen: 6 },
+    recipe: ['vitalStone', 'vitalStone'],
+    summary: '+650 health, +6 health regen. Built from two Vital Stones.',
+  },
+  archmageStaff: {
+    id: 'archmageStaff',
+    name: 'Archmage Staff',
+    short: 'Staff',
+    cost: 2200,
+    icon: '#7c3aed',
+    stats: { mana: 450, manaRegen: 3, spellAmpPct: 22 },
+    recipe: ['manaCrystal', 'arcaneAmplifier'],
+    summary: '+450 mana, +3 mana regen, +22% ability damage. Built from Mana Crystal + Arcane Amplifier.',
+  },
+  wardedCloak: {
+    id: 'wardedCloak',
+    name: 'Warded Cloak',
+    short: 'Cloak',
+    cost: 1500,
+    icon: '#0ea5e9',
+    stats: { armor: 6, mana: 150 },
+    recipe: ['guardPlate', 'manaCrystal'],
+    active: { kind: 'immunity', cooldown: 50, duration: 4 },
+    summary: '+6 armor, +150 mana. Use: immune to abilities (damage, stuns, slows) for 4 s. Built from Guard Plate + Mana Crystal.',
+  },
+  shadowStep: {
+    id: 'shadowStep',
+    name: 'Shadow Step',
+    short: 'Step',
+    cost: 1800,
+    icon: '#6366f1',
+    stats: {},
+    active: { kind: 'blink', cooldown: 12, range: 11 },
+    summary: 'Use, then tap the ground: blink up to 11 m. Can’t be used for 3 s after taking damage from a hero.',
   },
   swiftBoots: {
     id: 'swiftBoots',
@@ -192,7 +255,10 @@ export const SALVE = { heal: 350, duration: 8 };
 
 /** Default build orders (also the "recommended" list in the shop). */
 export const BUILDS: Record<'brakk' | 'vexa' | 'orin', ItemId[]> = {
-  brakk: ['healingSalve', 'swiftBoots', 'vitalStone', 'guardPlate', 'focusLens', 'crownOfAscension', 'vitalStone', 'lifedrinker'],
-  vexa: ['healingSalve', 'swiftBoots', 'ironBlade', 'quickGloves', 'lifedrinker', 'crownOfAscension', 'quickGloves', 'ironBlade'],
-  orin: ['healingSalve', 'swiftBoots', 'manaCrystal', 'arcaneAmplifier', 'focusLens', 'crownOfAscension', 'vitalStone', 'guardPlate'],
+  brakk: ['healingSalve', 'swiftBoots', 'vitalStone', 'vitalStone', 'titanHeart', 'shadowStep', 'crownOfAscension', 'wardedCloak'],
+  vexa: ['healingSalve', 'swiftBoots', 'ironBlade', 'quickGloves', 'twinBlades', 'lifedrinker', 'crownOfAscension', 'wardedCloak'],
+  orin: ['healingSalve', 'swiftBoots', 'manaCrystal', 'arcaneAmplifier', 'archmageStaff', 'focusLens', 'crownOfAscension', 'wardedCloak'],
 };
+
+/** Blink can't be used this long after taking damage from an enemy hero. */
+export const BLINK_DAMAGE_LOCK = 3;

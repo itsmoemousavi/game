@@ -95,7 +95,7 @@ export class Hud {
     const cost = buybackCost(h.level, w.time / 60);
     const gcd = Math.ceil(w.glyphCooldown[team]);
     const buffs = me.buffs
-      .filter((b) => b.key === 'charm' || b.key === 'rune' || b.key === 'salve')
+      .filter((b) => b.key === 'charm' || b.key === 'rune' || b.key === 'salve' || b.key === 'immunity')
       .map((b) => `${b.key}:${Math.ceil(b.t)}`)
       .join();
     const key = `${bb}|${cost}|${Math.ceil(h.buybackCooldown)}|${gcd}|${buffs}`;
@@ -109,6 +109,7 @@ export class Hud {
       const secs = Math.ceil(b.t);
       if (b.key === 'charm') chips.push(`<span style="background:#ffd23f">Revive ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}</span>`);
       if (b.key === 'salve') chips.push(`<span style="background:#4ade80">Salve ${secs}</span>`);
+      if (b.key === 'immunity') chips.push(`<span style="background:#facc15">Immune ${secs}</span>`);
       if (b.key === 'rune') {
         const kind: RuneKind = b.invisible ? 'invisibility' : b.damageMult ? 'doubleDamage' : b.moveSpeedPct ? 'haste' : 'regen';
         chips.push(`<span style="background:${RUNE_INFO[kind].color}">${RUNE_INFO[kind].name} ${secs}</span>`);

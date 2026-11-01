@@ -90,6 +90,12 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
       case 'revive':
         sfx.play('revive', near(w.unit(e.unitId)));
         break;
+      case 'blink':
+        sfx.play('teleport', near(w.unit(e.unitId)) * 0.7);
+        break;
+      case 'immunity':
+        sfx.play('glyph', near(w.unit(e.unitId)));
+        break;
       case 'purchase':
         if (e.unitId === meId) sfx.play('purchase');
         break;

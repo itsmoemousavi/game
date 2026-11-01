@@ -9,6 +9,7 @@ import {
   Unit,
   World,
   buyBlocker,
+  priceFor,
   inShop,
   teleportTargets,
   tpBlocker,
@@ -63,7 +64,7 @@ export class ItemsUi {
         if (!c) return;
         const item = c.me.hero!.items[i];
         if (this.shopOpen) this.send({ type: 'sell', unitId: c.me.id, slot: i });
-        else if (item?.id === 'observerWard' || item?.id === 'sentryWard') {
+        else if (item?.id === 'observerWard' || item?.id === 'sentryWard' || ITEMS[item?.id ?? 'healingSalve'].active?.kind === 'blink') {
           this.placingSlot = this.placingSlot === i ? null : i;
           this.onWard(this.placingSlot);
           this.lastKey = '';
@@ -150,18 +151,21 @@ export class ItemsUi {
     const { w, me } = c;
     const h = me.hero!;
     const atShop = inShop(w, me);
-    if (this.placingSlot !== null && !h.items[this.placingSlot]?.id.endsWith('Ward')) {
-      this.placingSlot = null; // ward used up
+    const placing = this.placingSlot !== null ? h.items[this.placingSlot] : null;
+    if (this.placingSlot !== null && (!placing || (!placing.id.endsWith('Ward') && !ITEMS[placing.id].active))) {
+      this.placingSlot = null; // used up / sold
       this.onWard(null);
     }
-    const key = `${h.items.map((s) => (s ? s.id + s.count : '-')).join()}|${h.tpCount}|${Math.ceil(h.tpCooldown)}|${!!h.channel}|${atShop}|${this.shopOpen}|${this.placingSlot}`;
+    const key = `${h.items.map((s) => (s ? s.id + s.count + ':' + Math.ceil(s.cooldown ?? 0) : '-')).join()}|${h.tpCount}|${Math.ceil(h.tpCooldown)}|${!!h.channel}|${atShop}|${this.shopOpen}|${this.placingSlot}`;
     if (key !== this.lastKey) {
       this.lastKey = key;
       h.items.forEach((s, i) => {
         const el = this.slots[i];
         const d = s ? ITEMS[s.id] : null;
         el.classList.toggle('empty', !d);
-        el.classList.toggle('usable', !!d?.consumable);
+        el.classList.toggle('usable', !!d?.consumable || !!d?.active);
+        const icd = Math.ceil(s?.cooldown ?? 0);
+        el.querySelector('.cd')!.textContent = icd > 0 ? String(icd) : '';
         el.classList.toggle('selling', !!d && this.shopOpen);
         el.classList.toggle('placing', this.placingSlot === i);
         el.querySelector('.lbl')!.innerHTML = d ? itemIcon(d.id) : '';
@@ -199,8 +203,12 @@ export class ItemsUi {
           : 'Return to your base (fountain) to buy or sell';
         this.root.querySelector('#shop-tp')!.classList.toggle('off', !atShop || h.gold < TELEPORT.cost);
         this.root.querySelectorAll<HTMLElement>('[data-buy]').forEach((el) => {
-          const b = buyBlocker(w, me, el.dataset.buy as ItemId);
+          const id = el.dataset.buy as ItemId;
+          const b = buyBlocker(w, me, id);
           el.classList.toggle('off', b !== null);
+          // Owning the parts makes a combined item cheaper.
+          const price = priceFor(h, id);
+          el.querySelector('.cost')!.innerHTML = price < ITEMS[id].cost ? `<s>${ITEMS[id].cost}</s> ${price}` : String(price);
         });
       }
     }

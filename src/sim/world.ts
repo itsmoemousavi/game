@@ -86,8 +86,8 @@ export type Command =
   | { type: 'buy'; unitId: number; itemId: ItemId }
   | { type: 'sell'; unitId: number; slot: number }
   | { type: 'buyTp'; unitId: number }
-  /** Use a consumable in inventory slot `slot`. */
-  | { type: 'useItem'; unitId: number; slot: number }
+  /** Use the item in inventory slot `slot` (consumables, items with a button; blink takes x/y). */
+  | { type: 'useItem'; unitId: number; slot: number; x?: number; y?: number }
   /** Channel a teleport to an allied building. Moving or being stunned cancels it. */
   | { type: 'teleport'; unitId: number; targetId: number }
   /** Place the ward in inventory slot `slot` at (x, y); walks into range first. */
@@ -117,6 +117,8 @@ export interface Buff {
   damageMult?: number;
   /** Invisible until it expires or the unit attacks / casts. */
   invisible?: boolean;
+  /** Immune to abilities: no spell damage, stuns or slows. */
+  spellImmune?: boolean;
 }
 
 /** Lingering ground area that ticks damage / slow on enemies inside (Arrow Storm, burning ground). */
@@ -348,6 +350,8 @@ export type GameEvent =
   | { type: 'bossKilled'; killerId: number | null; team: Side }
   | { type: 'revive'; unitId: number }
   | { type: 'purchase'; unitId: number }
+  | { type: 'blink'; unitId: number; fromX: number; fromY: number }
+  | { type: 'immunity'; unitId: number }
   | { type: 'miss'; sourceId: number; targetId: number }
   /** Notable damage (spells, critical hits) for floating numbers. */
   | { type: 'damage'; sourceId: number; targetId: number; amount: number; kind: DamageKind; crit: boolean };
@@ -564,7 +568,7 @@ export class World {
         buyTeleport(this, u);
         break;
       case 'useItem':
-        useItem(this, u, cmd.slot);
+        useItem(this, u, cmd.slot, cmd.x, cmd.y);
         break;
       case 'teleport':
         startTeleport(this, u, cmd.targetId);
@@ -613,15 +617,20 @@ export class World {
     return a;
   }
 
+  isSpellImmune(u: Unit) {
+    return u.buffs.some((b) => b.spellImmune);
+  }
+
   /** Add or refresh a buff (same key = refresh, keeping the strongest duration). */
   addBuff(u: Unit, b: Buff) {
+    if (b.slowPct && this.isSpellImmune(u)) return;
     const i = u.buffs.findIndex((x) => x.key === b.key);
     if (i >= 0) u.buffs[i] = { ...b, t: Math.max(b.t, u.buffs[i].t) };
     else u.buffs.push(b);
   }
 
   stun(u: Unit, seconds: number) {
-    if (!u.alive || u.kind === 'structure') return;
+    if (!u.alive || u.kind === 'structure' || this.isSpellImmune(u)) return;
     u.stunTimer = Math.max(u.stunTimer, seconds);
     u.dash = null;
   }
@@ -918,6 +927,7 @@ export class World {
     h.goldEarned += PASSIVE_GOLD_PER_SEC * DT;
     for (const a of h.abilities) if (a.cooldown > 0) a.cooldown = Math.max(0, a.cooldown - DT);
     if (h.tpCooldown > 0) h.tpCooldown = Math.max(0, h.tpCooldown - DT);
+    for (const it of h.items) if (it?.cooldown) it.cooldown = Math.max(0, it.cooldown - DT);
     if (h.autoLearn && h.skillPoints > 0) botLearn(this, u);
     if (!u.alive) {
       h.respawnTimer -= DT;
@@ -1291,6 +1301,7 @@ export class World {
   dealDamage(sourceId: number, target: Unit, raw: number, kind: DamageKind = 'attack', opts: { crit?: boolean; dot?: boolean } = {}) {
     if (!target.alive) return;
     if (target.structure && (!target.structure.vulnerable || kind === 'spell' || target.structure.glyph > 0)) return;
+    if (kind === 'spell' && this.isSpellImmune(target)) return;
     const src = this.unit(sourceId);
     let amount = kind === 'attack' ? raw * armorMultiplier(this.armorOf(target)) : raw;
     if (kind === 'spell' && src?.hero) amount *= 1 + src.hero.bonus.spellAmpPct / 100;

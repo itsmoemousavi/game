@@ -144,6 +144,20 @@ Item numbers are in `src/sim/data/items.ts`.
 | Healing Salve | consumable, heal over time |
 | Teleport Scroll | own slot, unlimited stack (see above) |
 
+### Combined items and items with a button (implemented)
+
+Buying a combined item uses up the parts you own, and you pay the difference; the shop shows the reduced price. Bot builds use these items.
+
+| Item | Made from | Effect |
+|---|---|---|
+| Twin Blades (1250) | Iron Blade + Quick Gloves + 350 | +30 damage, +30% attack speed |
+| Titan Heart (1400) | 2× Vital Stone + 500 | +650 health, +6 health regen |
+| Archmage Staff (2200) | Mana Crystal + Arcane Amplifier + 450 | +450 mana, +3 mana regen, +22% ability damage |
+| Warded Cloak (1500) | Guard Plate + Mana Crystal + 550 | +6 armor, +150 mana. **Use:** 4 s immune to abilities (no spell damage, stuns or slows; normal attacks still hurt). 50 s cooldown |
+| Shadow Step (1800) | bought directly | **Use:** tap the item, then tap the ground: blink up to 11 m. 12 s cooldown; can't be used for 3 s after taking damage from a hero |
+
+Item slots show their cooldown. Bots use Warded Cloak when hurt in a fight and Shadow Step to jump onto heroes.
+
 ## 6b. Fog of war, day & night, jungle
 
 **Fog of war:**
@@ -285,7 +299,6 @@ Milestone 5 (done): denying, wards, river power-ups, the Warden boss + revive ch
 Done or dropped: high ground (done), talents (dropped for now), Android build (not now).
 
 These were proposed and are parked for later:
-- **Item recipes and active items:** components combine into bigger items; items with a button (for example a short blink, or brief spell immunity), all original designs.
 - **Kill feed polish, announcer voice, kill streaks and bounties:** extra gold for ending a streak, as a comeback mechanic.
 - **End-of-match scoreboard and stats:** damage, gold over time, items.
 - **Pings and quick-chat wheel:** "Attack", "Retreat", "Enemy missing".

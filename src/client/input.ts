@@ -1,4 +1,4 @@
-import { Command, HEROES, Unit, World, abilityDef, castBlocker } from '../sim';
+import { Command, HEROES, ITEMS, Unit, World, abilityDef, castBlocker } from '../sim';
 import type { Renderer } from './renderer';
 import { toLocal } from './screen';
 
@@ -241,7 +241,12 @@ export class Input {
     // Placing a ward: this tap chooses the spot (the hero walks into range if needed).
     if (this.wardSlot !== null) {
       const p = this.renderer.screenToWorld(sx, sy);
-      this.queue.push({ type: 'placeWard', unitId: this.heroId(), slot: this.wardSlot, x: p.x, y: p.y });
+      const item = this.world().unit(this.heroId())?.hero?.items[this.wardSlot];
+      if (item && ITEMS[item.id].active?.kind === 'blink') {
+        this.queue.push({ type: 'useItem', unitId: this.heroId(), slot: this.wardSlot, x: p.x, y: p.y });
+      } else {
+        this.queue.push({ type: 'placeWard', unitId: this.heroId(), slot: this.wardSlot, x: p.x, y: p.y });
+      }
       this.wardSlot = null;
       this.renderer.wardMode = null;
       this.onWardPlaced();

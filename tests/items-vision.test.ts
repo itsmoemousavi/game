@@ -55,7 +55,7 @@ describe('shop & items', () => {
     const b = hero(0, 'brakk');
     b.hero!.gold = 10000;
     for (let i = 0; i < 3; i++) w.applyCommand({ type: 'buy', unitId: b.id, itemId: 'healingSalve' });
-    expect(b.hero!.items[0]).toEqual({ id: 'healingSalve', count: 3 });
+    expect(b.hero!.items[0]).toMatchObject({ id: 'healingSalve', count: 3 });
     for (let i = 0; i < 6; i++) w.applyCommand({ type: 'buy', unitId: b.id, itemId: 'guardPlate' });
     expect(b.hero!.items.filter(Boolean).length).toBe(6);
     const gold = b.hero!.gold;

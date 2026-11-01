@@ -1,4 +1,4 @@
-import { GameEvent, GameMap, HEROES, LANE_IDS, RUNE_INFO, Side, Team, Unit, WARD_CAST_RANGE, World, isInvisible, isNight } from '../sim';
+import { GameEvent, GameMap, HEROES, ITEMS, LANE_IDS, RUNE_INFO, Side, Team, Unit, WARD_CAST_RANGE, World, isInvisible, isNight } from '../sim';
 import type { Aim } from './input';
 
 /**
@@ -96,6 +96,12 @@ export class Renderer {
         const text = `${Math.round(e.amount)}${e.crit ? '!' : ''}`;
         const jitter = ((e.targetId * 7 + this.floaters.length * 13) % 10) / 10 - 0.5;
         this.floaters.push({ x: t.x + jitter, y: t.y - 1.6, t: 0.9, text, color, big: e.crit });
+        continue;
+      }
+      if (e.type === 'blink') {
+        const u = w.unit(e.unitId);
+        this.blasts.push({ x: e.fromX, y: e.fromY, r: 1.6, t: 0.35, color: '165,180,252' });
+        if (u) this.blasts.push({ x: u.x, y: u.y, r: 2, t: 0.4, color: '165,180,252' });
         continue;
       }
       if (e.type === 'revive') {
@@ -204,7 +210,9 @@ export class Renderer {
       ctx.setLineDash([0.6, 0.4]);
       ctx.lineWidth = 0.18;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, WARD_CAST_RANGE, 0, Math.PI * 2);
+      const it = focus.hero!.items[this.wardMode];
+      const range = it ? (ITEMS[it.id].active?.range ?? WARD_CAST_RANGE) : WARD_CAST_RANGE;
+      ctx.arc(p.x, p.y, range, 0, Math.PI * 2);
       ctx.stroke();
       ctx.setLineDash([]);
     }
@@ -246,6 +254,12 @@ export class Renderer {
       const isMe = h === focus;
       // Invisible allies (incl. you) are drawn see-through; enemies wouldn't be drawn at all.
       ctx.globalAlpha = isInvisible(h) ? 0.4 : 1;
+      if (h.buffs.some((b) => b.spellImmune)) {
+        ctx.fillStyle = `rgba(250,204,21,${0.25 + Math.sin(w.time * 9) * 0.08})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, h.radius + 0.9, 0, Math.PI * 2);
+        ctx.fill();
+      }
       if (h.buffs.some((b) => b.key === 'charm')) {
         ctx.strokeStyle = 'rgba(255,215,90,0.8)';
         ctx.lineWidth = 0.2;

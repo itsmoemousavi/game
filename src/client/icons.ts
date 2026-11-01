@@ -60,6 +60,26 @@ const ICONS: Record<ItemId | 'tp' | 'shop', string> = {
     '<path d="M2.5 12S6.5 6 12 6s9.5 6 9.5 6-4 6-9.5 6-9.5-6-9.5-6z" fill="#bfdbfe" stroke="#1e3a8a" stroke-width="1"/><circle cx="12" cy="12" r="3" fill="#1d4ed8"/><path d="M12 2.5v2.5M12 19v2.5M4 4l2 2M20 4l-2 2" stroke="#93c5fd" stroke-width="1.2" stroke-linecap="round"/>',
     '#172554',
   ),
+  twinBlades: svg(
+    '<path d="M16 3l3 3-9 9-3-3z" fill="#e5e7eb" stroke="#334155" stroke-width="0.9"/><path d="M8 3L5 6l9 9 3-3z" fill="#cbd5e1" stroke="#334155" stroke-width="0.9"/><path d="M5 16l3 3-2 2-3-3zM19 16l-3 3 2 2 3-3z" fill="#a16207"/>',
+    '#1e293b',
+  ),
+  titanHeart: svg(
+    '<path d="M12 21s-8-4.8-8-10.6A4.5 4.5 0 0 1 12 7.5a4.5 4.5 0 0 1 8 2.9C20 16.2 12 21 12 21z" fill="#dc2626" stroke="#450a0a" stroke-width="1"/><path d="M6.5 12h3l1.5-3 2 6 1.5-3h3" stroke="#fee2e2" stroke-width="1.3" fill="none" stroke-linejoin="round"/>',
+    '#3f0d0d',
+  ),
+  archmageStaff: svg(
+    '<path d="M7 21L16 8" stroke="#a16207" stroke-width="2" stroke-linecap="round"/><circle cx="17" cy="6.5" r="3.2" fill="#c084fc" stroke="#3b0764" stroke-width="1"/><path d="M17 1.8v1.6M21.7 6.5h-1.6M20.3 3.2l-1.1 1.1" stroke="#e9d5ff" stroke-width="1.1" stroke-linecap="round"/>',
+    '#2e1065',
+  ),
+  wardedCloak: svg(
+    '<path d="M12 3c3 0 6 1.5 7 3l-2 14H7L5 6c1-1.5 4-3 7-3z" fill="#0ea5e9" stroke="#0c4a6e" stroke-width="1"/><path d="M12 8l3 1.3v2.4c0 2.3-1.4 3.9-3 4.6-1.6-.7-3-2.3-3-4.6V9.3z" fill="#e0f2fe" stroke="#0c4a6e" stroke-width="0.8"/>',
+    '#082f49',
+  ),
+  shadowStep: svg(
+    '<path d="M4 18c2-1 3.5-1 5 0M8 13c2-1 3.5-1 5 0" stroke="#a5b4fc" stroke-width="1.4" stroke-linecap="round" fill="none" opacity="0.7"/><path d="M13 6h4l2 5-3 2v5h-3v-5l-2-2z" fill="#818cf8" stroke="#1e1b4b" stroke-width="1"/><circle cx="16" cy="4" r="1.6" fill="#c7d2fe"/>',
+    '#1e1b4b',
+  ),
   tp: svg(
     '<path d="M6 5h11a2 2 0 0 1 0 4H8v10H6a2 2 0 0 1 0-4" fill="#e0f2fe" stroke="#0c4a6e" stroke-width="1"/><path d="M8 9h9v8a2 2 0 0 1-2 2H8z" fill="#bae6fd" stroke="#0c4a6e" stroke-width="1"/><circle cx="12.5" cy="13.5" r="2.2" fill="none" stroke="#0284c7" stroke-width="1.2"/><circle cx="12.5" cy="13.5" r="0.8" fill="#0284c7"/>',
     '#0c4a6e',

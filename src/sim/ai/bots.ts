@@ -4,7 +4,7 @@ import { dist, pointAlong, polylineLength, projectOnPolyline } from '../math';
 import type { Unit, World } from '../world';
 import { abilityDef, botLearn, castBlocker } from '../abilities';
 import { BUILDS, ITEMS, TELEPORT } from '../data/items';
-import { buyBlocker, inShop, teleportTargets, tpBlocker } from '../inventory';
+import { buyBlocker, inShop, itemBlocker, teleportTargets, tpBlocker } from '../inventory';
 
 /**
  * Bot heroes. Bots issue the exact same Commands a human does, so later on a bot
@@ -184,9 +184,27 @@ function cast(w: World, me: Unit, slot: number, t: Unit) {
   else w.applyCommand({ type: 'cast', unitId: me.id, slot, x: t.x, y: t.y });
 }
 
+/** Item buttons: cloak up when hurt in a fight, blink onto a hero we want to fight. */
+function useItems(w: World, me: Unit, target: Unit, d: number): boolean {
+  const h = me.hero!;
+  const slotOf = (id: string) => h.items.findIndex((s) => s?.id === id);
+  const cloak = slotOf('wardedCloak');
+  if (cloak >= 0 && !itemBlocker(w, me, cloak) && me.hp < me.maxHp * 0.55 && target.hero) {
+    w.applyCommand({ type: 'useItem', unitId: me.id, slot: cloak });
+    return true;
+  }
+  const step = slotOf('shadowStep');
+  if (step >= 0 && target.hero && d > me.attackRange + 3 && d < 12 && me.hp > me.maxHp * 0.6 && !itemBlocker(w, me, step)) {
+    w.applyCommand({ type: 'useItem', unitId: me.id, slot: step, x: target.x, y: target.y });
+    return true;
+  }
+  return false;
+}
+
 /** Returns true if a spell was cast this think. */
 function useAbilities(w: World, me: Unit, target: Unit): boolean {
   const d = dist(me.x, me.y, target.x, target.y);
+  if (useItems(w, me, target, d)) return false; // keep fighting after the item
   if (target.hero) {
     for (const slot of [2, 0]) {
       if (!ready(me, slot)) continue;
