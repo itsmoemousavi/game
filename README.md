@@ -4,7 +4,12 @@ Mobile 3v3 lane-strategy game in the spirit of Dota 2. Destroy the enemy towers,
 
 See **[docs/DESIGN.md](docs/DESIGN.md)** for the full design, tech plan and roadmap.
 
-## Run it
+## Play it
+
+**On your phone (or any browser):** https://itsmoemousavi.github.io/game/ (turn the phone to landscape).
+Every push to the main development branch is tested, built and redeployed automatically by `.github/workflows/deploy-pages.yml`.
+
+## Run it locally
 
 ```bash
 npm install
