@@ -375,3 +375,25 @@ describe('streaks, bounties and match stats', () => {
     expect(o.hero!.stats.healing).toBeGreaterThan(100);
   });
 });
+
+describe('death costs gold', () => {
+  it('lose 25 + 2.5% of net worth, only from pocket gold; not with a revive charm', () => {
+    const { w, hero } = humans();
+    const v = hero(0, 'vexa');
+    const foe = hero(1, 'brakk');
+    v.hero!.gold = 2000;
+    w.dealDamage(foe.id, v, 1e6, 'spell');
+    expect(v.hero!.gold).toBe(2000 - Math.round(25 + 2000 * 0.025));
+    // Broke heroes can't go below zero.
+    const o = hero(0, 'orin');
+    o.hero!.gold = 10;
+    w.dealDamage(foe.id, o, 1e6, 'spell');
+    expect(o.hero!.gold).toBe(0);
+    // Revive charm: no loss.
+    const b = hero(0, 'brakk');
+    b.hero!.gold = 1000;
+    w.addBuff(b, { key: 'charm', t: 300 });
+    w.dealDamage(foe.id, b, 1e6, 'spell');
+    expect(b.hero!.gold).toBe(1000);
+  });
+});

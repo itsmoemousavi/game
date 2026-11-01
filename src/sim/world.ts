@@ -9,6 +9,7 @@ import {
   RANGED_PER_WAVE,
   STARTING_GOLD,
   CAMP_FIRST_SPAWN,
+  DEATH_GOLD,
   MULTI_KILL_WINDOW,
   UPHILL_MISS_CHANCE,
   CREEP_GROWTH_PER_5MIN,
@@ -31,7 +32,7 @@ import {
 } from './constants';
 import { HEROES, HeroId, maxAbilityLevel } from './data/heroes';
 import { CREEPS, CombatStats, HERO_VISION, NEUTRALS, STRUCTURES, SUPER_CREEP_MULT } from './data/units';
-import { ItemId, ItemStats } from './data/items';
+import { ITEMS, ItemId, ItemStats, TELEPORT } from './data/items';
 import { ItemSlot, buyItem, buyTeleport, emptyInventory, itemBonuses, sellItem, startTeleport, updateChannel, useItem } from './inventory';
 import { Vision, isInvisible } from './vision';
 import { Rune, activateGlyph, buyback, placeWard, spawnBoss, updateObjectives } from './objectives';
@@ -358,6 +359,7 @@ export type GameEvent =
   | { type: 'bossKilled'; killerId: number | null; team: Side }
   | { type: 'revive'; unitId: number }
   | { type: 'purchase'; unitId: number }
+  | { type: 'goldLost'; unitId: number; amount: number }
   | { type: 'blink'; unitId: number; fromX: number; fromY: number }
   /** Announcer moments: first blood, multi-kills, kill streaks, shutdowns. */
   | { type: 'announce'; unitId: number; victimId: number; firstBlood: boolean; multi: number; streak: number; shutdown: number }
@@ -1401,6 +1403,15 @@ export class World {
         // Revive charm: get back up on the spot after a short delay.
         h.respawnTimer = REVIVE_DELAY;
         h.reviveAt = { x: u.x, y: u.y };
+      } else if (killer && killer.team !== u.team) {
+        // Dying costs gold: 25 + 2.5% of net worth, only from gold in your pocket.
+        let worth = h.gold + h.tpCount * TELEPORT.cost;
+        for (const it of h.items) if (it) worth += ITEMS[it.id].cost * it.count;
+        const lost = Math.min(Math.floor(h.gold), Math.round(DEATH_GOLD.base + worth * DEATH_GOLD.share));
+        if (lost > 0) {
+          h.gold -= lost;
+          this.events.push({ type: 'goldLost', unitId: u.id, amount: lost });
+        }
       }
       this.teamKills[otherTeam(u.team as Team)]++;
       if (killerHero) {

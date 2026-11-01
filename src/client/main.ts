@@ -276,6 +276,10 @@ function announce(w: World, events: GameEvent[]) {
     return u?.hero ? HERO_DEFS[u.hero.defId].name : 'Someone';
   };
   for (const e of events) {
+    if (e.type === 'goldLost' && e.unitId === myHeroId) {
+      hud.goldLost(e.amount);
+      continue;
+    }
     if (e.type === 'announce') {
       if (hud.announce(w, e, myTeam)) sfx.play(w.unit(e.unitId)?.team === myTeam ? 'victory' : 'defeat', 0.5);
       continue;

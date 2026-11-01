@@ -69,7 +69,8 @@ If 3D performance in a Capacitor WebView ever becomes a blocker, the simulation 
   - hero kill: 150 + 10 × victim level
   - each destroyed structure pays every enemy hero 120–200
 - **XP:** shared among enemy heroes within 30 m. Level cap 15. Ultimate unlocks at level 6.
-- **Respawn:** 4 + 2 × level seconds.
+- **Respawn:** 3 + 1.5 × level seconds.
+- **Dying costs gold:** 25 + 2.5% of your net worth, taken only from unspent gold (never items). No loss when a revive charm saves you or when your own side kills you. The respawn banner shows how much you lost.
 - **Damage:** armor reduction `1 − 0.06a / (1 + 0.06|a|)`.
 
 ## 5. Heroes (proposals, will change)

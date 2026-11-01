@@ -79,6 +79,9 @@ export const UPHILL_MISS_CHANCE = 0.25;
 /** Kills this close together count as a multi-kill (double, triple...). */
 export const MULTI_KILL_WINDOW = 10;
 
+/** Gold lost on death: base + share of net worth (only from unspent gold). */
+export const DEATH_GOLD = { base: 25, share: 0.025 };
+
 export type Team = 0 | 1;
 /** Side a unit belongs to: a team, or 2 for neutral jungle monsters. */
 export type Side = Team | 2;

@@ -358,6 +358,12 @@ export class Hud {
     this.el.toasts.ownerDocument.getElementById('endstats')!.innerHTML = html + '</table>';
   }
 
+  /** Show how much gold this death cost, in the respawn banner. */
+  goldLost(amount: number) {
+    const el = this.el['killed-by'];
+    el.textContent = `${el.textContent?.replace(/ ·$/, '') ?? ''} · −${amount} gold ·`;
+  }
+
   /** Short announcement under the top bar. */
   toast(text: string, color = '#fff') {
     const d = document.createElement('div');
