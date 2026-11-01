@@ -1,5 +1,7 @@
 # Going 3D: plan
 
+> **Status: on hold.** 3D work starts only after the 2D game is finished and signed off. Until then all work (features, fixes, balance, bots) happens in 2D. This page is kept as the reference for later.
+
 ![3D concept: mid-lane fight](concept/shrinefall-3d-lane.png)
 ![3D concept: Azure base](concept/shrinefall-3d-base.png)
 
