@@ -1,0 +1,69 @@
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: #0d150f; color: #e8eee9; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; overflow: hidden; overscroll-behavior: none; user-select: none; -webkit-user-select: none; }
+button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
+.hidden { display: none !important; }
+
+/* ---------- hero select ---------- */
+#select { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left)); overflow-y: auto; background: radial-gradient(ellipse at top, #1d2e22, #0b120d); }
+#select h1 { margin: 0; font-size: clamp(24px, 5vw, 40px); letter-spacing: 0.04em; }
+#select h1 small { font-size: 0.4em; opacity: 0.6; font-weight: 500; }
+#select .tag { margin: 0; opacity: 0.75; font-size: 14px; text-align: center; }
+#hero-cards { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; max-width: 100%; }
+.hero-card { display: flex; gap: 10px; text-align: left; width: min(280px, 100%); padding: 12px; border-radius: 12px; border: 2px solid #2c3d31; background: #142019; }
+.hero-card.picked { border-color: #ffe066; background: #1c2b20; }
+.hero-card .portrait { flex: none; width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 22px; color: #111; }
+.hero-card .hname { font-weight: 700; }
+.hero-card .hname span { font-weight: 400; opacity: 0.7; font-size: 13px; }
+.hero-card .role { font-size: 12px; opacity: 0.7; margin: 2px 0 6px; }
+.hero-card ul { margin: 0; padding: 0; list-style: none; font-size: 12px; line-height: 1.5; }
+.hero-card li i { opacity: 0.6; }
+#select .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; }
+#lane-pick { display: flex; gap: 6px; }
+#lane-pick button { padding: 8px 14px; border-radius: 8px; border: 1px solid #2c3d31; background: #142019; }
+#lane-pick button.picked { border-color: #ffe066; }
+#btn-play { padding: 12px 28px; border-radius: 10px; border: 0; background: #3d8bfd; font-weight: 700; font-size: 16px; }
+
+/* ---------- in game ---------- */
+#app { position: fixed; inset: 0; }
+#game { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+#topbar { position: absolute; top: max(6px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; background: rgba(0,0,0,0.55); border-radius: 8px; padding: 4px 12px; font-weight: 700; pointer-events: none; }
+#topbar .t0 { color: #6fb0ff; } #topbar .t1 { color: #ff7b7f; }
+#clock { font-variant-numeric: tabular-nums; min-width: 44px; text-align: center; }
+
+#herobar { position: absolute; left: 50%; bottom: max(6px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; gap: 8px; align-items: center; background: rgba(0,0,0,0.6); border-radius: 10px; padding: 6px 10px; width: min(420px, 46vw); pointer-events: none; }
+#portrait { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #111; }
+#herobar .bars { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.bar { position: relative; height: 13px; background: #222; border-radius: 3px; overflow: hidden; }
+.bar > div { height: 100%; }
+.bar span { position: absolute; inset: 0; font-size: 10px; line-height: 13px; text-align: center; text-shadow: 0 1px 1px #000; }
+.bar.hp > div { background: #3fbf5f; } .bar.mana > div { background: #3d7bfd; }
+.bar.xp { height: 4px; } .bar.xp > div { background: #c58bff; }
+#herobar .stats { font-size: 11px; line-height: 1.35; white-space: nowrap; }
+#herobar .gold b { color: #ffd23f; }
+
+#actions { position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); width: 200px; height: 180px; }
+#actions button { position: absolute; border-radius: 50%; border: 2px solid rgba(255,255,255,0.35); background: rgba(20,30,24,0.75); display: grid; place-items: center; touch-action: none; }
+#btn-attack { right: 0; bottom: 0; width: 88px; height: 88px; background: rgba(170,50,50,0.8) !important; font-weight: 800; font-size: 14px; }
+.ability { width: 56px; height: 56px; align-content: center; gap: 1px; }
+.ability b { font-size: 15px; line-height: 1; }
+.ability .name { font-size: 8px; line-height: 1.05; max-width: 52px; text-align: center; opacity: 0.85; }
+.ability.soon { opacity: 0.5; }
+.ability.passive { border-style: dashed !important; }
+.ability.locked { filter: grayscale(1); }
+#btn-q { right: 100px; bottom: 2px; } #btn-w { right: 88px; bottom: 70px; } #btn-r { right: 20px; bottom: 102px; border-color: #ffd23f !important; }
+
+#joy-base { display: none; position: absolute; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.25); pointer-events: none; }
+#joy-knob { position: absolute; left: 35px; top: 35px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,0.4); }
+
+#hint { position: absolute; left: 8px; bottom: 8px; font-size: 11px; opacity: 0.55; pointer-events: none; max-width: 28vw; }
+@media (pointer: coarse) { #hint { display: none; } }
+
+.overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; pointer-events: none; }
+#respawn { background: rgba(0,0,0,0.35); font-size: 22px; }
+#gameover { background: rgba(0,0,0,0.7); pointer-events: auto; }
+#gameover .box { text-align: center; }
+#gameover h2 { font-size: 48px; margin: 0; } #gameover h2.win { color: #6fb0ff; } #gameover h2.lose { color: #ff7b7f; }
+#btn-restart { margin-top: 12px; padding: 10px 22px; border-radius: 10px; border: 0; background: #3d8bfd; font-weight: 700; }
+
+#rotate { display: none; position: fixed; inset: 0; z-index: 10; background: #0d150f; align-items: center; justify-content: center; font-size: 18px; padding: 24px; text-align: center; }
+@media (orientation: portrait) and (pointer: coarse) { #rotate { display: flex; } }
