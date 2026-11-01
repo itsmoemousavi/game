@@ -2,7 +2,9 @@
 
 Mobile 3v3 lane-strategy game in the spirit of Dota 2. Destroy the enemy towers, break a barracks, take down the two shrine towers, then destroy the enemy **Shrine**. Empty slots are filled with bots.
 
-See **[docs/DESIGN.md](docs/DESIGN.md)** for the full design, tech plan and roadmap.
+See **[docs/DESIGN.md](docs/DESIGN.md)** for the full design, tech plan and roadmap, and **[docs/3D-PLAN.md](docs/3D-PLAN.md)** for how the 3D version will work.
+
+**Branches:** `main` is the stable 2D game. New work happens on a working branch and arrives through a pull request; every push to that branch redeploys the test build below.
 
 ## Play it
 

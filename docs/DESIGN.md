@@ -259,7 +259,7 @@ Numbers are in `src/sim/constants.ts`, `data/units.ts` and `objectives.ts`.
 5. Smarter bots: abilities, items, teamfights, difficulty settings
 6. Polish: sound, effects, fog of war, scoreboard, settings, tutorial; **balance target: 15–20 min matches** (an all-bot match currently takes ~30–45 min; items should shorten it)
 7. Capacitor packaging, on-device performance tests (low-end Android), test builds via TestFlight / Play internal testing
-8. 3D renderer (Three.js), art direction, animations
+8. 3D renderer (Three.js), art direction, animations. See [3D-PLAN.md](3D-PLAN.md) for the plan and concept renders.
 9. Phase 2: online multiplayer (authoritative server, matchmaking, reconnect), accounts
 
 Milestone 5 (done): denying, wards, river power-ups, the Warden boss + revive charm, buyback, tower shield, backdoor protection, sound effects.
