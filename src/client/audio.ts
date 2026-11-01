@@ -38,6 +38,7 @@ export type SoundName =
   | 'revive'
   | 'purchase'
   | 'click'
+  | 'ping'
   | 'victory'
   | 'defeat';
 
@@ -117,6 +118,10 @@ const RECIPES: Record<SoundName, Recipe> = {
     s.tone('sine', 2000, 2000, 0.12, 0.15 * v, 0.05);
   },
   click: (s, v) => s.tone('sine', 900, 700, 0.04, 0.12 * v),
+  ping: (s, v) => {
+    s.tone('sine', 1180, 1180, 0.09, 0.2 * v);
+    s.tone('sine', 1580, 1580, 0.12, 0.2 * v, 0.09);
+  },
   victory: (s, v) => [523, 659, 784, 1046, 1318].forEach((f, i) => s.tone('triangle', f, f, 0.4, 0.25 * v, i * 0.15)),
   defeat: (s, v) => [392, 349, 311, 262].forEach((f, i) => s.tone('triangle', f, f, 0.5, 0.22 * v, i * 0.22)),
 };

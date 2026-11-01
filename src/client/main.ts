@@ -1,11 +1,13 @@
 import './style.css';
-import { BotDifficulty, DT, HEROES, HERO_IDS, HeroId, LANE_IDS, LaneId, PlayerSlot, Team, World } from '../sim';
+import { BotDifficulty, DT, HEROES, HERO_IDS, HeroId, LANE_IDS, LaneId, PlayerSlot, Team, World, XP_TABLE } from '../sim';
 import { Hud } from './hud';
 import { Input } from './input';
 import { ItemsUi } from './items-ui';
 import { Sfx } from './audio';
+import { Tutorial, spawnDummy } from './tutorial';
 import { playEvents } from './sound-events';
-import { GameEvent, HEROES as HERO_DEFS, RUNE_INFO, RuneKind, TEAM_NAMES } from '../sim';
+import { GameEvent, HEROES as HERO_DEFS, PingKind, RUNE_INFO, RuneKind, TEAM_NAMES } from '../sim';
+import { PING_STYLE } from './renderer';
 import { Renderer } from './renderer';
 import { enterImmersive, setupLandscape } from './screen';
 
@@ -83,7 +85,9 @@ for (const d of ['easy', 'normal', 'hard'] as BotDifficulty[]) {
   diffs.appendChild(b);
 }
 
-$<HTMLButtonElement>('#btn-play').addEventListener('click', () => startMatch());
+$<HTMLButtonElement>('#btn-play').addEventListener('click', () => startMatch('bots'));
+$<HTMLButtonElement>('#btn-practice').addEventListener('click', () => startMatch('practice'));
+$<HTMLButtonElement>('#btn-tutorial').addEventListener('click', () => startMatch('tutorial'));
 
 // ------------------------------------------------------------- match setup
 
@@ -132,6 +136,29 @@ const onTap = (sel: string, fn: () => void) =>
     fn();
   });
 onTap('#btn-glyph', () => world?.enqueue({ type: 'glyph', unitId: myHeroId }));
+// Pings: open the menu, pick a ping, then tap the map or minimap to place it.
+const pingMenu = $<HTMLElement>('#ping-menu');
+const pingBtn = $<HTMLElement>('#btn-ping');
+onTap('#btn-ping', () => {
+  if (input?.pingKind) {
+    input.pingKind = null;
+    pingBtn.classList.remove('armed');
+    return;
+  }
+  pingMenu.classList.toggle('hidden');
+});
+pingMenu.querySelectorAll<HTMLElement>('[data-ping]').forEach((b) =>
+  b.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!input) return;
+    input.pingKind = b.dataset.ping as PingKind;
+    input.onPingPlaced = () => pingBtn.classList.remove('armed');
+    pingMenu.classList.add('hidden');
+    pingBtn.classList.add('armed');
+    hud.toast('Tap the map or minimap to place the ping', '#f59e0b');
+  }),
+);
 onTap('#btn-buyback', () => world?.enqueue({ type: 'buyback', unitId: myHeroId }));
 // ------------------------------------------------------------- settings
 
@@ -281,6 +308,13 @@ function announce(w: World, events: GameEvent[]) {
       hud.goldLost(e.amount);
       continue;
     }
+    if (e.type === 'ping') {
+      if (e.ping.team !== myTeam) continue;
+      const st = PING_STYLE[e.ping.kind];
+      hud.toast(`${name(e.ping.fromId)}: ${st.label}`, st.color);
+      sfx.play('ping');
+      continue;
+    }
     if (e.type === 'announce') {
       if (hud.announce(w, e, myTeam)) sfx.play(w.unit(e.unitId)?.team === myTeam ? 'victory' : 'defeat', 0.5);
       continue;
@@ -312,10 +346,46 @@ function announce(w: World, events: GameEvent[]) {
   }
 }
 
-function startMatch() {
+type Mode = 'bots' | 'practice' | 'tutorial';
+let tutorial: Tutorial | null = null;
+const practicePanel = $<HTMLElement>('#practice');
+
+// Practice tools (offline only: they change the simulation directly).
+practicePanel.querySelectorAll<HTMLElement>('[data-cheat]').forEach((b) =>
+  b.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const me = world?.unit(myHeroId);
+    if (!world || !me?.hero) return;
+    const h = me.hero;
+    switch (b.dataset.cheat) {
+      case 'level':
+        if (h.level < 15) world.giveXp(me, XP_TABLE[h.level] - h.xp);
+        break;
+      case 'gold':
+        h.gold += 1000;
+        break;
+      case 'refresh':
+        for (const a of h.abilities) a.cooldown = 0;
+        for (const it of h.items) if (it) it.cooldown = 0;
+        me.hp = me.maxHp;
+        me.mana = me.maxMana;
+        break;
+      case 'dummy':
+        spawnDummy(world, me.x + Math.cos(me.facing) * 6, me.y + Math.sin(me.facing) * 6);
+        break;
+    }
+  }),
+);
+
+function startMatch(m: Mode) {
   select.classList.add('hidden');
   app.classList.remove('hidden');
-  world = new World({ seed: (Date.now() & 0xffff) + 1, slots: buildSlots() });
+  const slots = m === 'bots' ? buildSlots() : [{ team: myTeam, heroId: pickedHero, controller: 'human' as const, lane: pickedLane }];
+  world = new World({ seed: (Date.now() & 0xffff) + 1, slots });
+  practicePanel.classList.toggle('hidden', m !== 'practice');
+  tutorial?.hide();
+  tutorial = m === 'tutorial' ? new Tutorial($<HTMLElement>('#tutorial'), () => (tutorial = null)) : null;
   myHeroId = world.heroes.find((h) => h.hero!.controller === 'human')!.id;
   renderer = new Renderer(canvas, world.map);
   input?.destroy();
@@ -326,6 +396,8 @@ function startMatch() {
   sfx.unlock();
   const mm = renderer.minimapRect();
   $<HTMLElement>('#btn-glyph').style.top = `${mm.y + mm.size + 10}px`;
+  $<HTMLElement>('#btn-ping').style.top = `${mm.y + mm.size + 58}px`;
+  $<HTMLElement>('#ping-menu').style.top = `${mm.y + mm.size + 10}px`;
   hud.setHero(world.unit(myHeroId)!);
   world.applyCommand({ type: 'setAutoAttack', unitId: myHeroId, enabled: settings.autoAttack });
   settingsPanel.classList.add('hidden');
@@ -343,6 +415,8 @@ setupLandscape($<HTMLElement>('#root'), () => {
   if (renderer) {
     const mm = renderer.minimapRect();
     $<HTMLElement>('#btn-glyph').style.top = `${mm.y + mm.size + 10}px`;
+  $<HTMLElement>('#btn-ping').style.top = `${mm.y + mm.size + 58}px`;
+  $<HTMLElement>('#ping-menu').style.top = `${mm.y + mm.size + 10}px`;
   }
 });
 
@@ -359,6 +433,7 @@ function frame(now: number) {
       input.flush(world);
       world.step();
       renderer.pushEvents(world, world.events, myHeroId);
+      tutorial?.update(world, world.unit(myHeroId)!);
       playEvents(sfx, world, world.events, myHeroId, myTeam, { x: renderer.camX, y: renderer.camY });
       announce(world, world.events);
       for (const e of world.events) {
@@ -370,6 +445,10 @@ function frame(now: number) {
       acc -= DT;
     }
     const me = world.unit(myHeroId)!;
+    if (tutorial) {
+      if (input.peeking) tutorial.peeked = true;
+      renderer.marker = tutorial.marker?.(world, me) ?? null;
+    } else renderer.marker = null;
     // Back from the dead (or done peeking): camera returns to the hero.
     if (me.alive && renderer.freeCamera && !input.peeking) renderer.follow();
     renderer.render(world, acc / DT, me, myTeam, input.aim);

@@ -36,3 +36,21 @@ describe('smarter bots', () => {
     expect(w.teamKills[0]).toBeGreaterThan(w.teamKills[1]);
   }, 120_000);
 });
+
+describe('pings', () => {
+  it('bots answer a "gather here" ping', () => {
+    const slots: PlayerSlot[] = [];
+    HERO_IDS.slice(0, 3).forEach((heroId, i) => slots.push({ team: 0, heroId, controller: i === 0 ? 'human' : 'bot', lane: LANE_IDS[i] }));
+    HERO_IDS.slice(0, 3).forEach((heroId, i) => slots.push({ team: 1, heroId, controller: 'human', lane: LANE_IDS[i] }));
+    const w = new World({ seed: 32, slots });
+    const me = w.heroes.find((h) => h.team === 0 && h.hero!.controller === 'human')!;
+    run(w, 3);
+    const spot = { x: 52, y: 104 }; // our jungle
+    w.applyCommand({ type: 'ping', unitId: me.id, kind: 'gather', x: spot.x, y: spot.y });
+    expect(w.pings.length).toBe(1);
+    run(w, 9);
+    const bots = w.heroes.filter((h) => h.team === 0 && h.hero!.controller === 'bot');
+    const close = bots.filter((b) => Math.hypot(b.x - spot.x, b.y - spot.y) < 14);
+    expect(close.length).toBeGreaterThanOrEqual(1);
+  }, 30_000);
+});

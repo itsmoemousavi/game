@@ -1,4 +1,4 @@
-import { Command, HEROES, ITEMS, Unit, World, abilityDef, castBlocker } from '../sim';
+import { Command, HEROES, ITEMS, PingKind, Unit, World, abilityDef, castBlocker } from '../sim';
 import type { Renderer } from './renderer';
 import { toLocal } from './screen';
 
@@ -42,6 +42,10 @@ export class Input {
   /** Long-press info card for an ability (null hides it). */
   onTip: (slot: number | null) => void = () => {};
   private tip: { pointer: number; timer: ReturnType<typeof setTimeout> | null; shown: boolean } | null = null;
+
+  /** A ping waiting to be placed: the next tap on the map or minimap places it. */
+  pingKind: PingKind | null = null;
+  onPingPlaced: () => void = () => {};
 
   /** Inventory slot of a ward waiting to be placed: the next tap on the field places it. */
   wardSlot: number | null = null;
@@ -225,7 +229,17 @@ export class Input {
     const { x: sx, y: sy } = toLocal(e.clientX, e.clientY);
 
     const mm = this.renderer.minimapRect();
-    if (sx >= mm.x && sy >= mm.y && sx <= mm.x + mm.size && sy <= mm.y + mm.size) {
+    const onMinimap = sx >= mm.x && sy >= mm.y && sx <= mm.x + mm.size && sy <= mm.y + mm.size;
+    // Placing a ping: this tap (on the map or the minimap) chooses where.
+    if (this.pingKind) {
+      const k = this.world().map.size / mm.size;
+      const p = onMinimap ? { x: (sx - mm.x) * k, y: (sy - mm.y) * k } : this.renderer.screenToWorld(sx, sy);
+      this.queue.push({ type: 'ping', unitId: this.heroId(), kind: this.pingKind, x: p.x, y: p.y });
+      this.pingKind = null;
+      this.onPingPlaced();
+      return;
+    }
+    if (onMinimap) {
       const k = this.world().map.size / mm.size;
       const wx = (sx - mm.x) * k;
       const wy = (sy - mm.y) * k;

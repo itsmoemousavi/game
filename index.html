@@ -20,6 +20,8 @@
         <span>Bots</span>
         <div id="diff-pick"></div>
         <button id="btn-play">Play vs Bots</button>
+        <button id="btn-practice" class="alt">Practice</button>
+        <button id="btn-tutorial" class="alt">Tutorial</button>
       </div>
     </section>
 
@@ -91,6 +93,14 @@
       <div id="hint">Arrows / right-click: move · click enemy or Space: attack · Q W R: cast at cursor · Ctrl+Q/W/R or "+": learn · hold minimap: look · right-click minimap: walk · wheel: zoom</div>
 
       <div id="respawn"><span id="killed-by"></span>Respawning in <b id="respawn-time">0</b> <button id="btn-buyback">Buy back <b id="buyback-cost">0</b></button></div>
+      <button id="btn-ping" title="Ping your team">📍</button>
+      <div id="ping-menu" class="hidden">
+        <button data-ping="attack">⚔ Attack</button>
+        <button data-ping="defend">⛨ Defend</button>
+        <button data-ping="gather">⚑ Gather</button>
+        <button data-ping="retreat">⟲ Retreat</button>
+        <button data-ping="missing">? Enemy missing</button>
+      </div>
       <button id="btn-glyph" title="Tower shield: all your buildings invulnerable for 5 seconds (team cooldown 5 min)">🛡<span class="cd"></span></button>
       <button id="btn-settings" title="Settings">⚙</button>
       <button id="btn-pause" title="Pause">⏸</button>
@@ -124,6 +134,14 @@
       <div id="toasts"></div>
       <div id="killfeed"></div>
       <div id="announce"></div>
+      <div id="tutorial" class="hidden"></div>
+      <div id="practice" class="hidden">
+        <b>Practice</b>
+        <button data-cheat="level">+1 level</button>
+        <button data-cheat="gold">+1000 gold</button>
+        <button data-cheat="refresh">Refresh</button>
+        <button data-cheat="dummy">Dummy</button>
+      </div>
       <div id="gameover" class="overlay">
         <div class="box">
           <h2 id="gameover-title">Victory</h2>

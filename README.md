@@ -30,12 +30,14 @@ npx vite-node scripts/simulate.ts [seed] [minutes]   # headless all-bot match lo
 | Abilities | **Hold** Q/W/R: arrow appears · **drag** any direction to aim · release to cast · release on ✕ Cancel to abort | Q / W / R cast at the cursor |
 | Items | Tap an item to use it (salves) · **ward**: tap its slot, then tap the ground · 🛒 opens the shop (buy at base) · **TP** slot: tap, then pick a friendly building (teleports are bought in the shop) | same (click) |
 | Deny | Tap one of your own creeps below half health (or your own tower below 10%) | Click it |
-| Team | 🛡 under the minimap: tower shield · **Buy back** in the respawn banner | same (click) |
+| Team | 🛡 under the minimap: tower shield · 📍 ping (pick one, then tap the map/minimap) · **Buy back** in the respawn banner | same (click) |
 | Info | Tap the **top bar** for the scoreboard · tap your **portrait (ⓘ)** for hero stats · **long-press** an ability for its details | same (click / hold) |
 | Menu | **⏸** pause (resume / surrender) · **⚙** settings: auto attack, sound, auto-learn, left-handed, vibration, joystick size, camera zoom | same (click) |
 | Shopping | The button next to 🛒 quick-buys the next recommended item (at base) | same (click) |
 | Learn ability | Tap the yellow **+** next to the button | Ctrl + Q / W / R |
 | Camera | Hold/drag the minimap to look (while looking, the joystick is off and taps on the map are orders); release to return · while dead, drag anywhere to look around | Hold minimap to look, right-click minimap to walk there, wheel to zoom |
+
+Start screen: **Play vs Bots** (pick bot difficulty), **Practice** (alone, with level/gold/dummy tools) or **Tutorial** (guided first steps).
 
 The game always plays in landscape: on a phone held upright the game is shown sideways, so just turn the phone.
 

@@ -1,4 +1,4 @@
-import { GameEvent, GameMap, HEROES, ITEMS, LANE_IDS, RUNE_INFO, Side, Team, Unit, WARD_CAST_RANGE, World, isInvisible, isNight } from '../sim';
+import { GameEvent, GameMap, HEROES, ITEMS, LANE_IDS, PING_DURATION, PingKind, RUNE_INFO, Side, Team, Unit, WARD_CAST_RANGE, World, isInvisible, isNight } from '../sim';
 import type { Aim } from './input';
 
 /**
@@ -9,6 +9,13 @@ import type { Aim } from './input';
 export const TEAM_COLORS: Record<Side, string> = { 0: '#3d8bfd', 1: '#e5484d', 2: '#b08a55' };
 const TEAM_DARK: Record<Side, string> = { 0: '#1d4f9e', 1: '#8f2226', 2: '#6b5232' };
 const PX_PER_UNIT_BAKED = 6;
+export const PING_STYLE: Record<PingKind, { color: string; icon: string; label: string }> = {
+  attack: { color: '#ef4444', icon: '⚔', label: 'Attack!' },
+  defend: { color: '#3b82f6', icon: '⛨', label: 'Defend!' },
+  gather: { color: '#22c55e', icon: '⚑', label: 'Gather here!' },
+  retreat: { color: '#facc15', icon: '⟲', label: 'Retreat!' },
+  missing: { color: '#c084fc', icon: '?', label: 'Enemy missing!' },
+};
 
 export class Renderer {
   readonly ctx: CanvasRenderingContext2D;
@@ -29,6 +36,8 @@ export class Renderer {
   private floaters: { x: number; y: number; t: number; text: string; color: string; big?: boolean }[] = [];
   /** Inventory slot of a ward being placed (shows the placement range). */
   wardMode: number | null = null;
+  /** Tutorial highlight on the map. */
+  marker: { x: number; y: number } | null = null;
   /** Free camera: set while dead, or while the player holds the minimap. */
   private lookTarget: { x: number; y: number } | null = null;
   private fogCanvas: HTMLCanvasElement;
@@ -392,6 +401,24 @@ export class Renderer {
     ctx.globalAlpha = 1;
 
     this.drawFog(w, viewTeam);
+    this.drawPings(w, viewTeam);
+    if (this.marker) {
+      const pulse = (w.time * 1.2) % 1;
+      ctx.strokeStyle = '#ffd23f';
+      ctx.lineWidth = 0.35;
+      ctx.globalAlpha = 1 - pulse * 0.7;
+      ctx.beginPath();
+      ctx.arc(this.marker.x, this.marker.y, 1.5 + pulse * 3, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      if (focus?.alive) {
+        // Arrow from the hero toward the marker when it's further away.
+        const dx = this.marker.x - focus.x;
+        const dy = this.marker.y - focus.y;
+        const d = Math.hypot(dx, dy);
+        if (d > 6) this.arrow(focus.x + (dx / d) * 2, focus.y + (dy / d) * 2, focus.x + (dx / d) * 5, focus.y + (dy / d) * 5, '255,210,63');
+      }
+    }
     if (aim && focus && focus.alive) this.drawAim(w, focus, lerp(focus), aim);
     ctx.restore();
     if (isNight(w.time)) {
@@ -427,6 +454,30 @@ export class Renderer {
     const ctx = this.ctx;
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(this.fogCanvas, 0, 0, w.map.size, w.map.size);
+  }
+
+  private drawPings(w: World, team: Team) {
+    const ctx = this.ctx;
+    for (const p of w.pings) {
+      if (p.team !== team) continue;
+      const age = w.time - p.at;
+      if (age > PING_DURATION) continue;
+      const st = PING_STYLE[p.kind];
+      const pulse = (age * 1.6) % 1;
+      ctx.strokeStyle = st.color;
+      ctx.globalAlpha = 1 - pulse;
+      ctx.lineWidth = 0.35;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 1 + pulse * 4, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = st.color;
+      ctx.font = 'bold 2.2px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(st.icon, p.x, p.y);
+      ctx.textBaseline = 'alphabetic';
+    }
   }
 
   private drawSwings() {
@@ -914,6 +965,15 @@ export class Renderer {
         ctx.lineWidth = 1;
         ctx.stroke();
       } else ctx.fillRect(ux - 1, uy - 1, 2, 2);
+    }
+    for (const p of w.pings) {
+      if (p.team !== viewTeam || w.time - p.at > PING_DURATION) continue;
+      const pulse = ((w.time - p.at) * 1.6) % 1;
+      ctx.strokeStyle = PING_STYLE[p.kind].color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x + p.x * k, y + p.y * k, 3 + pulse * 7, 0, Math.PI * 2);
+      ctx.stroke();
     }
     const vw = (this.cssW / this.zoom) * k;
     const vh = (this.cssH / this.zoom) * k;

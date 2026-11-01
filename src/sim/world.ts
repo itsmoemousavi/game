@@ -79,6 +79,8 @@ export type Command =
   | { type: 'setAutoLearn'; unitId: number; enabled: boolean }
   /** Give up: the other team wins. */
   | { type: 'surrender'; unitId: number }
+  /** Team ping on the map (bots on your team react to it). */
+  | { type: 'ping'; unitId: number; kind: PingKind; x: number; y: number }
   | { type: 'stop'; unitId: number }
   /** Use ability `slot` (0 = Q, 1 = W, 2 = R). Give targetId for unit-target abilities, x/y otherwise. */
   | { type: 'cast'; unitId: number; slot: number; targetId?: number; x?: number; y?: number }
@@ -204,6 +206,7 @@ export interface HeroState {
   goldEarned: number;
   /** Hero kills since this hero last died. */
   streak: number;
+  lastPingAt: number;
   /** Kills in quick succession (multi-kills) and when the last one happened. */
   multi: number;
   lastKillAt: number;
@@ -362,6 +365,7 @@ export type GameEvent =
   | { type: 'revive'; unitId: number }
   | { type: 'purchase'; unitId: number }
   | { type: 'goldLost'; unitId: number; amount: number }
+  | { type: 'ping'; ping: Ping }
   | { type: 'blink'; unitId: number; fromX: number; fromY: number }
   /** Announcer moments: first blood, multi-kills, kill streaks, shutdowns. */
   | { type: 'announce'; unitId: number; victimId: number; firstBlood: boolean; multi: number; streak: number; shutdown: number }
@@ -371,6 +375,20 @@ export type GameEvent =
   | { type: 'damage'; sourceId: number; targetId: number; amount: number; kind: DamageKind; crit: boolean };
 
 export type DamageKind = 'attack' | 'spell';
+
+export type PingKind = 'attack' | 'retreat' | 'defend' | 'missing' | 'gather';
+export interface Ping {
+  id: number;
+  team: Team;
+  kind: PingKind;
+  x: number;
+  y: number;
+  fromId: number;
+  at: number;
+}
+/** Pings stay on the map this long; a hero can ping at most this often. */
+export const PING_DURATION = 6;
+export const PING_COOLDOWN = 1.2;
 
 export interface PlayerSlot {
   team: Team;
@@ -407,6 +425,7 @@ export class World {
   readonly vision: Vision;
   nextId = 1;
   firstBlood = false;
+  pings: Ping[] = [];
   /** Set when the match ended by surrender (the team that gave up). */
   surrendered: Team | null = null;
   private nextCampSpawn = CAMP_FIRST_SPAWN;
@@ -520,7 +539,7 @@ export class World {
     if (!u || !u.hero) return;
     const h = u.hero;
     // Shopping works while dead (you respawn at the fountain); everything else needs a living hero.
-    const whileDead = ['buy', 'sell', 'buyTp', 'learn', 'buyback', 'glyph', 'surrender', 'setAutoAttack', 'setAutoLearn'];
+    const whileDead = ['buy', 'sell', 'buyTp', 'learn', 'buyback', 'glyph', 'surrender', 'setAutoAttack', 'setAutoLearn', 'ping'];
     if (!u.alive && !whileDead.includes(cmd.type)) return;
     if (h.channel && (cmd.type === 'moveDir' || cmd.type === 'moveTo' || cmd.type === 'attack' || cmd.type === 'attackNearest' || cmd.type === 'cast' || cmd.type === 'stop')) {
       if (cmd.type !== 'moveDir' || Math.hypot(cmd.dx, cmd.dy) >= 0.15) h.channel = null;
@@ -552,6 +571,14 @@ export class World {
       case 'setAutoAttack':
         h.autoAttack = cmd.enabled;
         break;
+      case 'ping': {
+        if (this.time - h.lastPingAt < PING_COOLDOWN) break;
+        h.lastPingAt = this.time;
+        const ping: Ping = { id: this.newId(), team: u.team as Team, kind: cmd.kind, x: cmd.x, y: cmd.y, fromId: u.id, at: this.time };
+        this.pings = this.pings.filter((p) => this.time - p.at < PING_DURATION && p.fromId !== u.id).concat(ping);
+        this.events.push({ type: 'ping', ping });
+        break;
+      }
       case 'setAutoLearn':
         h.autoLearn = cmd.enabled;
         break;
@@ -759,6 +786,7 @@ export class World {
       denies: 0,
       goldEarned: 0,
       streak: 0,
+      lastPingAt: -99,
       multi: 0,
       lastKillAt: -99,
       stats: { heroDamage: 0, buildingDamage: 0, healing: 0, damageTaken: 0 },

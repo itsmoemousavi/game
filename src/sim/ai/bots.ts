@@ -119,8 +119,18 @@ export function botThink(w: World, me: Unit) {
     return;
   }
 
-  const target = chooseTarget(w, me, hpRatio) ?? (diff !== 'easy' ? gankTarget(w, me, hpRatio) : undefined);
+  // Team pings: "retreat" near us → fall back; "enemy missing" → no chasing for a while.
+  const pings = w.pings.filter((p) => p.team === me.team && p.fromId !== me.id && w.time - p.at < 10);
+  const retreat = pings.find((p) => p.kind === 'retreat' && dist(p.x, p.y, me.x, me.y) < 35 && w.time - p.at < 5);
+  if (retreat) {
+    const back = pointAlong(path, Math.max(0, myProgress - 25));
+    w.applyCommand({ type: 'moveTo', unitId: me.id, x: back.x, y: back.y });
+    return;
+  }
+  const careful = pings.some((p) => p.kind === 'missing');
+  const target = chooseTarget(w, me, hpRatio) ?? (diff !== 'easy' && !careful ? gankTarget(w, me, hpRatio) : undefined);
   if (target && useAbilities(w, me, target)) return;
+  if (!target && answerPing(w, me, pings)) return;
   if (!target && (grabRune(w, me) || plantWard(w, me, path))) return;
   if (target) {
     if (me.hero!.order.type !== 'attack' || me.hero!.order.targetId !== target.id) {
@@ -442,4 +452,21 @@ function gankTarget(w: World, me: Unit, hpRatio: number): Unit | undefined {
         isSafe(w, me, e.x, e.y),
     )
     .sort((a, b) => a.hp - b.hp)[0];
+}
+
+/** "Attack / Defend / Gather here" from a teammate: go there (teleport if far). */
+function answerPing(w: World, me: Unit, pings: { kind: string; x: number; y: number }[]): boolean {
+  const call = pings.filter((p) => p.kind === 'attack' || p.kind === 'defend' || p.kind === 'gather').pop();
+  if (!call || me.hp < me.maxHp * 0.45) return false;
+  const d = dist(me.x, me.y, call.x, call.y);
+  if (d < 8) return false;
+  if (d > 60 && !tpBlocker(me)) {
+    const near = teleportTargets(w, me.team as Team).sort((a, b) => dist(a.x, a.y, call.x, call.y) - dist(b.x, b.y, call.x, call.y))[0];
+    if (near && dist(near.x, near.y, call.x, call.y) < d - 25) {
+      w.applyCommand({ type: 'teleport', unitId: me.id, targetId: near.id });
+      return true;
+    }
+  }
+  w.applyCommand({ type: 'moveTo', unitId: me.id, x: call.x, y: call.y });
+  return true;
 }

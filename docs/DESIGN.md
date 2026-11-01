@@ -192,6 +192,31 @@ Goal: 15–20 minute matches. Bots-only test matches went from 33–53 min to **
 - **Announcer:** a big banner in the middle of the screen with a short jingle (higher for your team, lower for the enemy).
 - **End of match:** a table of every player's level, K/D/A, last hits/denies, gold earned, damage to heroes, damage to buildings, healing and items, with a ★ MVP. It also appears after a surrender, saying who surrendered.
 
+### Pings (implemented)
+
+Tap 📍 under the minimap, pick a ping, then tap the map or the minimap where it should go. Teammates (and bots) see a pulsing marker on the map and minimap, plus a message with a sound. One ping per 1.2 s.
+
+| Ping | What bots do |
+|---|---|
+| ⚔ Attack / ⛨ Defend / ⚑ Gather | come there (teleporting if far and a building is closer), as long as they have more than 45% health |
+| ⟲ Retreat | bots within 35 m fall back down their lane |
+| ? Enemy missing | bots stop chasing kills for 10 s |
+
+### Practice mode and tutorial (implemented)
+
+- **Practice:** you alone on the map (creeps and buildings run as normal), with a tool panel: +1 level, +1000 gold, refresh cooldowns/health/mana, spawn a training dummy.
+- **Tutorial:** 8 guided steps with a marker and an arrow:
+  1. move with the joystick
+  2. learn Q
+  3. cast it on a dummy
+  4. finish the dummy with Attack
+  5. buy a Healing Salve
+  6. hold the minimap to look around
+  7. get 2 last hits
+  8. how to win
+
+  Each step completes when you do it; "Skip tutorial" ends it.
+
 ## 6b. Fog of war, day & night, jungle
 
 **Fog of war:**
@@ -347,7 +372,6 @@ Milestone 5 (done): denying, wards, river power-ups, the Warden boss + revive ch
 Done or dropped: high ground (done), talents (dropped for now), Android build (not now).
 
 These were proposed and are parked for later:
-- **Pings and quick-chat wheel:** "Attack", "Retreat", "Enemy missing".
 - **Balance:** bots-only test matches currently take 37–52 min; the target is 15–20 min.
 
 ## 9. Things to plan for before the store release
