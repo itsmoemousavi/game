@@ -23,20 +23,23 @@ npx vite-node scripts/simulate.ts [seed] [minutes]   # headless all-bot match lo
 
 | | Phone (landscape) | Desktop |
 |---|---|---|
-| Move | Drag anywhere on the left half (virtual joystick) | WASD / arrows, or right-click the ground |
+| Move | Drag anywhere on the left half (virtual joystick) | Arrow keys, or right-click the ground |
 | Attack | **Attack** button (auto-target, heroes first) or tap an enemy | Space, or click an enemy |
+| Abilities | **Tap** Q/W/R to quick-cast · **drag** to aim, release to cast · release on ✕ Cancel to abort | Q / W / R cast at the cursor |
+| Learn ability | Tap the yellow **+** next to the button | Ctrl + Q / W / R |
 | Map | Tap the minimap to walk there | Click the minimap; mouse wheel to zoom |
 
-Q / W / R ability buttons are placeholders until milestone 3.
+The game always plays in landscape: on a phone held upright the game is shown sideways, so just turn the phone.
 
 ## Layout
 
 ```
 src/sim/        deterministic game simulation (no rendering), reusable on a future server
   data/         heroes, creeps, structures (all balance numbers)
+  abilities.ts  how every ability works (numbers live in data/heroes.ts)
   ai/bots.ts    bot heroes
   map.ts        map, lanes, maze, structure placement
   world.ts      units, combat, creep waves, protection rules, win condition
-src/client/     2D renderer, touch/keyboard input, HUD (to be replaced by a 3D renderer later)
+src/client/     2D renderer, touch/keyboard input, HUD, landscape lock (renderer to be replaced by 3D later)
 tests/          vitest suites
 ```

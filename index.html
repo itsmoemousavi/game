@@ -9,6 +9,7 @@
     <title>Shrinefall</title>
   </head>
   <body>
+    <div id="root">
     <section id="select">
       <h1>Shrinefall <small>prototype</small></h1>
       <p class="tag">3v3 · Destroy the enemy Shrine · Empty slots are filled by bots</p>
@@ -46,13 +47,17 @@
       <div id="joy-base"><div id="joy-knob"></div></div>
 
       <div id="actions">
-        <button id="btn-q" class="ability soon"><b>Q</b><span class="name"></span></button>
-        <button id="btn-w" class="ability soon"><b>W</b><span class="name"></span></button>
-        <button id="btn-r" class="ability soon ult locked"><b>R</b><span class="name"></span></button>
+        <button id="btn-q" class="ability" data-slot="0"><b>Q</b><span class="name"></span><span class="pips"></span><span class="cd"></span></button>
+        <button id="btn-w" class="ability" data-slot="1"><b>W</b><span class="name"></span><span class="pips"></span><span class="cd"></span></button>
+        <button id="btn-r" class="ability ult" data-slot="2"><b>R</b><span class="name"></span><span class="pips"></span><span class="cd"></span></button>
+        <button class="learn" id="learn-q" data-learn="0">+</button>
+        <button class="learn" id="learn-w" data-learn="1">+</button>
+        <button class="learn" id="learn-r" data-learn="2">+</button>
         <button id="btn-attack">Attack</button>
       </div>
+      <div id="cancel-zone">✕ Cancel</div>
 
-      <div id="hint">WASD / right-click move · click enemy or Space to attack · wheel zoom · click minimap</div>
+      <div id="hint">Arrows / right-click: move · click enemy or Space: attack · Q W R: cast at cursor · Ctrl+Q/W/R or "+": learn · wheel: zoom</div>
 
       <div id="respawn" class="overlay"><div>Respawning in <b id="respawn-time">0</b></div></div>
       <div id="gameover" class="overlay">
@@ -63,8 +68,7 @@
         </div>
       </div>
     </div>
-
-    <div id="rotate">Rotate your device to landscape</div>
+    </div>
     <script type="module" src="/src/client/main.ts"></script>
   </body>
 </html>

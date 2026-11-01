@@ -3,6 +3,7 @@ import { DT, HEROES, HERO_IDS, HeroId, LANE_IDS, LaneId, PlayerSlot, Team, World
 import { Hud } from './hud';
 import { Input } from './input';
 import { Renderer } from './renderer';
+import { enterImmersive, setupLandscape } from './screen';
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 
@@ -32,7 +33,7 @@ for (const id of HERO_IDS) {
       <div class="hname">${d.name} <span>${d.title}</span></div>
       <div class="role">${d.role} · ${d.projectileSpeed ? 'Ranged' : 'Melee'}</div>
       <ul>${d.abilities
-        .map((a) => `<li><b>${a.slot}${a.ultimate ? ' (Ult)' : ''}</b> ${a.name}${a.kind === 'passive' ? ' <i>passive</i>' : ''}</li>`)
+        .map((a) => `<li><b>${a.slot}${a.ultimate ? ' (Ult)' : ''}</b> ${a.name}${a.targeting === 'passive' ? ' <i>passive</i>' : ''}</li>`)
         .join('')}</ul>
     </div>`;
   card.addEventListener('click', () => {
@@ -92,11 +93,10 @@ function startMatch() {
   input?.destroy();
   input = new Input(canvas, renderer, () => world!, () => myHeroId, app);
   hud.setHero(world.unit(myHeroId)!);
-  const tryFullscreen = document.documentElement.requestFullscreen?.bind(document.documentElement);
-  if (matchMedia('(pointer: coarse)').matches && tryFullscreen) tryFullscreen().catch(() => {});
+  void enterImmersive();
 }
 
-window.addEventListener('resize', () => renderer?.resize());
+setupLandscape($<HTMLElement>('#root'), () => renderer?.resize());
 
 // ------------------------------------------------------------- loop
 
@@ -112,7 +112,7 @@ function frame(now: number) {
       acc -= DT;
     }
     const me = world.unit(myHeroId)!;
-    renderer.render(world, acc / DT, me, myTeam);
+    renderer.render(world, acc / DT, me, myTeam, input.aim);
     hud.update(world, me, myTeam);
   } else acc = 0;
   requestAnimationFrame(frame);

@@ -6,7 +6,8 @@
 
 | Topic | Decision |
 |---|---|
-| Platform | **Mobile first** (iOS + Android, landscape), released on app stores after testing. Desktop browser is used for development/testing. |
+| Platform | **Mobile first** (iOS + Android), released on app stores after testing. Desktop browser is used for development/testing. |
+| Orientation | **Always landscape.** If the phone is held upright, the whole game is drawn rotated 90° (`src/client/screen.ts`) and touch input is converted to match. Native builds will also lock orientation to landscape in the Capacitor/Xcode/Android settings. |
 | Visuals | **2D top-down now, 3D later.** Game logic is fully separate from rendering so the 2D renderer can be replaced without touching gameplay. |
 | Mode | 3v3. Empty slots are filled with bots. Phase 1 is offline (you + 5 bots). |
 | Heroes | 3 to start (proposals below, expected to change). Each has 3 abilities; one is always the Ultimate. Abilities can be active or passive. |
@@ -69,12 +70,33 @@ If 3D performance in a Capacitor WebView ever becomes a blocker, the simulation 
 | **Vexa, the Gale Archer** | Ranged carry | *Piercing Arrow*: line skillshot | *Hunter's Rhythm* (passive): every 4th attack crits + speed burst | *Arrow Storm*: 3 s area barrage, damage + slow |
 | **Orin, the Emberseer** | Mage / support | *Fireball*: targeted AoE nuke | *Mending Flame*: heal an ally over time | *Cataclysm*: delayed meteor, huge damage + burning ground |
 
-Ability levels: basic abilities max level 4, ultimate max level 3 (learnable at levels 6 / 10 / 14). One skill point per level.
+Ability levels: basic abilities max level 4 (and at most ⌈hero level / 2⌉), ultimate max level 3 (learnable at levels 6 / 10 / 14). Heroes start with 1 skill point and gain 1 per level.
 
-### Mobile ability controls
-- **Tap:** quick-cast on an auto-selected target.
-- **Drag the button:** aim (skillshots/areas) and release to cast; drag to the cancel zone to abort.
-- **Passive abilities:** shown with a dashed border.
+**Implemented (milestone 3).** Numbers are in `src/sim/data/heroes.ts`; behaviour is in `src/sim/abilities.ts`.
+
+| Ability | Implementation |
+|---|---|
+| Shield Charge | dash up to 10 m; damages enemies touched; stops at the first hero and stuns it (1–1.6 s) |
+| Iron Hide | blocks 10–34 damage per attack (an attack always deals at least 40%); +4–10 armor below 50% HP |
+| Earthsplitter | 0.6 s wind-up (Brakk can't act), then 7 m radius damage 200–400 + stun 1.5–2.1 s |
+| Piercing Arrow | 18 m line, hits every enemy, 90–270 damage |
+| Hunter's Rhythm | every 4th attack ×1.4–2.0 damage and +15–30% move speed for 1.5 s |
+| Arrow Storm | 6 m area for 3 s, 70–140 damage per second, 30–40% slow |
+| Fireball | homing, explodes for 80–230 in a 3 m radius |
+| Mending Flame | heals an ally 120–300 over 4 s |
+| Cataclysm | lands after 1.5 s: 250–500 in 5 m, then burning ground 30–60 damage per second for 3 s |
+
+**Rules:**
+- Spells ignore armor but can't damage structures.
+- Stunned units can't move, attack or cast.
+- Unit-target spells walk into range automatically; ground-target spells are capped at max range.
+
+### Mobile ability controls (implemented)
+- **Tap:** quick-cast on the best target. Enemy heroes come first; heals go to the most hurt ally; aimed spells point at the nearest enemy hero.
+- **Drag the button:** aim, then release to cast. The aim indicator shows range, line width, area or the chosen target. Release over **✕ Cancel** to abort.
+- **"+" badge:** shown when a skill point can be spent; tap it to learn the ability.
+- **Button states:** cooldown seconds, blue when out of mana, dim until learned, dots for the ability's level, dashed border for passives.
+- **Desktop:** Q/W/R cast at the cursor, Ctrl+Q/W/R to learn.
 
 ## 6. Items (proposal)
 
@@ -97,7 +119,11 @@ Ability levels: basic abilities max level 4, ultimate max level 3 (learnable at 
 ## 7. Bots
 
 - Bots use the same commands as players, so a bot slot can later be handed to an online player.
-- **Current (milestone 2):**
+- **Current:**
+  - learn abilities (ultimate first)
+  - use nukes and stuns on enemy heroes; save ultimates for weakened targets or groups
+  - farm creep waves with area spells when mana is high
+  - Orin heals hurt allies
   - lane assignment
   - follow the creep wave
   - last-hit / harass
@@ -110,10 +136,10 @@ Ability levels: basic abilities max level 4, ultimate max level 3 (learnable at 
 
 1. ✅ Project setup, map + maze, camera, touch joystick / click-to-move, pathfinding
 2. ✅ Combat, creep waves, towers + protection rules, barracks → super creeps, shrine win condition, basic bots, hero select, HUD, minimap
-3. Abilities for the 3 heroes (data-driven ability system, buffs/debuffs, stuns, slows, projectiles, areas), skill points, mobile aim-and-release casting
+3. ✅ Abilities for the 3 heroes (data-driven ability system, buffs/debuffs, stuns, slows, projectiles, areas), skill points, mobile aim-and-release casting, bots use abilities, always-landscape
 4. Items, shop UI, gold sinks; neutral jungle camps
 5. Smarter bots: abilities, items, teamfights, difficulty settings
-6. Polish: sound, effects, fog of war, scoreboard, settings, tutorial; **balance target: 15–20 min matches** (an all-bot match currently takes ~40 min with no abilities or items)
+6. Polish: sound, effects, fog of war, scoreboard, settings, tutorial; **balance target: 15–20 min matches** (an all-bot match currently takes ~30–45 min; items should shorten it)
 7. Capacitor packaging, on-device performance tests (low-end Android), test builds via TestFlight / Play internal testing
 8. 3D renderer (Three.js), art direction, animations
 9. Phase 2: online multiplayer (authoritative server, matchmaking, reconnect), accounts

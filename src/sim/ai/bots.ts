@@ -1,28 +1,33 @@
 import { teamLanePath } from '../map';
 import { dist, pointAlong, projectOnPolyline } from '../math';
 import type { Unit, World } from '../world';
+import { abilityDef, botLearn, castBlocker } from '../abilities';
 
 /**
  * Bot heroes. Bots issue the exact same Commands a human does, so later on a bot
  * slot can be handed to an online player (or vice versa) without special cases.
  *
- * Current behaviour (milestone 2):
+ * Current behaviour:
+ *  - Learn abilities as they level (ultimate first) and use them on enemy heroes;
+ *    use area spells to farm creep waves when mana is high; heal hurt allies.
  *  - Retreat to fountain below 30% HP, return at 90%.
  *  - Back off when an enemy tower is shooting at us.
  *  - Fight: last-hit/kill creeps, attack weak enemy heroes, siege structures only
  *    when friendly creeps are tanking the tower.
  *  - Otherwise follow the front of our creep wave in the assigned lane.
- * Abilities, items and team fights come in later milestones.
+ * Items and coordinated team fights come in later milestones.
  */
 export function botThink(w: World, me: Unit) {
   const h = me.hero!;
   const hpRatio = me.hp / me.maxHp;
+  if (h.skillPoints > 0) botLearn(w, me);
+  if (supportAllies(w, me)) return;
 
   if (hpRatio < 0.3) h.bot.retreating = true;
   if (h.bot.retreating && hpRatio > 0.9) h.bot.retreating = false;
   if (h.bot.retreating) {
-    const f = w.map.fountains[me.team];
-    w.applyCommand({ type: 'moveTo', unitId: me.id, x: f.x, y: f.y });
+    const f = w.respawnPoint(me.team, h.slot);
+    if (dist(me.x, me.y, f.x, f.y) > 2) w.applyCommand({ type: 'moveTo', unitId: me.id, x: f.x, y: f.y });
     return;
   }
 
@@ -40,6 +45,7 @@ export function botThink(w: World, me: Unit) {
   }
 
   const target = chooseTarget(w, me, hpRatio);
+  if (target && useAbilities(w, me, target)) return;
   if (target) {
     if (me.hero!.order.type !== 'attack' || me.hero!.order.targetId !== target.id) {
       w.applyCommand({ type: 'attack', unitId: me.id, targetId: target.id });
@@ -129,4 +135,58 @@ function chooseTarget(w: World, me: Unit, hpRatio: number): Unit | undefined {
     }
   }
   return best;
+}
+
+const ready = (me: Unit, slot: number) => castBlocker(me, slot) === null;
+
+/** Healer bots top up hurt allies first. */
+function supportAllies(w: World, me: Unit): boolean {
+  const def = abilityDef(me, 1);
+  if (!def || def.targeting !== 'ally' || !ready(me, 1)) return false;
+  const hurt = w.units
+    .filter((a) => a.hero && a.alive && a.team === me.team && a.hp / a.maxHp < 0.55 && dist(a.x, a.y, me.x, me.y) <= def.castRange + 4)
+    .sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
+  if (!hurt) return false;
+  w.applyCommand({ type: 'cast', unitId: me.id, slot: 1, targetId: hurt.id });
+  return true;
+}
+
+function cast(w: World, me: Unit, slot: number, t: Unit) {
+  const def = abilityDef(me, slot)!;
+  if (def.targeting === 'enemy') w.applyCommand({ type: 'cast', unitId: me.id, slot, targetId: t.id });
+  else w.applyCommand({ type: 'cast', unitId: me.id, slot, x: t.x, y: t.y });
+}
+
+/** Returns true if a spell was cast this think. */
+function useAbilities(w: World, me: Unit, target: Unit): boolean {
+  const d = dist(me.x, me.y, target.x, target.y);
+  if (target.hero) {
+    for (const slot of [2, 0]) {
+      if (!ready(me, slot)) continue;
+      const def = abilityDef(me, slot)!;
+      if (def.targeting === 'passive' || def.targeting === 'ally') continue;
+      const range = def.targeting === 'none' ? def.radius - 1 : def.castRange;
+      if (d > range) continue;
+      // Save ultimates for a real fight: weakened target, or several enemies clumped.
+      if (def.ultimate) {
+        const clumped = w.units.filter((e) => e.hero && e.alive && e.team !== me.team && dist(e.x, e.y, target.x, target.y) < def.radius).length;
+        if (target.hp / target.maxHp > 0.75 && clumped < 2) continue;
+      }
+      cast(w, me, slot, target);
+      return true;
+    }
+    return false;
+  }
+  // Farming: blast creep waves with the basic nuke when mana is plentiful.
+  if (target.creep && me.mana > me.maxMana * 0.7 && ready(me, 0)) {
+    const def = abilityDef(me, 0)!;
+    if ((def.targeting === 'enemy' || (def.targeting === 'direction' && def.id === 'piercingArrow')) && d <= def.castRange) {
+      const pack = w.units.filter((c) => c.creep && c.alive && c.team !== me.team && dist(c.x, c.y, target.x, target.y) < 4).length;
+      if (pack >= 3) {
+        cast(w, me, 0, target);
+        return true;
+      }
+    }
+  }
+  return false;
 }

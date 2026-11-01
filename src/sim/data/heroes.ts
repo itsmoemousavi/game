@@ -1,16 +1,45 @@
 /**
  * Hero definitions. Everything about a hero is data so we can rebalance or swap heroes
- * without touching game logic. Abilities are described here and will be implemented
- * in milestone 3 (see docs/DESIGN.md).
+ * without touching game logic. Ability behaviour lives in ../abilities.ts.
  */
 export type HeroId = 'brakk' | 'vexa' | 'orin';
 export type HeroRole = 'Tank / Initiator' | 'Ranged Carry' | 'Mage / Support';
 
+export type AbilityId =
+  | 'shieldCharge'
+  | 'ironHide'
+  | 'earthsplitter'
+  | 'piercingArrow'
+  | 'huntersRhythm'
+  | 'arrowStorm'
+  | 'fireball'
+  | 'mendingFlame'
+  | 'cataclysm';
+
+/**
+ * How an ability is aimed.
+ *  - none:      instant, centred on the caster
+ *  - direction: skillshot / dash toward a point (range = max travel)
+ *  - point:     ground-targeted area within cast range
+ *  - enemy:     targets an enemy unit
+ *  - ally:      targets an allied hero (or self)
+ *  - passive:   always on
+ */
+export type Targeting = 'none' | 'direction' | 'point' | 'enemy' | 'ally' | 'passive';
+
 export interface AbilityDef {
+  id: AbilityId;
   slot: 'Q' | 'W' | 'R';
   name: string;
-  kind: 'active' | 'passive';
   ultimate: boolean;
+  targeting: Targeting;
+  castRange: number;
+  /** Radius (areas) or width (lines) used for the aim indicator. */
+  radius: number;
+  /** Per ability level (index 0 = level 1). */
+  manaCost: number[];
+  cooldown: number[];
+  values: Record<string, number[]>;
   summary: string;
 }
 
@@ -65,25 +94,43 @@ export const HEROES: Record<HeroId, HeroDef> = {
     moveSpeed: 7,
     abilities: [
       {
+        id: 'shieldCharge',
         slot: 'Q',
         name: 'Shield Charge',
-        kind: 'active',
         ultimate: false,
-        summary: 'Dashes forward, damaging and stunning the first enemy hero hit.',
+        targeting: 'direction',
+        castRange: 10,
+        radius: 1.6,
+        manaCost: [80, 85, 90, 95],
+        cooldown: [13, 12, 11, 10],
+        values: { damage: [70, 110, 150, 190], stun: [1, 1.2, 1.4, 1.6] },
+        summary: 'Dashes forward, damaging enemies in the way. Stops at the first enemy hero and stuns it.',
       },
       {
+        id: 'ironHide',
         slot: 'W',
         name: 'Iron Hide',
-        kind: 'passive',
         ultimate: false,
-        summary: 'Blocks a flat amount of damage from every attack; bonus armor when below 50% health.',
+        targeting: 'passive',
+        castRange: 0,
+        radius: 0,
+        manaCost: [0, 0, 0, 0],
+        cooldown: [0, 0, 0, 0],
+        values: { block: [10, 18, 26, 34], lowHpArmor: [4, 6, 8, 10] },
+        summary: 'Passive. Blocks flat damage from every attack. Bonus armor while below 50% health.',
       },
       {
+        id: 'earthsplitter',
         slot: 'R',
         name: 'Earthsplitter',
-        kind: 'active',
         ultimate: true,
-        summary: 'After a short wind-up, slams the ground: big area damage and stun around Brakk.',
+        targeting: 'none',
+        castRange: 0,
+        radius: 7,
+        manaCost: [150, 175, 200],
+        cooldown: [80, 70, 60],
+        values: { damage: [200, 300, 400], stun: [1.5, 1.8, 2.1], windup: [0.6, 0.6, 0.6] },
+        summary: 'After a short wind-up, slams the ground: damages and stuns all enemies around Brakk.',
       },
     ],
   },
@@ -110,25 +157,43 @@ export const HEROES: Record<HeroId, HeroDef> = {
     moveSpeed: 7.2,
     abilities: [
       {
+        id: 'piercingArrow',
         slot: 'Q',
         name: 'Piercing Arrow',
-        kind: 'active',
         ultimate: false,
-        summary: 'Fires a long skillshot arrow that damages every enemy in a line.',
+        targeting: 'direction',
+        castRange: 18,
+        radius: 1.2,
+        manaCost: [90, 95, 100, 105],
+        cooldown: [10, 9, 8, 7],
+        values: { damage: [90, 150, 210, 270] },
+        summary: 'Fires a long arrow that damages every enemy in a line.',
       },
       {
+        id: 'huntersRhythm',
         slot: 'W',
         name: "Hunter's Rhythm",
-        kind: 'passive',
         ultimate: false,
-        summary: 'Every 4th attack deals critical damage and briefly grants move speed.',
+        targeting: 'passive',
+        castRange: 0,
+        radius: 0,
+        manaCost: [0, 0, 0, 0],
+        cooldown: [0, 0, 0, 0],
+        values: { critMult: [1.4, 1.6, 1.8, 2.0], speedPct: [15, 20, 25, 30] },
+        summary: 'Passive. Every 4th attack is a critical hit and grants a burst of move speed.',
       },
       {
+        id: 'arrowStorm',
         slot: 'R',
         name: 'Arrow Storm',
-        kind: 'active',
         ultimate: true,
-        summary: 'Rains arrows on a target area for 3s, damaging and slowing enemies inside.',
+        targeting: 'point',
+        castRange: 14,
+        radius: 6,
+        manaCost: [125, 150, 175],
+        cooldown: [70, 60, 50],
+        values: { dps: [70, 105, 140], slowPct: [30, 35, 40], duration: [3, 3, 3] },
+        summary: 'Rains arrows on an area for 3 seconds, damaging and slowing enemies inside.',
       },
     ],
   },
@@ -155,28 +220,52 @@ export const HEROES: Record<HeroId, HeroDef> = {
     moveSpeed: 6.8,
     abilities: [
       {
+        id: 'fireball',
         slot: 'Q',
         name: 'Fireball',
-        kind: 'active',
         ultimate: false,
-        summary: 'Hurls a fireball at a target; explodes for area damage.',
+        targeting: 'enemy',
+        castRange: 11,
+        radius: 3,
+        manaCost: [90, 100, 110, 120],
+        cooldown: [8, 8, 8, 8],
+        values: { damage: [80, 130, 180, 230] },
+        summary: 'Hurls a fireball at an enemy; it explodes, damaging everything nearby.',
       },
       {
+        id: 'mendingFlame',
         slot: 'W',
         name: 'Mending Flame',
-        kind: 'active',
         ultimate: false,
-        summary: 'Heals an allied hero (or self) over 4 seconds.',
+        targeting: 'ally',
+        castRange: 10,
+        radius: 0,
+        manaCost: [80, 90, 100, 110],
+        cooldown: [14, 13, 12, 11],
+        values: { heal: [120, 180, 240, 300], duration: [4, 4, 4, 4] },
+        summary: 'Heals an allied hero (or Orin) over 4 seconds.',
       },
       {
+        id: 'cataclysm',
         slot: 'R',
         name: 'Cataclysm',
-        kind: 'active',
         ultimate: true,
-        summary: 'Calls a meteor on a target area; after 1.5s it lands for massive damage and leaves burning ground.',
+        targeting: 'point',
+        castRange: 15,
+        radius: 5,
+        manaCost: [175, 225, 275],
+        cooldown: [90, 80, 70],
+        values: { damage: [250, 375, 500], delay: [1.5, 1.5, 1.5], burnDps: [30, 45, 60], burnDuration: [3, 3, 3] },
+        summary: 'Calls a meteor on an area. After 1.5s it lands for massive damage and leaves burning ground.',
       },
     ],
   },
 };
 
 export const HERO_IDS: HeroId[] = ['brakk', 'vexa', 'orin'];
+
+/** Highest level an ability may have at a given hero level (Dota-style). */
+export function maxAbilityLevel(def: AbilityDef, heroLevel: number): number {
+  if (def.ultimate) return heroLevel >= 14 ? 3 : heroLevel >= 10 ? 2 : heroLevel >= 6 ? 1 : 0;
+  return Math.min(4, Math.ceil(heroLevel / 2));
+}

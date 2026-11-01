@@ -1,4 +1,5 @@
 import { GameMap, HEROES, LANE_IDS, Team, Unit, World } from '../sim';
+import type { Aim } from './input';
 
 /**
  * 2D top-down renderer. It only READS the simulation; swapping it for a 3D renderer
@@ -56,7 +57,7 @@ export class Renderer {
     return { x: 8, y: 8, size };
   }
 
-  render(w: World, alpha: number, focus: Unit | undefined, viewTeam: Team) {
+  render(w: World, alpha: number, focus: Unit | undefined, viewTeam: Team, aim: Aim | null = null) {
     const ctx = this.ctx;
     const lerp = (u: { x: number; y: number; px: number; py: number }) => ({
       x: u.px + (u.x - u.px) * alpha,
@@ -100,6 +101,7 @@ export class Renderer {
     const heroes = w.units.filter((u) => u.kind === 'hero' && u.alive);
 
     for (const s of structures) this.drawStructure(s);
+    this.drawAreas(w);
     for (const c of creeps) {
       const p = lerp(c);
       ctx.fillStyle = c.creep!.super ? TEAM_DARK[c.team] : TEAM_COLORS[c.team];
@@ -154,6 +156,8 @@ export class Renderer {
       ctx.fillText(`${h.hero!.level} ${def.name}`, p.x, p.y - h.radius - 1.2);
     }
 
+    for (const u of [...creeps, ...heroes]) this.drawStatus(u, lerp(u), w.time);
+
     // Target marker for the player's current target.
     const tgt = focus ? w.unit(focus.targetId) : undefined;
     if (tgt && tgt.alive) {
@@ -169,11 +173,38 @@ export class Renderer {
 
     for (const pr of w.projectiles) {
       const p = lerp(pr);
+      if (pr.spell) {
+        ctx.fillStyle = 'rgba(255,140,40,0.35)';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 1.1, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffcf5a';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 0.55, 0, Math.PI * 2);
+        ctx.fill();
+        continue;
+      }
       ctx.fillStyle = pr.team === 0 ? '#bfe0ff' : '#ffc9c9';
       ctx.beginPath();
       ctx.arc(p.x, p.y, 0.3, 0, Math.PI * 2);
       ctx.fill();
     }
+    for (const sk of w.skillshots) {
+      const p = lerp(sk);
+      ctx.strokeStyle = '#d9fff0';
+      ctx.lineWidth = 0.35;
+      ctx.beginPath();
+      ctx.moveTo(p.x - sk.dx * 2.5, p.y - sk.dy * 2.5);
+      ctx.lineTo(p.x + sk.dx * 0.8, p.y + sk.dy * 0.8);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(63,191,127,0.4)';
+      ctx.lineWidth = sk.width;
+      ctx.beginPath();
+      ctx.moveTo(p.x - sk.dx * 4, p.y - sk.dy * 4);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+    }
+    if (aim && focus && focus.alive) this.drawAim(w, focus, lerp(focus), aim);
 
     this.flashes = this.flashes.filter((f) => (f.t -= 1 / 60) > 0);
     for (const f of this.flashes) {
@@ -186,6 +217,160 @@ export class Renderer {
     ctx.restore();
 
     this.drawMinimap(w, focus);
+  }
+
+  private drawAreas(w: World) {
+    const ctx = this.ctx;
+    for (const z of w.zones) {
+      const fade = Math.min(1, (z.duration - z.t) * 3);
+      ctx.globalAlpha = fade;
+      if (z.kind === 'arrowStorm') {
+        ctx.fillStyle = 'rgba(63,191,127,0.18)';
+        ctx.strokeStyle = 'rgba(160,255,200,0.7)';
+      } else {
+        ctx.fillStyle = 'rgba(255,110,30,0.25)';
+        ctx.strokeStyle = 'rgba(255,170,60,0.7)';
+      }
+      ctx.lineWidth = 0.2;
+      ctx.beginPath();
+      ctx.arc(z.x, z.y, z.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      // Falling arrows / flickering embers: deterministic pseudo-random positions.
+      ctx.fillStyle = z.kind === 'arrowStorm' ? '#e6fff2' : '#ffb347';
+      const n = 14;
+      for (let i = 0; i < n; i++) {
+        const seed = (i * 97 + Math.floor(z.t * 8) * 31) % 101;
+        const a = (seed / 101) * Math.PI * 2;
+        const r = (((i * 53) % 17) / 17) * z.radius * 0.95;
+        ctx.fillRect(z.x + Math.cos(a) * r - 0.1, z.y + Math.sin(a) * r - 0.45, 0.2, 0.9);
+      }
+      ctx.globalAlpha = 1;
+    }
+    for (const b of w.blasts) {
+      const k = Math.min(1, b.t / b.delay);
+      ctx.strokeStyle = b.kind === 'cataclysm' ? 'rgba(255,90,40,0.9)' : 'rgba(230,190,90,0.9)';
+      ctx.lineWidth = 0.25;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = b.kind === 'cataclysm' ? 'rgba(255,90,40,0.3)' : 'rgba(230,190,90,0.3)';
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.radius * k, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  private drawStatus(u: Unit, p: { x: number; y: number }, time: number) {
+    const ctx = this.ctx;
+    if (u.stunTimer > 0) {
+      ctx.fillStyle = '#ffe066';
+      for (let i = 0; i < 3; i++) {
+        const a = time * 5 + (i * Math.PI * 2) / 3;
+        ctx.beginPath();
+        ctx.arc(p.x + Math.cos(a) * (u.radius + 0.2), p.y - u.radius - 0.2 + Math.sin(a) * 0.35, 0.18, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    for (const b of u.buffs) {
+      if (b.slowPct) {
+        ctx.strokeStyle = 'rgba(120,200,255,0.8)';
+        ctx.lineWidth = 0.15;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, u.radius + 0.25, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      if (b.healPerSec) {
+        ctx.fillStyle = 'rgba(80,255,120,0.25)';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, u.radius + 0.5 + Math.sin(time * 6) * 0.15, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (b.moveSpeedPct) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        ctx.lineWidth = 0.1;
+        ctx.beginPath();
+        ctx.moveTo(p.x - Math.cos(u.facing) * 1.5, p.y - Math.sin(u.facing) * 1.5);
+        ctx.lineTo(p.x - Math.cos(u.facing) * 2.5, p.y - Math.sin(u.facing) * 2.5);
+        ctx.stroke();
+      }
+    }
+    if (u.dash) {
+      ctx.strokeStyle = 'rgba(255,224,102,0.6)';
+      ctx.lineWidth = u.radius * 1.6;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x - u.dash.dx * 3, p.y - u.dash.dy * 3);
+      ctx.stroke();
+    }
+    if (u.castLock > 0.2) {
+      ctx.strokeStyle = 'rgba(230,190,90,0.9)';
+      ctx.lineWidth = 0.2;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, u.radius + 0.6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - u.castLock / 0.6));
+      ctx.stroke();
+    }
+  }
+
+  private drawAim(w: World, me: Unit, p: { x: number; y: number }, aim: Aim) {
+    const ctx = this.ctx;
+    const def = HEROES[me.hero!.defId].abilities[aim.slot];
+    const color = aim.cancel ? 'rgba(255,80,80,' : 'rgba(120,200,255,';
+    ctx.lineWidth = 0.15;
+    if (def.castRange > 0) {
+      ctx.strokeStyle = `${color}0.6)`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, def.castRange, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.fillStyle = `${color}0.25)`;
+    ctx.strokeStyle = `${color}0.9)`;
+    switch (def.targeting) {
+      case 'direction': {
+        const dx = aim.x - p.x;
+        const dy = aim.y - p.y;
+        const l = Math.hypot(dx, dy) || 1;
+        const nx = -dy / l;
+        const ny = dx / l;
+        const hw = def.radius;
+        ctx.beginPath();
+        ctx.moveTo(p.x + nx * hw, p.y + ny * hw);
+        ctx.lineTo(aim.x + nx * hw, aim.y + ny * hw);
+        ctx.lineTo(aim.x - nx * hw, aim.y - ny * hw);
+        ctx.lineTo(p.x - nx * hw, p.y - ny * hw);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        break;
+      }
+      case 'point':
+      case 'none':
+        ctx.beginPath();
+        ctx.arc(aim.x, aim.y, def.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        break;
+      case 'enemy':
+      case 'ally': {
+        const t = w.unit(aim.targetId);
+        ctx.beginPath();
+        ctx.arc(aim.x, aim.y, 0.5, 0, Math.PI * 2);
+        ctx.fill();
+        if (t) {
+          ctx.lineWidth = 0.3;
+          ctx.beginPath();
+          ctx.arc(t.x, t.y, t.radius + 0.6, 0, Math.PI * 2);
+          ctx.stroke();
+          if (def.radius > 0) {
+            ctx.lineWidth = 0.1;
+            ctx.beginPath();
+            ctx.arc(t.x, t.y, def.radius, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        }
+        break;
+      }
+    }
   }
 
   private drawStructure(s: Unit) {

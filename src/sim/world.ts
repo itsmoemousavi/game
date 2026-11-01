@@ -13,13 +13,22 @@ import {
   XP_TABLE,
   otherTeam,
 } from './constants';
-import { HEROES, HeroId } from './data/heroes';
+import { HEROES, HeroId, maxAbilityLevel } from './data/heroes';
 import { CREEPS, STRUCTURES, SUPER_CREEP_MULT } from './data/units';
-import { GameMap, LaneId, StructureTier, createMap, fits, lineClear, teamLanePath } from './map';
+import { GameMap, LaneId, StructureTier, createMap, fits, isWalkable, lineClear, teamLanePath } from './map';
 import { Vec2, dist, distV } from './math';
+
+const distToSeg = (px: number, py: number, ax: number, ay: number, bx: number, by: number) => {
+  const abx = bx - ax;
+  const aby = by - ay;
+  const l2 = abx * abx + aby * aby;
+  const t = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * abx + (py - ay) * aby) / l2));
+  return dist(px, py, ax + abx * t, ay + aby * t);
+};
 import { findPath } from './pathfinding';
 import { Rng } from './rng';
 import { botThink } from './ai/bots';
+import { applyAttackPassives, castAbility, damageAfterPassives, passiveArmor, resolveCast } from './abilities';
 
 export type UnitKind = 'hero' | 'creep' | 'structure';
 export type Controller = 'human' | 'bot';
@@ -28,7 +37,8 @@ export type Order =
   | { type: 'idle' }
   | { type: 'dir'; dx: number; dy: number }
   | { type: 'move'; x: number; y: number }
-  | { type: 'attack'; targetId: number };
+  | { type: 'attack'; targetId: number }
+  | { type: 'cast'; slot: number; targetId?: number; x?: number; y?: number };
 
 /** Every way a player (human or bot, local or remote) can influence the game. */
 export type Command =
@@ -36,7 +46,88 @@ export type Command =
   | { type: 'moveTo'; unitId: number; x: number; y: number }
   | { type: 'attack'; unitId: number; targetId: number }
   | { type: 'attackNearest'; unitId: number }
-  | { type: 'stop'; unitId: number };
+  | { type: 'stop'; unitId: number }
+  /** Use ability `slot` (0 = Q, 1 = W, 2 = R). Give targetId for unit-target abilities, x/y otherwise. */
+  | { type: 'cast'; unitId: number; slot: number; targetId?: number; x?: number; y?: number }
+  /** Spend a skill point on ability `slot`. */
+  | { type: 'learn'; unitId: number; slot: number };
+
+export interface AbilityState {
+  level: number;
+  cooldown: number;
+}
+
+/** Timed effect on a unit (slows, speed boosts, heals/damage over time...). */
+export interface Buff {
+  key: string;
+  t: number;
+  sourceId?: number;
+  slowPct?: number;
+  moveSpeedPct?: number;
+  armor?: number;
+  healPerSec?: number;
+  damagePerSec?: number;
+}
+
+/** Lingering ground area that ticks damage / slow on enemies inside (Arrow Storm, burning ground). */
+export interface Zone {
+  id: number;
+  kind: 'arrowStorm' | 'burn';
+  team: Team;
+  sourceId: number;
+  x: number;
+  y: number;
+  radius: number;
+  t: number;
+  duration: number;
+  dps: number;
+  slowPct: number;
+}
+
+/** Delayed one-shot area effect (Earthsplitter wind-up, Cataclysm meteor). */
+export interface Blast {
+  id: number;
+  kind: 'earthsplitter' | 'cataclysm';
+  team: Team;
+  sourceId: number;
+  x: number;
+  y: number;
+  radius: number;
+  t: number;
+  delay: number;
+  damage: number;
+  stun: number;
+  burn?: { dps: number; duration: number };
+}
+
+/** Non-homing projectile travelling in a straight line (Piercing Arrow). */
+export interface Skillshot {
+  id: number;
+  kind: 'piercingArrow';
+  team: Team;
+  sourceId: number;
+  x: number;
+  y: number;
+  px: number;
+  py: number;
+  dx: number;
+  dy: number;
+  speed: number;
+  remaining: number;
+  width: number;
+  damage: number;
+  hit: number[];
+}
+
+export interface Dash {
+  dx: number;
+  dy: number;
+  speed: number;
+  remaining: number;
+  damage: number;
+  stun: number;
+  hit: number[];
+}
 
 export interface HeroState {
   defId: HeroId;
@@ -51,6 +142,10 @@ export interface HeroState {
   lastHits: number;
   respawnTimer: number;
   order: Order;
+  abilities: AbilityState[];
+  skillPoints: number;
+  /** Attacks made, for "every Nth attack" passives. */
+  attackCount: number;
   bot: { thinkTimer: number; retreating: boolean };
 }
 
@@ -102,6 +197,14 @@ export interface Unit {
   path: Vec2[] | null;
   pathGoal: Vec2 | null;
   repathAt: number;
+  /** Which way we're steering around a structure (0 = not avoiding). */
+  avoidSide: number;
+  /** Seconds of stun left: no moving, attacking or casting. */
+  stunTimer: number;
+  /** Seconds the unit is busy casting (cannot act). */
+  castLock: number;
+  buffs: Buff[];
+  dash: Dash | null;
   hero?: HeroState;
   creep?: CreepState;
   structure?: StructureState;
@@ -118,6 +221,8 @@ export interface Projectile {
   targetId: number;
   speed: number;
   damage: number;
+  /** Spell projectiles deal spell damage (and may explode). */
+  spell?: { kind: 'fireball'; aoe: number };
 }
 
 export type GameEvent =
@@ -125,7 +230,11 @@ export type GameEvent =
   | { type: 'death'; unitId: number; killerId: number | null }
   | { type: 'gold'; unitId: number; amount: number }
   | { type: 'levelUp'; unitId: number; level: number }
-  | { type: 'gameOver'; winner: Team };
+  | { type: 'gameOver'; winner: Team }
+  | { type: 'cast'; unitId: number; slot: number }
+  | { type: 'heal'; unitId: number; amount: number };
+
+export type DamageKind = 'attack' | 'spell';
 
 export interface PlayerSlot {
   team: Team;
@@ -144,24 +253,31 @@ const armorMultiplier = (armor: number) => 1 - (0.06 * armor) / (1 + 0.06 * Math
 
 export class World {
   readonly map: GameMap;
+  /** Map + footprints of standing structures; used for pathing and movement. */
+  nav: GameMap;
   readonly rng: Rng;
   tick = 0;
   time = 0;
   units: Unit[] = [];
   projectiles: Projectile[] = [];
+  skillshots: Skillshot[] = [];
+  zones: Zone[] = [];
+  blasts: Blast[] = [];
   events: GameEvent[] = [];
   winner: Team | null = null;
   teamKills: [number, number] = [0, 0];
-  private nextId = 1;
+  nextId = 1;
   private nextWave = FIRST_WAVE_TIME;
   private pending: Command[] = [];
   private byId = new Map<number, Unit>();
 
   constructor(opts: WorldOptions) {
     this.map = opts.map ?? createMap();
+    this.nav = { ...this.map, walkable: new Uint8Array(this.map.walkable) };
     this.rng = new Rng(opts.seed);
     for (const s of this.map.structures) this.spawnStructure(s.team, s.tier, s.lane, s.pos);
     this.refreshVulnerability();
+    this.rebuildNav();
     opts.slots.forEach((slot, i) => this.spawnHero(slot, i));
   }
 
@@ -238,7 +354,63 @@ export class World {
       case 'stop':
         h.order = { type: 'idle' };
         break;
+      case 'cast':
+        if (castAbility(this, u, cmd.slot, cmd) === 'approach') {
+          h.order = { type: 'cast', slot: cmd.slot, targetId: cmd.targetId, x: cmd.x, y: cmd.y };
+        }
+        break;
+      case 'learn': {
+        const def = HEROES[h.defId].abilities[cmd.slot];
+        const st = h.abilities[cmd.slot];
+        if (!def || h.skillPoints <= 0 || st.level >= maxAbilityLevel(def, h.level)) break;
+        st.level++;
+        h.skillPoints--;
+        break;
+      }
     }
+  }
+
+  /** Can `u` act this tick (not stunned / mid-cast)? */
+  canAct(u: Unit): boolean {
+    return u.stunTimer <= 0 && u.castLock <= 0 && !u.dash;
+  }
+
+  speedOf(u: Unit): number {
+    let pct = 0;
+    let slow = 0;
+    for (const b of u.buffs) {
+      if (b.moveSpeedPct) pct += b.moveSpeedPct;
+      if (b.slowPct) slow = Math.max(slow, b.slowPct);
+    }
+    return u.moveSpeed * (1 + pct / 100) * (1 - slow / 100);
+  }
+
+  armorOf(u: Unit): number {
+    let a = u.armor + passiveArmor(u);
+    for (const b of u.buffs) if (b.armor) a += b.armor;
+    return a;
+  }
+
+  /** Add or refresh a buff (same key = refresh, keeping the strongest duration). */
+  addBuff(u: Unit, b: Buff) {
+    const i = u.buffs.findIndex((x) => x.key === b.key);
+    if (i >= 0) u.buffs[i] = { ...b, t: Math.max(b.t, u.buffs[i].t) };
+    else u.buffs.push(b);
+  }
+
+  stun(u: Unit, seconds: number) {
+    if (!u.alive || u.kind === 'structure') return;
+    u.stunTimer = Math.max(u.stunTimer, seconds);
+    u.dash = null;
+  }
+
+  heal(u: Unit, amount: number) {
+    if (!u.alive) return;
+    u.hp = Math.min(u.maxHp, u.hp + amount);
+  }
+
+  newId() {
+    return this.nextId++;
   }
 
   /** Mobile "attack button" targeting: enemy hero first, then nearest anything. */
@@ -286,6 +458,11 @@ export class World {
       path: null,
       pathGoal: null,
       repathAt: 0,
+      avoidSide: 0,
+      stunTimer: 0,
+      castLock: 0,
+      buffs: [],
+      dash: null,
     };
     this.units.push(u);
     this.byId.set(u.id, u);
@@ -325,12 +502,15 @@ export class World {
       lastHits: 0,
       respawnTimer: 0,
       order: { type: 'idle' },
+      abilities: [0, 1, 2].map(() => ({ level: 0, cooldown: 0 })),
+      skillPoints: 1,
+      attackCount: 0,
       bot: { thinkTimer: (index % 6) * 0.05, retreating: false },
     };
     this.applyHeroStats(u, true);
   }
 
-  private respawnPoint(team: Team, index: number): Vec2 {
+  respawnPoint(team: Team, index: number): Vec2 {
     const f = this.map.fountains[team];
     const a = (index % 3) * ((2 * Math.PI) / 3);
     const dir = team === 0 ? 1 : -1;
@@ -421,9 +601,15 @@ export class World {
     for (const u of this.units) {
       if (u.attackTimer > 0) u.attackTimer -= DT;
       if (u.hero) this.updateHeroUpkeep(u);
+      if (u.alive) this.updateStatus(u);
     }
     for (const u of this.units) {
       if (!u.alive) continue;
+      if (u.dash) {
+        this.updateDash(u);
+        continue;
+      }
+      if (u.stunTimer > 0 || u.castLock > 0) continue;
       if (u.hero) {
         if (u.hero.controller === 'bot') {
           u.hero.bot.thinkTimer -= DT;
@@ -437,6 +623,8 @@ export class World {
       else if (u.structure) this.updateStructure(u);
     }
     this.updateProjectiles();
+    this.updateSkillshots();
+    this.updateAreas();
     this.separate();
 
     // Drop dead creeps; heroes respawn and structures stay as ruins.
@@ -452,6 +640,7 @@ export class World {
   private updateHeroUpkeep(u: Unit) {
     const h = u.hero!;
     h.gold += PASSIVE_GOLD_PER_SEC * DT;
+    for (const a of h.abilities) if (a.cooldown > 0) a.cooldown = Math.max(0, a.cooldown - DT);
     if (!u.alive) {
       h.respawnTimer -= DT;
       if (h.respawnTimer <= 0) {
@@ -462,6 +651,10 @@ export class World {
         u.hp = u.maxHp;
         u.mana = u.maxMana;
         u.path = null;
+        u.buffs = [];
+        u.stunTimer = 0;
+        u.castLock = 0;
+        u.dash = null;
         h.order = { type: 'idle' };
         h.bot.retreating = false;
       }
@@ -480,7 +673,7 @@ export class World {
     const o = h.order;
     switch (o.type) {
       case 'dir':
-        this.stepMove(u, o.dx, o.dy, u.moveSpeed * DT);
+        this.stepMove(u, o.dx, o.dy, this.speedOf(u) * DT);
         u.targetId = null;
         break;
       case 'move':
@@ -495,6 +688,11 @@ export class World {
         }
         u.targetId = t.id;
         if (!this.tryAttack(u, t)) this.navigate(u, t.x, t.y, 0);
+        break;
+      }
+      case 'cast': {
+        const r = resolveCast(this, u, o);
+        if (r !== 'approach') h.order = { type: 'idle' };
         break;
       }
       case 'idle': {
@@ -558,7 +756,13 @@ export class World {
       const d = dist(p.x, p.y, t.x, t.y);
       const step = p.speed * DT;
       if (d <= step + t.radius * 0.5) {
-        this.dealDamage(p.sourceId, t, p.damage);
+        if (p.spell) {
+          for (const e of this.units) {
+            if (e.alive && e.team !== p.team && e.kind !== 'structure' && dist(e.x, e.y, t.x, t.y) <= p.spell.aoe + e.radius) {
+              this.dealDamage(p.sourceId, e, p.damage, 'spell');
+            }
+          }
+        } else this.dealDamage(p.sourceId, t, p.damage, 'attack');
         continue;
       }
       p.x += ((t.x - p.x) / d) * step;
@@ -566,6 +770,111 @@ export class World {
       keep.push(p);
     }
     this.projectiles = keep;
+  }
+
+  // ---------------------------------------------------------------- status & spells
+
+  private updateStatus(u: Unit) {
+    if (u.stunTimer > 0) u.stunTimer = Math.max(0, u.stunTimer - DT);
+    if (u.castLock > 0) u.castLock = Math.max(0, u.castLock - DT);
+    if (!u.buffs.length) return;
+    for (const b of u.buffs) {
+      b.t -= DT;
+      if (b.healPerSec) {
+        this.heal(u, b.healPerSec * DT);
+      }
+      if (b.damagePerSec && b.sourceId !== undefined) this.dealDamage(b.sourceId, u, b.damagePerSec * DT, 'spell');
+      if (!u.alive) return;
+    }
+    u.buffs = u.buffs.filter((b) => b.t > 0);
+  }
+
+  private updateDash(u: Unit) {
+    const d = u.dash!;
+    const step = Math.min(d.remaining, d.speed * DT);
+    const bx = u.x;
+    const by = u.y;
+    this.stepMove(u, d.dx, d.dy, step);
+    const moved = Math.hypot(u.x - bx, u.y - by);
+    d.remaining -= step;
+    for (const e of this.units) {
+      if (!e.alive || e.team === u.team || e.kind === 'structure' || d.hit.includes(e.id)) continue;
+      if (dist(u.x, u.y, e.x, e.y) > u.radius + e.radius + 0.6) continue;
+      d.hit.push(e.id);
+      this.dealDamage(u.id, e, d.damage, 'spell');
+      if (e.kind === 'hero') {
+        this.stun(e, d.stun);
+        u.dash = null;
+        u.hero!.order = { type: 'attack', targetId: e.id };
+        return;
+      }
+    }
+    if (d.remaining <= 0 || moved < step * 0.3) u.dash = null;
+  }
+
+  private updateSkillshots() {
+    const keep: Skillshot[] = [];
+    for (const s of this.skillshots) {
+      s.px = s.x;
+      s.py = s.y;
+      const step = Math.min(s.remaining, s.speed * DT);
+      s.x += s.dx * step;
+      s.y += s.dy * step;
+      s.remaining -= step;
+      for (const e of this.units) {
+        if (!e.alive || e.team === s.team || e.kind === 'structure' || s.hit.includes(e.id)) continue;
+        if (distToSeg(e.x, e.y, s.px, s.py, s.x, s.y) > s.width / 2 + e.radius) continue;
+        s.hit.push(e.id);
+        this.dealDamage(s.sourceId, e, s.damage, 'spell');
+      }
+      if (s.remaining > 0) keep.push(s);
+    }
+    this.skillshots = keep;
+  }
+
+  private updateAreas() {
+    for (const z of this.zones) {
+      z.t += DT;
+      for (const e of this.units) {
+        if (!e.alive || e.team === z.team || e.kind === 'structure') continue;
+        if (dist(e.x, e.y, z.x, z.y) > z.radius + e.radius) continue;
+        this.dealDamage(z.sourceId, e, z.dps * DT, 'spell');
+        if (z.slowPct > 0) this.addBuff(e, { key: `slow:${z.kind}`, t: 0.3, slowPct: z.slowPct });
+      }
+    }
+    this.zones = this.zones.filter((z) => z.t < z.duration);
+
+    const pending: Blast[] = [];
+    for (const b of this.blasts) {
+      b.t += DT;
+      if (b.t < b.delay) {
+        pending.push(b);
+        continue;
+      }
+      for (const e of this.units) {
+        if (!e.alive || e.team === b.team || e.kind === 'structure') continue;
+        if (dist(e.x, e.y, b.x, b.y) > b.radius + e.radius) continue;
+        this.dealDamage(b.sourceId, e, b.damage, 'spell');
+        if (b.stun > 0) this.stun(e, b.stun);
+      }
+      if (b.burn) {
+        this.zones.push({
+          id: this.newId(),
+          kind: 'burn',
+          team: b.team,
+          sourceId: b.sourceId,
+          x: b.x,
+          y: b.y,
+          radius: b.radius,
+          t: 0,
+          duration: b.burn.duration,
+          dps: b.burn.dps,
+          slowPct: 0,
+        });
+      }
+      this.events.push({ type: 'cast', unitId: b.sourceId, slot: -1 });
+    }
+    this.blasts = pending;
   }
 
   // ---------------------------------------------------------------- combat
@@ -582,6 +891,7 @@ export class World {
     if (u.attackTimer > 0) return true;
     u.attackTimer = u.attackInterval;
     this.events.push({ type: 'attack', sourceId: u.id, targetId: t.id });
+    const damage = applyAttackPassives(this, u);
     if (u.projectileSpeed > 0) {
       this.projectiles.push({
         id: this.nextId++,
@@ -593,19 +903,24 @@ export class World {
         sourceId: u.id,
         targetId: t.id,
         speed: u.projectileSpeed,
-        damage: u.damage,
+        damage,
       });
     } else {
-      this.dealDamage(u.id, t, u.damage);
+      this.dealDamage(u.id, t, damage, 'attack');
     }
     return true;
   }
 
-  dealDamage(sourceId: number, target: Unit, raw: number) {
+  /**
+   * Attacks are reduced by armor. Spells ignore armor but cannot hurt structures.
+   */
+  dealDamage(sourceId: number, target: Unit, raw: number, kind: DamageKind = 'attack') {
     if (!target.alive) return;
-    if (target.structure && !target.structure.vulnerable) return;
+    if (target.structure && (!target.structure.vulnerable || kind === 'spell')) return;
     const src = this.unit(sourceId);
-    const amount = raw * armorMultiplier(target.armor);
+    let amount = kind === 'attack' ? raw * armorMultiplier(this.armorOf(target)) : raw;
+    amount = damageAfterPassives(this, target, amount, kind);
+    if (amount <= 0) return;
     target.hp -= amount;
 
     // Towers punish heroes that attack heroes under them.
@@ -626,6 +941,10 @@ export class World {
     u.alive = false;
     u.targetId = null;
     u.path = null;
+    u.dash = null;
+    u.buffs = [];
+    u.stunTimer = 0;
+    u.castLock = 0;
     this.events.push({ type: 'death', unitId: u.id, killerId: killer?.id ?? null });
     const killerHero = killer?.kind === 'hero' && killer.team !== u.team ? killer : undefined;
 
@@ -652,6 +971,7 @@ export class World {
         if (h.hero && h.team !== u.team) this.giveGold(h, STRUCTURES[tier].teamGold);
       }
       this.refreshVulnerability();
+      this.rebuildNav();
       if (tier === 'shrine') {
         this.winner = otherTeam(u.team);
         this.events.push({ type: 'gameOver', winner: this.winner });
@@ -678,6 +998,7 @@ export class World {
     h.xp += amount;
     while (h.level < MAX_LEVEL && h.xp >= XP_TABLE[h.level]) {
       h.level++;
+      h.skillPoints++;
       this.applyHeroStats(u);
       this.events.push({ type: 'levelUp', unitId: u.id, level: h.level });
     }
@@ -718,34 +1039,64 @@ export class World {
 
   // ---------------------------------------------------------------- movement
 
-  /** Move up to `d` meters in direction (dx, dy), sliding along walls. */
-  stepMove(u: Unit, dx: number, dy: number, d: number) {
+  /** Standing structures are solid: carve their footprints out of the nav grid. */
+  rebuildNav() {
+    const m = this.map;
+    const g = m.grid;
+    this.nav.walkable.set(m.walkable);
+    for (const s of this.units) {
+      if (!s.structure || !s.alive) continue;
+      const r = s.radius + 0.4;
+      const c0 = Math.max(0, Math.floor((s.x - r) / m.cell));
+      const c1 = Math.min(g - 1, Math.floor((s.x + r) / m.cell));
+      const r0 = Math.max(0, Math.floor((s.y - r) / m.cell));
+      const r1 = Math.min(g - 1, Math.floor((s.y + r) / m.cell));
+      for (let cy = r0; cy <= r1; cy++) {
+        for (let cx = c0; cx <= c1; cx++) {
+          if (dist((cx + 0.5) * m.cell, (cy + 0.5) * m.cell, s.x, s.y) <= r) this.nav.walkable[cy * g + cx] = 0;
+        }
+      }
+    }
+  }
+
+  /**
+   * Move up to `d` meters in direction (dx, dy), sliding along walls.
+   * `avoid` bends straight-line movers (creeps) around structures; path-followers
+   * don't need it because the nav grid already routes around them.
+   */
+  stepMove(u: Unit, dx: number, dy: number, d: number, avoid = false) {
     const l = Math.hypot(dx, dy);
     if (l === 0 || d <= 0) return;
     dx /= l;
     dy /= l;
-    [dx, dy] = this.avoidStructures(u, dx, dy);
+    if (avoid) [dx, dy] = this.avoidStructures(u, dx, dy);
     u.facing = Math.atan2(dy, dx);
-    const m = this.map;
+    const nav = this.nav;
+    // If we're already squeezed against a wall/footprint, only require the centre to be
+    // walkable so the unit can always work itself free.
+    const ok = fits(nav, u.x, u.y, u.radius)
+      ? (x: number, y: number) => fits(nav, x, y, u.radius)
+      : (x: number, y: number) => isWalkable(this.map, x, y);
     const nx = u.x + dx * d;
     const ny = u.y + dy * d;
-    if (fits(m, nx, ny, u.radius)) {
+    if (ok(nx, ny)) {
       u.x = nx;
       u.y = ny;
       return;
     }
     // Slide along the wall: keep whichever axis component is free.
     if (Math.abs(dx) >= Math.abs(dy)) {
-      if (fits(m, nx, u.y, u.radius)) u.x = nx;
-      else if (fits(m, u.x, ny, u.radius)) u.y = ny;
+      if (ok(nx, u.y)) u.x = nx;
+      else if (ok(u.x, ny)) u.y = ny;
     } else {
-      if (fits(m, u.x, ny, u.radius)) u.y = ny;
-      else if (fits(m, nx, u.y, u.radius)) u.x = nx;
+      if (ok(u.x, ny)) u.y = ny;
+      else if (ok(nx, u.y)) u.x = nx;
     }
   }
 
   /** Bend a movement direction around any living structure directly ahead. */
   private avoidStructures(u: Unit, dx: number, dy: number): [number, number] {
+    let blocked = false;
     for (const s of this.units) {
       if (s.kind !== 'structure' || !s.alive) continue;
       const rx = s.x - u.x;
@@ -757,12 +1108,15 @@ export class World {
       if (ahead <= 0) continue;
       const side = rx * dy - ry * dx; // perpendicular offset of the obstacle from our heading
       if (Math.abs(side) >= clearance) continue;
-      // Steer along the tangent on the side we're already leaning toward.
-      const sgn = side >= 0 ? 1 : -1;
+      // Steer along a tangent; keep the same side until clear (no jitter).
+      blocked = true;
+      if (u.avoidSide === 0) u.avoidSide = side >= 0 ? 1 : -1;
+      const sgn = u.avoidSide;
       const tx = (-ry / d) * sgn;
       const ty = (rx / d) * sgn;
       return [tx, ty];
     }
+    if (!blocked) u.avoidSide = 0;
     return [dx, dy];
   }
 
@@ -770,7 +1124,7 @@ export class World {
   private steerTo(u: Unit, x: number, y: number) {
     const d = dist(u.x, u.y, x, y);
     if (d < 0.05) return;
-    this.stepMove(u, x - u.x, y - u.y, Math.min(d, u.moveSpeed * DT));
+    this.stepMove(u, x - u.x, y - u.y, Math.min(d, this.speedOf(u) * DT), true);
   }
 
   /** Path-following movement (heroes). Returns true on arrival. */
@@ -780,20 +1134,25 @@ export class World {
       u.path = null;
       return true;
     }
-    const step = u.moveSpeed * DT;
-    if (lineClear(this.map, u, { x, y }, u.radius * 0.7)) {
+    const step = this.speedOf(u) * DT;
+    if (lineClear(this.nav, u, { x, y }, u.radius * 0.7)) {
       u.path = null;
       this.stepMove(u, x - u.x, y - u.y, Math.min(step, d));
       return false;
     }
     if (!u.path || !u.pathGoal || distV(u.pathGoal, { x, y }) > 2 || this.time >= u.repathAt) {
-      u.path = findPath(this.map, u, { x, y }, u.radius * 0.7);
+      u.path = findPath(this.nav, u, { x, y }, u.radius * 0.7);
       u.pathGoal = { x, y };
       u.repathAt = this.time + 1;
     }
-    if (!u.path || u.path.length === 0) {
+    if (!u.path) {
       this.stepMove(u, x - u.x, y - u.y, Math.min(step, d));
       return false;
+    }
+    if (u.path.length === 0) {
+      // Already at the closest reachable spot (goal is inside a wall or structure).
+      u.path = null;
+      return true;
     }
     let next = u.path[0];
     while (u.path.length > 1 && dist(u.x, u.y, next.x, next.y) < 0.6) {

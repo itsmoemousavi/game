@@ -1,4 +1,4 @@
-import { HEROES, MAX_LEVEL, TEAM_NAMES, Team, Unit, World, XP_TABLE } from '../sim';
+import { HEROES, MAX_LEVEL, TEAM_NAMES, Team, Unit, World, XP_TABLE, castBlocker, maxAbilityLevel } from '../sim';
 
 const fmtTime = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 
@@ -6,6 +6,9 @@ const fmtTime = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60
 export class Hud {
   private el: Record<string, HTMLElement> = {};
   private lastKey = '';
+  private abilityKeys = ['', '', ''];
+  private buttons: HTMLElement[] = [];
+  private learnButtons: HTMLElement[] = [];
 
   constructor(
     root: HTMLElement,
@@ -28,11 +31,12 @@ export class Hud {
       'respawn-time',
       'gameover',
       'gameover-title',
-      'btn-q',
-      'btn-w',
-      'btn-r',
     ]) {
       this.el[id] = root.querySelector(`#${id}`)!;
+    }
+    for (let i = 0; i < 3; i++) {
+      this.buttons.push(root.querySelector(`[data-slot="${i}"]`)!);
+      this.learnButtons.push(root.querySelector(`[data-learn="${i}"]`)!);
     }
     root.querySelector('#btn-restart')!.addEventListener('click', () => this.onRestart());
   }
@@ -41,17 +45,43 @@ export class Hud {
     const def = HEROES[me.hero!.defId];
     this.el.portrait.textContent = def.name[0];
     this.el.portrait.style.background = def.color;
-    for (const a of def.abilities) {
-      const b = this.el[`btn-${a.slot.toLowerCase()}`];
+    def.abilities.forEach((a, i) => {
+      const b = this.buttons[i];
       b.querySelector('.name')!.textContent = a.name;
-      b.title = `${a.name} (${a.kind}${a.ultimate ? ', ultimate' : ''}): ${a.summary} — coming in milestone 3`;
-      b.classList.toggle('passive', a.kind === 'passive');
-    }
+      b.title = `${a.name}${a.ultimate ? ' (Ultimate)' : ''}: ${a.summary}`;
+      b.classList.toggle('passive', a.targeting === 'passive');
+      const pips = b.querySelector('.pips')!;
+      pips.innerHTML = '<i></i>'.repeat(a.manaCost.length);
+    });
+    this.abilityKeys = ['', '', ''];
     this.el.gameover.style.display = 'none';
+  }
+
+  /** Cooldowns, mana, levels and learn buttons. Cheap: only touches the DOM on change. */
+  private updateAbilities(me: Unit) {
+    const h = me.hero!;
+    const def = HEROES[h.defId];
+    def.abilities.forEach((a, i) => {
+      const st = h.abilities[i];
+      const blocker = castBlocker(me, i);
+      const canLearn = h.skillPoints > 0 && st.level < maxAbilityLevel(a, h.level);
+      const cd = Math.ceil(st.cooldown);
+      const key = `${st.level}|${blocker}|${cd}|${canLearn}`;
+      if (key === this.abilityKeys[i]) return;
+      this.abilityKeys[i] = key;
+      const b = this.buttons[i];
+      b.classList.toggle('unlearned', st.level === 0);
+      b.classList.toggle('nomana', blocker === 'mana');
+      b.classList.toggle('cooling', blocker === 'cooldown');
+      b.querySelector('.cd')!.textContent = blocker === 'cooldown' ? String(cd) : '';
+      b.querySelectorAll('.pips i').forEach((p, k) => p.classList.toggle('on', k < st.level));
+      this.learnButtons[i].classList.toggle('show', canLearn);
+    });
   }
 
   update(w: World, me: Unit, myTeam: Team) {
     const h = me.hero!;
+    this.updateAbilities(me);
     const key = [
       w.teamKills[0],
       w.teamKills[1],
@@ -83,7 +113,6 @@ export class Hud {
     this.el.level.textContent = String(h.level);
     this.el.gold.textContent = String(Math.floor(h.gold));
     this.el.kda.textContent = `${h.kills} / ${h.deaths} · LH ${h.lastHits}`;
-    this.el['btn-r'].classList.toggle('locked', h.level < 6);
 
     this.el.respawn.style.display = !me.alive && w.winner === null ? 'flex' : 'none';
     this.el['respawn-time'].textContent = String(Math.max(0, Math.ceil(h.respawnTimer)));
