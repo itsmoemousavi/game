@@ -239,3 +239,21 @@ svg.icon { display: block; width: 100%; height: 100%; }
 #itembar .item .cd { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,0.6); border-radius: 5px; font-size: 13px; font-weight: 800; z-index: 2; }
 #itembar .item .cd:empty { display: none; }
 .shop-item .cost s { opacity: 0.5; font-weight: 400; font-size: 11px; }
+
+/* ---------- announcer ---------- */
+#announce { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%); pointer-events: none; text-align: center; }
+#announce div { font-size: 30px; font-weight: 900; letter-spacing: 0.02em; text-shadow: 0 2px 0 #000, 0 0 18px rgba(0,0,0,0.8); animation: announce 2.4s forwards; white-space: nowrap; }
+#announce small { display: block; font-size: 14px; font-weight: 700; opacity: 0.9; }
+@keyframes announce { 0% { opacity: 0; transform: scale(1.6); } 10% { opacity: 1; transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-12px); } }
+
+/* ---------- end of match ---------- */
+#gameover .box { max-height: 92%; overflow-y: auto; padding: 0 12px; }
+#endstats table { border-collapse: collapse; font-size: 12px; margin: 8px auto; }
+#endstats th { font-size: 10px; opacity: 0.6; text-transform: uppercase; padding: 3px 6px; text-align: right; }
+#endstats th:first-child, #endstats td:first-child { text-align: left; }
+#endstats td { padding: 4px 6px; border-top: 1px solid rgba(255,255,255,0.12); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+#endstats tr.me td { background: rgba(255,224,102,0.1); }
+#endstats .mvp { color: #ffd23f; font-weight: 800; }
+#endstats .t0 { color: #6fb0ff; } #endstats .t1 { color: #ff7b7f; }
+
+#gameover { z-index: 9; }

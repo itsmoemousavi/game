@@ -9,6 +9,7 @@ import {
   RANGED_PER_WAVE,
   STARTING_GOLD,
   CAMP_FIRST_SPAWN,
+  MULTI_KILL_WINDOW,
   UPHILL_MISS_CHANCE,
   CREEP_GROWTH_PER_5MIN,
   CHARM_DURATION,
@@ -198,6 +199,13 @@ export interface HeroState {
   denies: number;
   /** All gold earned this match (for gold-per-minute). */
   goldEarned: number;
+  /** Hero kills since this hero last died. */
+  streak: number;
+  /** Kills in quick succession (multi-kills) and when the last one happened. */
+  multi: number;
+  lastKillAt: number;
+  /** End-of-match stats. */
+  stats: { heroDamage: number; buildingDamage: number; healing: number; damageTaken: number };
   /** Auto-attack enemies in range while idle (player setting). */
   autoAttack: boolean;
   /** Spend skill points automatically (player setting). */
@@ -351,6 +359,8 @@ export type GameEvent =
   | { type: 'revive'; unitId: number }
   | { type: 'purchase'; unitId: number }
   | { type: 'blink'; unitId: number; fromX: number; fromY: number }
+  /** Announcer moments: first blood, multi-kills, kill streaks, shutdowns. */
+  | { type: 'announce'; unitId: number; victimId: number; firstBlood: boolean; multi: number; streak: number; shutdown: number }
   | { type: 'immunity'; unitId: number }
   | { type: 'miss'; sourceId: number; targetId: number }
   /** Notable damage (spells, critical hits) for floating numbers. */
@@ -392,6 +402,9 @@ export class World {
   teamKills: [number, number] = [0, 0];
   readonly vision: Vision;
   nextId = 1;
+  firstBlood = false;
+  /** Set when the match ended by surrender (the team that gave up). */
+  surrendered: Team | null = null;
   private nextCampSpawn = CAMP_FIRST_SPAWN;
   runes: Rune[] = [];
   nextRune = RUNE_FIRST;
@@ -540,6 +553,7 @@ export class World {
         break;
       case 'surrender':
         if (this.winner === null) {
+          this.surrendered = u.team as Team;
           this.winner = otherTeam(u.team as Team);
           this.events.push({ type: 'gameOver', winner: this.winner });
         }
@@ -740,6 +754,10 @@ export class World {
       lastHits: 0,
       denies: 0,
       goldEarned: 0,
+      streak: 0,
+      multi: 0,
+      lastKillAt: -99,
+      stats: { heroDamage: 0, buildingDamage: 0, healing: 0, damageTaken: 0 },
       autoAttack: true,
       autoLearn: false,
       lastCrit: false,
@@ -1141,7 +1159,12 @@ export class World {
     if (!u.buffs.length) return;
     for (const b of u.buffs) {
       b.t -= DT;
-      if (b.healPerSec) this.heal(u, b.healPerSec * DT);
+      if (b.healPerSec) {
+        const before = u.hp;
+        this.heal(u, b.healPerSec * DT);
+        const healer = this.unit(b.sourceId);
+        if (healer?.hero) healer.hero.stats.healing += u.hp - before;
+      }
       if (b.manaPerSec) u.mana = Math.min(u.maxMana, u.mana + b.manaPerSec * DT);
       if (b.damagePerSec && b.sourceId !== undefined) this.dealDamage(b.sourceId, u, b.damagePerSec * DT, 'spell', { dot: true });
       if (!u.alive) return;
@@ -1316,6 +1339,11 @@ export class World {
     if (amount <= 0) return;
     target.hp -= amount;
     if (target.hero && src?.hero && src.team !== target.team) target.hero.damagedBy.set(src.id, this.time);
+    if (src?.hero && src.team !== target.team) {
+      if (target.hero) src.hero.stats.heroDamage += Math.min(amount, target.hp + amount);
+      else if (target.structure) src.hero.stats.buildingDamage += amount;
+    }
+    if (target.hero) target.hero.stats.damageTaken += amount;
     if ((kind === 'spell' && !opts.dot) || opts.crit) {
       this.events.push({ type: 'damage', sourceId, targetId: target.id, amount, kind, crit: !!opts.crit });
     }
@@ -1376,9 +1404,19 @@ export class World {
       }
       this.teamKills[otherTeam(u.team as Team)]++;
       if (killerHero) {
-        killerHero.hero!.kills++;
-        this.giveGold(killerHero, 150 + h.level * 10);
+        const k = killerHero.hero!;
+        k.kills++;
+        k.streak++;
+        k.multi = this.time - k.lastKillAt <= MULTI_KILL_WINDOW ? k.multi + 1 : 1;
+        k.lastKillAt = this.time;
+        // Shutdown bounty for ending a streak, and a first blood bonus.
+        const shutdown = Math.min(400, Math.max(0, h.streak - 2) * 60);
+        const firstBlood = !this.firstBlood;
+        this.firstBlood = true;
+        this.giveGold(killerHero, 150 + h.level * 10 + shutdown + (firstBlood ? 100 : 0));
+        this.events.push({ type: 'announce', unitId: killerHero.id, victimId: u.id, firstBlood, multi: k.multi, streak: k.streak, shutdown });
       }
+      h.streak = 0;
       // Assists: every other enemy hero that hurt this hero in the last 12 seconds.
       for (const [id, at] of h.damagedBy) {
         const a = this.unit(id);

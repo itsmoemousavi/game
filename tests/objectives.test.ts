@@ -328,3 +328,50 @@ describe('jungle camps & boss fight back', () => {
     expect(b.hp).toBeLessThan(b.maxHp);
   });
 });
+
+describe('streaks, bounties and match stats', () => {
+  it('first blood, multi-kills, streaks and shutdown bounties', () => {
+    const { w, hero } = humans();
+    const v = hero(0, 'vexa');
+    const announces: { firstBlood: boolean; multi: number; streak: number; shutdown: number }[] = [];
+    const kill = (killer: Unit, victim: Unit) => {
+      victim.hp = 1;
+      w.dealDamage(killer.id, victim, 10, 'spell');
+      for (const e of w.events) if (e.type === 'announce') announces.push(e);
+      w.events.length = 0;
+    };
+    kill(v, hero(1, 'brakk'));
+    kill(v, hero(1, 'orin'));
+    kill(v, hero(1, 'vexa'));
+    expect(announces[0].firstBlood).toBe(true);
+    expect(announces[1].multi).toBe(2);
+    expect(announces[2].multi).toBe(3);
+    expect(announces[2].streak).toBe(3);
+    // Ending Vexa's 3-kill streak pays a shutdown bounty.
+    const gold = hero(1, 'brakk').hero!.gold;
+    hero(1, 'brakk').alive = true;
+    kill(hero(1, 'brakk'), v);
+    expect(announces[3].shutdown).toBeGreaterThan(0);
+    expect(hero(1, 'brakk').hero!.gold).toBeGreaterThan(gold + 150);
+    expect(v.hero!.streak).toBe(0);
+  });
+
+  it('tracks hero damage, building damage and healing', () => {
+    const { w, hero } = humans();
+    const o = hero(0, 'orin');
+    const ally = hero(0, 'brakk');
+    w.dealDamage(o.id, hero(1, 'vexa'), 100, 'spell');
+    const t1 = w.structures.find((s) => s.team === 1 && s.structure!.tier === 'tower1')!;
+    t1.structure!.backdoor = false;
+    w.dealDamage(o.id, t1, 100, 'attack');
+    ally.hp = 100;
+    place(o, 52, 104);
+    place(ally, 54, 104);
+    w.applyCommand({ type: 'learn', unitId: o.id, slot: 1 });
+    w.applyCommand({ type: 'cast', unitId: o.id, slot: 1, targetId: ally.id });
+    run(w, 4.2);
+    expect(o.hero!.stats.heroDamage).toBeCloseTo(100);
+    expect(o.hero!.stats.buildingDamage).toBeGreaterThan(30);
+    expect(o.hero!.stats.healing).toBeGreaterThan(100);
+  });
+});

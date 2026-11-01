@@ -172,6 +172,15 @@ Goal: 15–20 minute matches. Bots-only test matches went from 33–53 min to **
 | Respawn time | 4 + 2×level → 3 + 1.5×level seconds |
 | Bots | group up and push from minute 6 when not outnumbered |
 
+### Streaks, bounties, announcer, match stats (implemented)
+
+- **First Blood:** the first hero kill of the match pays +100 gold.
+- **Multi-kills:** kills within 10 s of each other. **Double Kill**, then **Triple Kill — Team Wipe** (all three enemies in a 3v3).
+- **Streaks** (kills without dying): **Hot Streak** (3), **Blazing** (4), **Inferno** (5), **Legendary** (6+). The phrases are original or plain English, not Dota's callouts.
+- **Shutdown:** killing a hero on a streak pays 60 gold per kill above 2, up to 400.
+- **Announcer:** a big banner in the middle of the screen with a short jingle (higher for your team, lower for the enemy).
+- **End of match:** a table of every player's level, K/D/A, last hits/denies, gold earned, damage to heroes, damage to buildings, healing and items, with a ★ MVP. It also appears after a surrender, saying who surrendered.
+
 ## 6b. Fog of war, day & night, jungle
 
 **Fog of war:**
@@ -327,8 +336,6 @@ Milestone 5 (done): denying, wards, river power-ups, the Warden boss + revive ch
 Done or dropped: high ground (done), talents (dropped for now), Android build (not now).
 
 These were proposed and are parked for later:
-- **Kill feed polish, announcer voice, kill streaks and bounties:** extra gold for ending a streak, as a comeback mechanic.
-- **End-of-match scoreboard and stats:** damage, gold over time, items.
 - **Pings and quick-chat wheel:** "Attack", "Retreat", "Enemy missing".
 - **More heroes:** 6–8 for variety.
 - **Balance:** bots-only test matches currently take 37–52 min; the target is 15–20 min.

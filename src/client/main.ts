@@ -276,6 +276,14 @@ function announce(w: World, events: GameEvent[]) {
     return u?.hero ? HERO_DEFS[u.hero.defId].name : 'Someone';
   };
   for (const e of events) {
+    if (e.type === 'announce') {
+      if (hud.announce(w, e, myTeam)) sfx.play(w.unit(e.unitId)?.team === myTeam ? 'victory' : 'defeat', 0.5);
+      continue;
+    }
+    if (e.type === 'gameOver') {
+      hud.showEndStats(w, myTeam, myHeroId);
+      continue;
+    }
     if (e.type === 'bossKilled') {
       hud.toast(e.team === 2 ? 'The Warden fell' : `${TEAM_NAMES[e.team]} slew the Warden — revive charm!`, '#c4b5fd');
     } else if (e.type === 'rune') {

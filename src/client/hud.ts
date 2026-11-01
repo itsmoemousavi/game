@@ -84,6 +84,7 @@ export class Hud {
     });
     this.abilityKeys = ['', '', ''];
     this.el.gameover.style.display = 'none';
+    this.endShown = false;
   }
 
   private teamKey = '';
@@ -309,6 +310,54 @@ export class Hud {
     tip.classList.remove('hidden');
   }
 
+  /** Big announcer banner: first blood, multi-kills, streaks, shutdowns. */
+  announce(w: World, e: { unitId: number; firstBlood: boolean; multi: number; streak: number; shutdown: number }, myTeam: Team): boolean {
+    const u = w.unit(e.unitId);
+    if (!u?.hero) return false;
+    const multi = ['', '', 'Double Kill!', 'Triple Kill!'][Math.min(e.multi, 3)];
+    const streak = e.streak >= 6 ? 'Legendary!' : ['', '', '', 'Hot Streak!', 'Blazing!', 'Inferno!'][e.streak] ?? '';
+    const lines: string[] = [];
+    if (e.firstBlood) lines.push('First Blood!');
+    if (multi) lines.push(e.multi >= 3 ? 'Triple Kill — Team Wipe!' : multi);
+    else if (streak) lines.push(streak);
+    if (e.shutdown > 0) lines.push(`Shutdown! +${e.shutdown}`);
+    if (!lines.length) return false;
+    const d = document.createElement('div');
+    d.style.color = u.team === myTeam ? '#8cc4ff' : '#ff8f92';
+    d.textContent = lines[0];
+    const sub = document.createElement('small');
+    sub.textContent = `${HEROES[u.hero.defId].name}${lines.length > 1 ? ' · ' + lines.slice(1).join(' · ') : ''}`;
+    d.appendChild(sub);
+    const box = this.el.toasts.ownerDocument.getElementById('announce')!;
+    box.replaceChildren(d);
+    setTimeout(() => d.remove(), 2500);
+    return true;
+  }
+
+  private endShown = false;
+
+  /** End-of-match table: everyone's numbers, with the MVP highlighted. */
+  showEndStats(w: World, myTeam: Team, meId: number) {
+    if (this.endShown) return;
+    this.endShown = true;
+    const score = (h: NonNullable<Unit['hero']>) =>
+      h.kills * 3 + h.assists * 1.5 - h.deaths + h.stats.heroDamage / 400 + h.stats.buildingDamage / 600 + h.stats.healing / 300 + h.lastHits / 10;
+    const heroes = [...w.heroes].sort((a, b) => (a.team === b.team ? score(b.hero!) - score(a.hero!) : a.team === myTeam ? -1 : 1));
+    const mvp = [...w.heroes].sort((a, b) => score(b.hero!) - score(a.hero!))[0];
+    const n = (v: number) => Math.round(v).toLocaleString();
+    let html =
+      '<table><tr><th>Hero</th><th>Lv</th><th>K / D / A</th><th>LH / DN</th><th>Gold</th><th>Hero dmg</th><th>Building dmg</th><th>Healing</th><th>Items</th></tr>';
+    for (const u of heroes) {
+      const h = u.hero!;
+      const def = HEROES[h.defId];
+      const items = h.items.map((it) => (it ? `<i style="display:inline-block;width:16px;height:16px;vertical-align:middle">${itemIcon(it.id)}</i>` : '')).join('');
+      html += `<tr class="${u.id === meId ? 'me' : ''}"><td class="t${u.team}">${u === mvp ? '<span class="mvp">★ MVP</span> ' : ''}${def.name}${h.controller === 'bot' ? ' <small>(bot)</small>' : ''}</td>
+        <td>${h.level}</td><td>${h.kills} / ${h.deaths} / ${h.assists}</td><td>${h.lastHits} / ${h.denies}</td><td>${n(h.goldEarned)}</td>
+        <td>${n(h.stats.heroDamage)}</td><td>${n(h.stats.buildingDamage)}</td><td>${n(h.stats.healing)}</td><td>${items}</td></tr>`;
+    }
+    this.el.toasts.ownerDocument.getElementById('endstats')!.innerHTML = html + '</table>';
+  }
+
   /** Short announcement under the top bar. */
   toast(text: string, color = '#fff') {
     const d = document.createElement('div');
@@ -364,11 +413,15 @@ export class Hud {
     this.el['respawn-time'].textContent = String(Math.max(0, Math.ceil(h.respawnTimer)));
 
     if (w.winner !== null) {
+      this.showEndStats(w, myTeam, me.id);
       this.el.gameover.style.display = 'flex';
       const won = w.winner === myTeam;
       this.el['gameover-title'].textContent = won ? 'Victory' : 'Defeat';
       this.el['gameover-title'].className = won ? 'win' : 'lose';
-      this.el.gameover.querySelector('.sub')!.textContent = `${TEAM_NAMES[w.winner]} destroyed the enemy Shrine at ${fmtTime(w.time)}`;
+      this.el.gameover.querySelector('.sub')!.textContent =
+        w.surrendered !== null
+          ? `${TEAM_NAMES[w.surrendered]} surrendered at ${fmtTime(w.time)}`
+          : `${TEAM_NAMES[w.winner]} destroyed the enemy Shrine at ${fmtTime(w.time)}`;
     }
   }
 }
