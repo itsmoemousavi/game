@@ -34,7 +34,15 @@ If 3D performance in a Capacitor WebView ever becomes a blocker, the simulation 
 
 - 200 × 200 m, split diagonally by a river. **Azure** (team 0) owns the bottom-left triangle; **Crimson** (team 1) owns the top-right. The map is point-symmetric, so both sides are identical (enforced by a test).
 - **3 lanes:** top (left edge → top edge), mid (diagonal), bottom (bottom edge → right edge).
-- **Maze:** the space between lanes is walls (forest) carved with narrow jungle corridors and rooms. Rooms will hold neutral camps.
+- **Maze:**
+  - **Jungle corridors and rooms:** the space between lanes is forest with jungle corridors and rooms. The rooms hold the jungle camps.
+  - **Forest paths:** narrow trails cut through the trees (drawn as faint trails) for hiding, ganking and escaping. Trees on both sides block sight.
+- **High ground:**
+  - **Ground levels:** normal ground is level 1. Each base sits on a plateau (level 2). There are three ward hills per side (level 3, small raised clearings on the forest paths).
+  - **Seeing up:** you can't see ground higher than you're standing on.
+  - **Trees** only block you if their tops (their ground level + 1) are at or above your level. So a ward or hero on a hill sees over the normal forest into the paths, but not over the trees around a base.
+  - **Uphill attacks:** attacks from lower ground onto higher ground miss 25% of the time, and you need vision up there to keep attacking at all.
+  - **Drawing:** plateaus and hills are drawn lighter with dark cliff edges.
 - **Per team (Dota-style layout):**
   - each lane: a Tier‑1 tower beside the lane, about halfway from the base to the river
   - each lane's **gate**: where the lane leaves the base, a Tier‑2 tower on one side and the Barracks on the other; creeps walk between them
@@ -153,7 +161,9 @@ Item numbers are in `src/sim/data/items.ts`.
 **Jungle camps:**
 - 3 camps per side, in the jungle rooms. Each has 1 brute and 2 imps.
 - They spawn at 0:30 and refill every minute when empty.
-- They stay passive until attacked, fight back as a group, give up past 11 m from home, and heal at camp.
+- They stay passive until attacked, then the whole camp fights back for 5 s after the last hit.
+  - **Chasing:** they chase up to 11 m from home, and wait at that edge if a ranged attacker stands further out.
+  - **Healing:** only once they've been left alone at home. This fixed camps (and the Warden) healing up instead of fighting a ranged hero.
 - Rewards: gold to the killer, XP to the killer's team.
 
 **Camera:**
@@ -264,11 +274,17 @@ Numbers are in `src/sim/constants.ts`, `data/units.ts` and `objectives.ts`.
 
 Milestone 5 (done): denying, wards, river power-ups, the Warden boss + revive charm, buyback, tower shield, backdoor protection, sound effects.
 
+**Controls update:**
+- **Quick tap:** a tap anywhere (no drag) is a tap-to-move or tap-to-attack, including on the joystick side, so jungle monsters on the left can be tapped.
+- **Looking around:** while a finger holds the minimap, the joystick is off and taps on the map move your hero or attack what you tap. Letting go brings the joystick back.
+
+**Item icons:** every item, the teleport scroll and the shop have drawn icons (`src/client/icons.ts`, original artwork) in the item bar, the shop, quick-buy and the scoreboard.
+
 ## 8b. Backlog: ideas agreed to revisit
 
+Done or dropped: high ground (done), talents (dropped for now), Android build (not now).
+
 These were proposed and are parked for later:
-- **High ground:** bases on a ledge; attacking uphill can miss and needs vision.
-- **Talents at levels 10 and 15:** pick one of two bonuses per hero.
 - **Item recipes and active items:** components combine into bigger items; items with a button (for example a short blink, or brief spell immunity), all original designs.
 - **Kill feed polish, announcer voice, kill streaks and bounties:** extra gold for ending a streak, as a comeback mechanic.
 - **End-of-match scoreboard and stats:** damage, gold over time, items.

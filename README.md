@@ -25,7 +25,7 @@ npx vite-node scripts/simulate.ts [seed] [minutes]   # headless all-bot match lo
 
 | | Phone (landscape) | Desktop |
 |---|---|---|
-| Move | Drag anywhere on the left half (virtual joystick) | Arrow keys, or right-click the ground |
+| Move | Drag anywhere on the left half (virtual joystick) · quick tap anywhere = walk there / attack what you tapped | Arrow keys, or right-click the ground |
 | Attack | **Hold Attack** (works together with the joystick: hits what's in range, otherwise you keep walking) · tap an enemy to attack it | Hold Space, or click an enemy |
 | Abilities | **Hold** Q/W/R: arrow appears · **drag** any direction to aim · release to cast · release on ✕ Cancel to abort | Q / W / R cast at the cursor |
 | Items | Tap an item to use it (salves) · **ward**: tap its slot, then tap the ground · 🛒 opens the shop (buy at base) · **TP** slot: tap, then pick a friendly building (teleports are bought in the shop) | same (click) |
@@ -35,7 +35,7 @@ npx vite-node scripts/simulate.ts [seed] [minutes]   # headless all-bot match lo
 | Menu | **⏸** pause (resume / surrender) · **⚙** settings: auto attack, sound, auto-learn, left-handed, vibration, joystick size, camera zoom | same (click) |
 | Shopping | The button next to 🛒 quick-buys the next recommended item (at base) | same (click) |
 | Learn ability | Tap the yellow **+** next to the button | Ctrl + Q / W / R |
-| Camera | Hold/drag the minimap to look; release to return · while dead, drag anywhere to look around | Hold minimap to look, right-click minimap to walk there, wheel to zoom |
+| Camera | Hold/drag the minimap to look (while looking, the joystick is off and taps on the map are orders); release to return · while dead, drag anywhere to look around | Hold minimap to look, right-click minimap to walk there, wheel to zoom |
 
 The game always plays in landscape: on a phone held upright the game is shown sideways, so just turn the phone.
 
