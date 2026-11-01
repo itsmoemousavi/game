@@ -27,6 +27,7 @@
       <div id="topbar">
         <span class="team t0" id="score-0">0</span>
         <span id="clock">0:00</span>
+        <span id="daynight" title="Day / night">☀</span>
         <span class="team t1" id="score-1">0</span>
       </div>
 
@@ -44,12 +45,39 @@
         </div>
       </div>
 
+      <div id="itembar">
+        <button class="item empty" data-item="0"><span class="lbl"></span><span class="cnt"></span></button>
+        <button class="item empty" data-item="1"><span class="lbl"></span><span class="cnt"></span></button>
+        <button class="item empty" data-item="2"><span class="lbl"></span><span class="cnt"></span></button>
+        <button class="item empty" data-item="3"><span class="lbl"></span><span class="cnt"></span></button>
+        <button class="item empty" data-item="4"><span class="lbl"></span><span class="cnt"></span></button>
+        <button class="item empty" data-item="5"><span class="lbl"></span><span class="cnt"></span></button>
+        <button class="item tp none" id="tp-slot"><span class="lbl">TP</span><span class="cnt">0</span><span class="cd"></span></button>
+        <button id="btn-shop" title="Shop">🛒</button>
+      </div>
+
+      <div id="shop" class="hidden">
+        <div class="shop-head">
+          <b>Shop</b>
+          <span class="gold"><b id="shop-gold">0</b> gold</span>
+          <button id="shop-tp" title="Buy a teleport scroll">+ TP (50)</button>
+          <button id="shop-close">✕</button>
+        </div>
+        <p id="shop-note"></p>
+        <div id="shop-items"></div>
+      </div>
+
+      <div id="tp-picker" class="hidden">
+        <div class="tp-head"><b>Teleport</b> — tap a friendly building <button id="tp-close">✕</button></div>
+        <canvas id="tp-canvas"></canvas>
+      </div>
+
       <div id="joy-base"><div id="joy-knob"></div></div>
 
       <div id="actions">
-        <button id="btn-q" class="ability" data-slot="0"><b>Q</b><span class="name"></span><span class="pips"></span><span class="cd"></span></button>
-        <button id="btn-w" class="ability" data-slot="1"><b>W</b><span class="name"></span><span class="pips"></span><span class="cd"></span></button>
-        <button id="btn-r" class="ability ult" data-slot="2"><b>R</b><span class="name"></span><span class="pips"></span><span class="cd"></span></button>
+        <button id="btn-q" class="ability" data-slot="0"><b>Q</b><span class="name"></span><span class="pips"></span><span class="mana"></span><span class="cd"></span></button>
+        <button id="btn-w" class="ability" data-slot="1"><b>W</b><span class="name"></span><span class="pips"></span><span class="mana"></span><span class="cd"></span></button>
+        <button id="btn-r" class="ability ult" data-slot="2"><b>R</b><span class="name"></span><span class="pips"></span><span class="mana"></span><span class="cd"></span></button>
         <button class="learn" id="learn-q" data-learn="0">+</button>
         <button class="learn" id="learn-w" data-learn="1">+</button>
         <button class="learn" id="learn-r" data-learn="2">+</button>
@@ -57,9 +85,9 @@
       </div>
       <div id="cancel-zone">✕ Cancel</div>
 
-      <div id="hint">Arrows / right-click: move · click enemy or Space: attack · Q W R: cast at cursor · Ctrl+Q/W/R or "+": learn · wheel: zoom</div>
+      <div id="hint">Arrows / right-click: move · click enemy or Space: attack · Q W R: cast at cursor · Ctrl+Q/W/R or "+": learn · hold minimap: look · right-click minimap: walk · wheel: zoom</div>
 
-      <div id="respawn" class="overlay"><div>Respawning in <b id="respawn-time">0</b></div></div>
+      <div id="respawn">Respawning in <b id="respawn-time">0</b> · drag to look around</div>
       <div id="gameover" class="overlay">
         <div class="box">
           <h2 id="gameover-title">Victory</h2>

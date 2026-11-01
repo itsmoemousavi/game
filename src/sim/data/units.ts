@@ -14,6 +14,8 @@ export interface CombatStats {
   acquireRange: number;
   bountyGold: number;
   bountyXp: number;
+  /** Vision radius (meters) by day and by night. */
+  vision?: [number, number];
 }
 
 export const CREEPS: Record<'melee' | 'ranged', CombatStats> = {
@@ -29,6 +31,7 @@ export const CREEPS: Record<'melee' | 'ranged', CombatStats> = {
     acquireRange: 8,
     bountyGold: 38,
     bountyXp: 57,
+    vision: [11, 8],
   },
   ranged: {
     hp: 300,
@@ -42,6 +45,7 @@ export const CREEPS: Record<'melee' | 'ranged', CombatStats> = {
     acquireRange: 9,
     bountyGold: 48,
     bountyXp: 69,
+    vision: [11, 8],
   },
 };
 
@@ -60,6 +64,7 @@ const tower = (hp: number, damage: number): CombatStats => ({
   acquireRange: 11,
   bountyGold: 0,
   bountyXp: 0,
+  vision: [15, 13],
 });
 
 export const STRUCTURES: Record<StructureTier, CombatStats & { teamGold: number }> = {
@@ -75,6 +80,39 @@ export const STRUCTURES: Record<StructureTier, CombatStats & { teamGold: number 
     acquireRange: 14,
     radius: 3,
     projectileSpeed: 40,
+    vision: [20, 20],
     teamGold: 0,
   },
 };
+
+/** Jungle monsters: passive until attacked, then fight and leash back to camp. */
+export const NEUTRALS: Record<'brute' | 'imp', CombatStats> = {
+  brute: {
+    hp: 700,
+    armor: 3,
+    damage: 30,
+    attackInterval: 1.2,
+    attackRange: 1.3,
+    projectileSpeed: 0,
+    moveSpeed: 5.5,
+    radius: 1.1,
+    acquireRange: 0,
+    bountyGold: 60,
+    bountyXp: 75,
+  },
+  imp: {
+    hp: 380,
+    armor: 1,
+    damage: 18,
+    attackInterval: 1,
+    attackRange: 1.1,
+    projectileSpeed: 0,
+    moveSpeed: 5.5,
+    radius: 0.75,
+    acquireRange: 0,
+    bountyGold: 35,
+    bountyXp: 45,
+  },
+};
+
+export const HERO_VISION: [number, number] = [17, 10];

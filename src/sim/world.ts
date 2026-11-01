@@ -8,13 +8,21 @@ import {
   PASSIVE_GOLD_PER_SEC,
   RANGED_PER_WAVE,
   STARTING_GOLD,
+  CAMP_FIRST_SPAWN,
+  CAMP_RESPAWN,
+  NEUTRAL_LEASH,
+  Side,
   Team,
+  VISION_HZ,
   XP_SHARE_RADIUS,
   XP_TABLE,
   otherTeam,
 } from './constants';
 import { HEROES, HeroId, maxAbilityLevel } from './data/heroes';
-import { CREEPS, STRUCTURES, SUPER_CREEP_MULT } from './data/units';
+import { CREEPS, CombatStats, HERO_VISION, NEUTRALS, STRUCTURES, SUPER_CREEP_MULT } from './data/units';
+import { ItemId, ItemStats } from './data/items';
+import { ItemSlot, buyItem, buyTeleport, emptyInventory, itemBonuses, sellItem, startTeleport, updateChannel, useItem } from './inventory';
+import { Vision } from './vision';
 import { GameMap, LaneId, StructureTier, createMap, fits, isWalkable, lineClear, teamLanePath } from './map';
 import { Vec2, dist, distV } from './math';
 
@@ -30,7 +38,7 @@ import { Rng } from './rng';
 import { botThink } from './ai/bots';
 import { applyAttackPassives, castAbility, damageAfterPassives, passiveArmor, resolveCast } from './abilities';
 
-export type UnitKind = 'hero' | 'creep' | 'structure';
+export type UnitKind = 'hero' | 'creep' | 'neutral' | 'structure';
 export type Controller = 'human' | 'bot';
 
 export type Order =
@@ -50,7 +58,15 @@ export type Command =
   /** Use ability `slot` (0 = Q, 1 = W, 2 = R). Give targetId for unit-target abilities, x/y otherwise. */
   | { type: 'cast'; unitId: number; slot: number; targetId?: number; x?: number; y?: number }
   /** Spend a skill point on ability `slot`. */
-  | { type: 'learn'; unitId: number; slot: number };
+  | { type: 'learn'; unitId: number; slot: number }
+  /** Shop (only near your fountain). */
+  | { type: 'buy'; unitId: number; itemId: ItemId }
+  | { type: 'sell'; unitId: number; slot: number }
+  | { type: 'buyTp'; unitId: number }
+  /** Use a consumable in inventory slot `slot`. */
+  | { type: 'useItem'; unitId: number; slot: number }
+  /** Channel a teleport to an allied building. Moving or being stunned cancels it. */
+  | { type: 'teleport'; unitId: number; targetId: number };
 
 export interface AbilityState {
   level: number;
@@ -73,7 +89,7 @@ export interface Buff {
 export interface Zone {
   id: number;
   kind: 'arrowStorm' | 'burn';
-  team: Team;
+  team: Side;
   sourceId: number;
   x: number;
   y: number;
@@ -88,7 +104,7 @@ export interface Zone {
 export interface Blast {
   id: number;
   kind: 'earthsplitter' | 'cataclysm';
-  team: Team;
+  team: Side;
   sourceId: number;
   x: number;
   y: number;
@@ -103,8 +119,8 @@ export interface Blast {
 /** Non-homing projectile travelling in a straight line (Piercing Arrow). */
 export interface Skillshot {
   id: number;
-  kind: 'piercingArrow';
-  team: Team;
+  kind: 'piercingArrow' | 'fireball';
+  team: Side;
   sourceId: number;
   x: number;
   y: number;
@@ -117,6 +133,8 @@ export interface Skillshot {
   width: number;
   damage: number;
   hit: number[];
+  /** If set: stop at the first enemy hit (or at max range) and explode in this radius. */
+  explode?: number;
 }
 
 export interface Dash {
@@ -146,7 +164,21 @@ export interface HeroState {
   skillPoints: number;
   /** Attacks made, for "every Nth attack" passives. */
   attackCount: number;
-  bot: { thinkTimer: number; retreating: boolean };
+  /** 6 item slots (null = empty). */
+  items: (ItemSlot | null)[];
+  /** Teleport scrolls carried (separate slot, unlimited). */
+  tpCount: number;
+  tpCooldown: number;
+  channel: { kind: 'tp'; t: number; total: number; targetId: number } | null;
+  /** Item bonuses currently applied (cooldown reduction, spell amp, lifesteal, ult upgrade...). */
+  bonus: Required<ItemStats>;
+  bot: { thinkTimer: number; retreating: boolean; buildIndex: number };
+}
+
+export interface NeutralState {
+  camp: number;
+  homeX: number;
+  homeY: number;
 }
 
 export interface CreepState {
@@ -168,7 +200,7 @@ export interface StructureState {
 export interface Unit {
   id: number;
   kind: UnitKind;
-  team: Team;
+  team: Side;
   x: number;
   y: number;
   /** Position at the previous tick, for render interpolation. */
@@ -192,6 +224,8 @@ export interface Unit {
   acquireRange: number;
   bountyGold: number;
   bountyXp: number;
+  visionDay: number;
+  visionNight: number;
   targetId: number | null;
   facing: number;
   path: Vec2[] | null;
@@ -208,11 +242,12 @@ export interface Unit {
   hero?: HeroState;
   creep?: CreepState;
   structure?: StructureState;
+  neutral?: NeutralState;
 }
 
 export interface Projectile {
   id: number;
-  team: Team;
+  team: Side;
   x: number;
   y: number;
   px: number;
@@ -232,7 +267,9 @@ export type GameEvent =
   | { type: 'levelUp'; unitId: number; level: number }
   | { type: 'gameOver'; winner: Team }
   | { type: 'cast'; unitId: number; slot: number }
-  | { type: 'heal'; unitId: number; amount: number };
+  | { type: 'heal'; unitId: number; amount: number }
+  | { type: 'teleport'; unitId: number }
+  | { type: 'explosion'; x: number; y: number; radius: number };
 
 export type DamageKind = 'attack' | 'spell';
 
@@ -266,7 +303,9 @@ export class World {
   events: GameEvent[] = [];
   winner: Team | null = null;
   teamKills: [number, number] = [0, 0];
+  readonly vision: Vision;
   nextId = 1;
+  private nextCampSpawn = CAMP_FIRST_SPAWN;
   private nextWave = FIRST_WAVE_TIME;
   private pending: Command[] = [];
   private byId = new Map<number, Unit>();
@@ -275,10 +314,18 @@ export class World {
     this.map = opts.map ?? createMap();
     this.nav = { ...this.map, walkable: new Uint8Array(this.map.walkable) };
     this.rng = new Rng(opts.seed);
+    this.vision = new Vision(this.map.grid, this.map.cell);
     for (const s of this.map.structures) this.spawnStructure(s.team, s.tier, s.lane, s.pos);
     this.refreshVulnerability();
     this.rebuildNav();
     opts.slots.forEach((slot, i) => this.spawnHero(slot, i));
+    this.vision.update(this);
+  }
+
+  /** Whether `team` can currently see unit `u` (fog of war). */
+  canSee(team: Side, u: Unit): boolean {
+    if (team === 2) return true;
+    return this.vision.sees(team, u);
   }
 
   // ---------------------------------------------------------------- queries
@@ -295,7 +342,7 @@ export class World {
     return id == null ? undefined : this.byId.get(id);
   }
 
-  findStructure(team: Team, tier: StructureTier, lane: LaneId | null = null): Unit[] {
+  findStructure(team: Side, tier: StructureTier, lane: LaneId | null = null): Unit[] {
     return this.units.filter(
       (u) => u.structure && u.team === team && u.structure.tier === tier && (lane === null || u.structure.lane === lane),
     );
@@ -327,8 +374,13 @@ export class World {
 
   applyCommand(cmd: Command) {
     const u = this.unit(cmd.unitId);
-    if (!u || !u.hero || !u.alive) return;
+    if (!u || !u.hero) return;
     const h = u.hero;
+    // Shopping works while dead (you respawn at the fountain); everything else needs a living hero.
+    if (!u.alive && cmd.type !== 'buy' && cmd.type !== 'sell' && cmd.type !== 'buyTp' && cmd.type !== 'learn') return;
+    if (h.channel && (cmd.type === 'moveDir' || cmd.type === 'moveTo' || cmd.type === 'attack' || cmd.type === 'attackNearest' || cmd.type === 'cast' || cmd.type === 'stop')) {
+      if (cmd.type !== 'moveDir' || Math.hypot(cmd.dx, cmd.dy) >= 0.15) h.channel = null;
+    }
     switch (cmd.type) {
       case 'moveDir': {
         const l = Math.hypot(cmd.dx, cmd.dy);
@@ -343,9 +395,11 @@ export class World {
         h.order = { type: 'move', x: cmd.x, y: cmd.y };
         u.path = null;
         break;
-      case 'attack':
-        if (this.canAttack(u, this.unit(cmd.targetId))) h.order = { type: 'attack', targetId: cmd.targetId };
+      case 'attack': {
+        const t = this.unit(cmd.targetId);
+        if (this.canAttack(u, t) && this.canSee(u.team, t)) h.order = { type: 'attack', targetId: cmd.targetId };
         break;
+      }
       case 'attackNearest': {
         const t = this.pickAutoTarget(u);
         h.order = t ? { type: 'attack', targetId: t.id } : { type: 'idle' };
@@ -358,6 +412,21 @@ export class World {
         if (castAbility(this, u, cmd.slot, cmd) === 'approach') {
           h.order = { type: 'cast', slot: cmd.slot, targetId: cmd.targetId, x: cmd.x, y: cmd.y };
         }
+        break;
+      case 'buy':
+        buyItem(this, u, cmd.itemId);
+        break;
+      case 'sell':
+        sellItem(this, u, cmd.slot);
+        break;
+      case 'buyTp':
+        buyTeleport(this, u);
+        break;
+      case 'useItem':
+        useItem(this, u, cmd.slot);
+        break;
+      case 'teleport':
+        startTeleport(this, u, cmd.targetId);
         break;
       case 'learn': {
         const def = HEROES[h.defId].abilities[cmd.slot];
@@ -416,17 +485,18 @@ export class World {
   /** Mobile "attack button" targeting: enemy hero first, then nearest anything. */
   pickAutoTarget(u: Unit): Unit | undefined {
     const reach = Math.max(u.attackRange + 4, 8);
-    const near = this.enemiesNear(u, u.x, u.y, reach);
+    const seen = (e: Unit) => this.canSee(u.team, e);
+    const near = this.enemiesNear(u, u.x, u.y, reach, seen);
     const byDist = (a: Unit, b: Unit) => dist(u.x, u.y, a.x, a.y) - dist(u.x, u.y, b.x, b.y);
     const heroes = near.filter((e) => e.kind === 'hero').sort(byDist);
     if (heroes.length) return heroes[0];
     if (near.length) return near.sort(byDist)[0];
-    return this.enemiesNear(u, u.x, u.y, 14).sort(byDist)[0];
+    return this.enemiesNear(u, u.x, u.y, 14, seen).sort(byDist)[0];
   }
 
   // ---------------------------------------------------------------- spawning
 
-  private newUnit(kind: UnitKind, team: Team, pos: Vec2, s: (typeof CREEPS)['melee']): Unit {
+  private newUnit(kind: UnitKind, team: Side, pos: Vec2, s: CombatStats): Unit {
     const u: Unit = {
       id: this.nextId++,
       kind,
@@ -453,6 +523,8 @@ export class World {
       acquireRange: s.acquireRange,
       bountyGold: s.bountyGold,
       bountyXp: s.bountyXp,
+      visionDay: s.vision?.[0] ?? 0,
+      visionNight: s.vision?.[1] ?? 0,
       targetId: null,
       facing: team === 0 ? -Math.PI / 4 : (3 * Math.PI) / 4,
       path: null,
@@ -488,6 +560,7 @@ export class World {
       acquireRange: Math.max(def.attackRange + 2, 6),
       bountyGold: 0,
       bountyXp: 0,
+      vision: HERO_VISION,
     });
     u.hero = {
       defId: slot.heroId,
@@ -505,7 +578,12 @@ export class World {
       abilities: [0, 1, 2].map(() => ({ level: 0, cooldown: 0 })),
       skillPoints: 1,
       attackCount: 0,
-      bot: { thinkTimer: (index % 6) * 0.05, retreating: false },
+      items: emptyInventory(),
+      tpCount: 0,
+      tpCooldown: 0,
+      channel: null,
+      bonus: itemBonuses([]),
+      bot: { thinkTimer: (index % 6) * 0.05, retreating: false, buildIndex: 0 },
     };
     this.applyHeroStats(u, true);
   }
@@ -517,27 +595,45 @@ export class World {
     return { x: f.x + dir * (5 + Math.cos(a) * 1.5), y: f.y - dir * (5 + Math.sin(a) * 1.5) };
   }
 
-  /** Recompute hero stats from definition + level (items will hook in here). */
+  /** Recompute hero stats from definition + level + items. */
   applyHeroStats(u: Unit, fill = false) {
     const h = u.hero!;
     const def = HEROES[h.defId];
     const lv = h.level - 1;
+    const b = (h.bonus = itemBonuses(h.items));
     const oldMax = u.maxHp;
     const oldMana = u.maxMana;
-    u.maxHp = def.baseHp + def.hpPerLevel * lv;
-    u.maxMana = def.baseMana + def.manaPerLevel * lv;
-    u.hpRegen = def.hpRegen + 0.15 * lv;
-    u.manaRegen = def.manaRegen + 0.1 * lv;
-    u.armor = def.baseArmor + def.armorPerLevel * lv;
-    u.damage = def.baseDamage + def.damagePerLevel * lv;
-    u.attackInterval = Math.max(0.6, def.attackInterval - def.attackIntervalPerLevel * lv);
+    u.maxHp = def.baseHp + def.hpPerLevel * lv + b.hp;
+    u.maxMana = def.baseMana + def.manaPerLevel * lv + b.mana;
+    u.hpRegen = def.hpRegen + 0.15 * lv + b.hpRegen;
+    u.manaRegen = def.manaRegen + 0.1 * lv + b.manaRegen;
+    u.armor = def.baseArmor + def.armorPerLevel * lv + b.armor;
+    u.damage = def.baseDamage + def.damagePerLevel * lv + b.damage;
+    u.attackInterval = Math.max(0.45, (def.attackInterval - def.attackIntervalPerLevel * lv) / (1 + b.attackSpeedPct / 100));
+    u.moveSpeed = def.moveSpeed * (1 + b.moveSpeedPct / 100);
     if (fill) {
       u.hp = u.maxHp;
       u.mana = u.maxMana;
     } else {
-      u.hp += u.maxHp - oldMax;
-      u.mana += u.maxMana - oldMana;
+      u.hp = Math.min(u.maxHp, Math.max(1, u.hp + u.maxHp - oldMax));
+      u.mana = Math.min(u.maxMana, Math.max(0, u.mana + u.maxMana - oldMana));
     }
+  }
+
+  /** Jungle camps: refill every empty camp on the minute. */
+  private spawnCamps() {
+    this.map.camps.forEach((c, camp) => {
+      if (this.units.some((u) => u.neutral?.camp === camp && u.alive)) return;
+      const pack: ['brute' | 'imp', number, number][] = [
+        ['brute', 0, 0],
+        ['imp', 1.8, 1.2],
+        ['imp', -1.6, 1.4],
+      ];
+      for (const [kind, ox, oy] of pack) {
+        const u = this.newUnit('neutral', 2, { x: c.x + ox, y: c.y + oy }, NEUTRALS[kind]);
+        u.neutral = { camp, homeX: u.x, homeY: u.y };
+      }
+    });
   }
 
   private spawnWave() {
@@ -598,6 +694,11 @@ export class World {
       this.nextWave += CREEP_WAVE_INTERVAL;
     }
 
+    if (this.time >= this.nextCampSpawn) {
+      this.spawnCamps();
+      this.nextCampSpawn += CAMP_RESPAWN;
+    }
+
     for (const u of this.units) {
       if (u.attackTimer > 0) u.attackTimer -= DT;
       if (u.hero) this.updateHeroUpkeep(u);
@@ -609,6 +710,7 @@ export class World {
         this.updateDash(u);
         continue;
       }
+      if (u.hero?.channel && updateChannel(this, u, DT)) continue;
       if (u.stunTimer > 0 || u.castLock > 0) continue;
       if (u.hero) {
         if (u.hero.controller === 'bot') {
@@ -620,16 +722,18 @@ export class World {
         }
         this.updateHero(u);
       } else if (u.creep) this.updateCreep(u);
+      else if (u.neutral) this.updateNeutral(u);
       else if (u.structure) this.updateStructure(u);
     }
     this.updateProjectiles();
     this.updateSkillshots();
     this.updateAreas();
     this.separate();
+    if (this.tick % Math.round(1 / (DT * VISION_HZ)) === 0) this.vision.update(this);
 
     // Drop dead creeps; heroes respawn and structures stay as ruins.
     this.units = this.units.filter((u) => {
-      if (u.kind === 'creep' && !u.alive) {
+      if ((u.kind === 'creep' || u.kind === 'neutral') && !u.alive) {
         this.byId.delete(u.id);
         return false;
       }
@@ -641,10 +745,11 @@ export class World {
     const h = u.hero!;
     h.gold += PASSIVE_GOLD_PER_SEC * DT;
     for (const a of h.abilities) if (a.cooldown > 0) a.cooldown = Math.max(0, a.cooldown - DT);
+    if (h.tpCooldown > 0) h.tpCooldown = Math.max(0, h.tpCooldown - DT);
     if (!u.alive) {
       h.respawnTimer -= DT;
       if (h.respawnTimer <= 0) {
-        const p = this.respawnPoint(u.team, h.slot);
+        const p = this.respawnPoint(u.team as Team, h.slot);
         u.x = u.px = p.x;
         u.y = u.py = p.y;
         u.alive = true;
@@ -660,7 +765,7 @@ export class World {
       }
       return;
     }
-    const f = this.map.fountains[u.team];
+    const f = this.map.fountains[u.team as Team];
     const inFountain = dist(u.x, u.y, f.x, f.y) < FOUNTAIN_HEAL_RADIUS;
     const hpRegen = u.hpRegen + (inFountain ? u.maxHp * 0.1 : 0);
     const manaRegen = u.manaRegen + (inFountain ? u.maxMana * 0.1 : 0);
@@ -699,7 +804,7 @@ export class World {
         // Auto-attack anything already in range, without chasing.
         let t = this.unit(u.targetId);
         if (!this.canAttack(u, t) || !this.inReach(u, t)) {
-          t = this.enemiesNear(u, u.x, u.y, u.attackRange + u.radius + 0.3).sort(
+          t = this.enemiesNear(u, u.x, u.y, u.attackRange + u.radius + 0.3, (e) => e.kind !== 'neutral' && this.canSee(u.team, e)).sort(
             (a, b) => dist(u.x, u.y, a.x, a.y) - dist(u.x, u.y, b.x, b.y),
           )[0];
         }
@@ -715,7 +820,7 @@ export class World {
     let t = this.unit(u.targetId);
     if (!this.canAttack(u, t) || dist(u.x, u.y, t.x, t.y) > u.acquireRange + 4) t = undefined;
     if (!t) {
-      t = this.enemiesNear(u, u.x, u.y, u.acquireRange).sort(
+      t = this.enemiesNear(u, u.x, u.y, u.acquireRange, (e) => e.kind !== 'neutral').sort(
         (a, b) => dist(u.x, u.y, a.x, a.y) - dist(u.x, u.y, b.x, b.y),
       )[0];
     }
@@ -739,13 +844,30 @@ export class World {
     const aggro = this.unit(s.aggroId);
     if (s.aggroTimer > 0 && this.canAttack(u, aggro) && this.inReach(u, aggro)) t = aggro;
     if (!this.canAttack(u, t) || !this.inReach(u, t)) {
-      const near = this.enemiesNear(u, u.x, u.y, u.attackRange + u.radius, (e) => e.kind !== 'structure');
+      const near = this.enemiesNear(u, u.x, u.y, u.attackRange + u.radius, (e) => e.kind !== 'structure' && e.kind !== 'neutral');
       const byDist = (a: Unit, b: Unit) => dist(u.x, u.y, a.x, a.y) - dist(u.x, u.y, b.x, b.y);
       // Towers prefer creeps; heroes are hit when alone or when they attack an allied hero.
       t = near.filter((e) => e.kind === 'creep').sort(byDist)[0] ?? near.sort(byDist)[0];
     }
     u.targetId = t ? t.id : null;
     if (t) this.tryAttack(u, t);
+  }
+
+  /** Neutrals idle at camp; when attacked they fight back, but never stray far from home. */
+  private updateNeutral(u: Unit) {
+    const n = u.neutral!;
+    const home = dist(u.x, u.y, n.homeX, n.homeY);
+    let t = this.unit(u.targetId);
+    if (t && (!t.alive || home > NEUTRAL_LEASH || dist(t.x, t.y, n.homeX, n.homeY) > NEUTRAL_LEASH + 3)) {
+      u.targetId = null;
+      t = undefined;
+    }
+    if (t) {
+      if (!this.tryAttack(u, t)) this.steerTo(u, t.x, t.y);
+      return;
+    }
+    if (home > 0.3) this.steerTo(u, n.homeX, n.homeY);
+    else u.hp = Math.min(u.maxHp, u.hp + u.maxHp * 0.1 * DT); // regenerate quickly at camp
   }
 
   private updateProjectiles() {
@@ -821,11 +943,27 @@ export class World {
       s.x += s.dx * step;
       s.y += s.dy * step;
       s.remaining -= step;
+      let exploded = false;
       for (const e of this.units) {
         if (!e.alive || e.team === s.team || e.kind === 'structure' || s.hit.includes(e.id)) continue;
         if (distToSeg(e.x, e.y, s.px, s.py, s.x, s.y) > s.width / 2 + e.radius) continue;
+        if (s.explode) {
+          s.x = e.x;
+          s.y = e.y;
+          exploded = true;
+          break;
+        }
         s.hit.push(e.id);
         this.dealDamage(s.sourceId, e, s.damage, 'spell');
+      }
+      if (s.explode && (exploded || s.remaining <= 0)) {
+        for (const e of this.units) {
+          if (e.alive && e.team !== s.team && e.kind !== 'structure' && dist(e.x, e.y, s.x, s.y) <= s.explode + e.radius) {
+            this.dealDamage(s.sourceId, e, s.damage, 'spell');
+          }
+        }
+        this.events.push({ type: 'explosion', x: s.x, y: s.y, radius: s.explode });
+        continue;
       }
       if (s.remaining > 0) keep.push(s);
     }
@@ -919,9 +1057,19 @@ export class World {
     if (target.structure && (!target.structure.vulnerable || kind === 'spell')) return;
     const src = this.unit(sourceId);
     let amount = kind === 'attack' ? raw * armorMultiplier(this.armorOf(target)) : raw;
+    if (kind === 'spell' && src?.hero) amount *= 1 + src.hero.bonus.spellAmpPct / 100;
     amount = damageAfterPassives(this, target, amount, kind);
     if (amount <= 0) return;
     target.hp -= amount;
+    if (kind === 'attack' && src?.hero && src.hero.bonus.lifestealPct > 0) {
+      this.heal(src, (amount * src.hero.bonus.lifestealPct) / 100);
+    }
+    // Wake the whole camp when a neutral is hit.
+    if (target.neutral && src && src.team !== 2) {
+      for (const n of this.units) {
+        if (n.neutral?.camp === target.neutral.camp && n.alive && n.targetId === null) n.targetId = src.id;
+      }
+    }
 
     // Towers punish heroes that attack heroes under them.
     if (src && src.kind === 'hero' && target.kind === 'hero') {
@@ -953,7 +1101,7 @@ export class World {
       h.deaths++;
       h.respawnTimer = 4 + h.level * 2;
       h.order = { type: 'idle' };
-      this.teamKills[otherTeam(u.team)]++;
+      this.teamKills[otherTeam(u.team as Team)]++;
       if (killerHero) {
         killerHero.hero!.kills++;
         this.giveGold(killerHero, 150 + h.level * 10);
@@ -965,6 +1113,12 @@ export class World {
         this.giveGold(killerHero, u.bountyGold);
       }
       this.shareXp(u, u.bountyXp);
+    } else if (u.neutral) {
+      if (killerHero) {
+        killerHero.hero!.lastHits++;
+        this.giveGold(killerHero, u.bountyGold);
+        this.shareXp(u, u.bountyXp, killerHero.team);
+      }
     } else if (u.structure) {
       const tier = u.structure.tier;
       for (const h of this.units) {
@@ -973,7 +1127,7 @@ export class World {
       this.refreshVulnerability();
       this.rebuildNav();
       if (tier === 'shrine') {
-        this.winner = otherTeam(u.team);
+        this.winner = otherTeam(u.team as Team);
         this.events.push({ type: 'gameOver', winner: this.winner });
       }
     }
@@ -984,9 +1138,13 @@ export class World {
     this.events.push({ type: 'gold', unitId: h.id, amount });
   }
 
-  private shareXp(dead: Unit, amount: number) {
+  private shareXp(dead: Unit, amount: number, toTeam?: Side) {
     const receivers = this.units.filter(
-      (h) => h.hero && h.alive && h.team !== dead.team && dist(h.x, h.y, dead.x, dead.y) <= XP_SHARE_RADIUS,
+      (h) =>
+        h.hero &&
+        h.alive &&
+        (toTeam === undefined ? h.team !== dead.team : h.team === toTeam) &&
+        dist(h.x, h.y, dead.x, dead.y) <= XP_SHARE_RADIUS,
     );
     if (!receivers.length) return;
     const each = amount / receivers.length;
@@ -1171,6 +1329,8 @@ export class World {
       const a = movers[i];
       for (let j = i + 1; j < movers.length; j++) {
         const b = movers[j];
+        // Jungle monsters only bump into each other, so they never wall off a corridor.
+        if ((a.kind === 'neutral') !== (b.kind === 'neutral')) continue;
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const min = (a.radius + b.radius) * 0.9;

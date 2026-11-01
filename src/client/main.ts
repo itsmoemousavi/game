@@ -2,6 +2,7 @@ import './style.css';
 import { DT, HEROES, HERO_IDS, HeroId, LANE_IDS, LaneId, PlayerSlot, Team, World } from '../sim';
 import { Hud } from './hud';
 import { Input } from './input';
+import { ItemsUi } from './items-ui';
 import { Renderer } from './renderer';
 import { enterImmersive, setupLandscape } from './screen';
 
@@ -84,6 +85,12 @@ const hud = new Hud(app, () => {
   world = null;
 });
 
+const itemsUi = new ItemsUi(
+  app,
+  (cmd) => world?.enqueue(cmd),
+  () => (world && renderer ? { w: world, me: world.unit(myHeroId)!, team: myTeam, terrain: renderer.terrain } : null),
+);
+
 function startMatch() {
   select.classList.add('hidden');
   app.classList.remove('hidden');
@@ -93,6 +100,7 @@ function startMatch() {
   input?.destroy();
   input = new Input(canvas, renderer, () => world!, () => myHeroId, app);
   hud.setHero(world.unit(myHeroId)!);
+  itemsUi.reset();
   void enterImmersive();
 }
 
@@ -109,11 +117,15 @@ function frame(now: number) {
     while (acc >= DT) {
       input.flush(world);
       world.step();
+      renderer.pushEvents(world, world.events);
       acc -= DT;
     }
     const me = world.unit(myHeroId)!;
+    // Back from the dead (or done peeking): camera returns to the hero.
+    if (me.alive && renderer.freeCamera && !input.peeking) renderer.follow();
     renderer.render(world, acc / DT, me, myTeam, input.aim);
     hud.update(world, me, myTeam);
+    itemsUi.update();
   } else acc = 0;
   requestAnimationFrame(frame);
 }

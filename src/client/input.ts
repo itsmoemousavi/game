@@ -24,14 +24,20 @@ const TAP_SLOP = 12;
  *  - Attack button: attack nearest (heroes first). Tap an enemy to attack it.
  *  - Ability buttons: TAP = quick-cast on the best target; DRAG = aim, release to cast,
  *    release over "Cancel" to abort. The small "+" learns the ability.
+ *  - Minimap: hold/drag to look somewhere else; release to snap back to your hero.
+ *  - While dead: drag anywhere to look around the map.
  * Desktop (testing): arrows / right-click move, Space attack, Q/W/R cast at the cursor,
- * Ctrl+Q/W/R learn, H stop, wheel zoom.
+ * Ctrl+Q/W/R learn, H stop, wheel zoom, right-click minimap = walk there.
  */
 export class Input {
   aim: Aim | null = null;
   private keys = new Set<string>();
   private joy: { id: number; ox: number; oy: number; dx: number; dy: number } | null = null;
   private drag: { id: number; slot: number; ox: number; oy: number; moved: boolean } | null = null;
+  /** Finger/mouse held on the minimap: camera peeks there until released. */
+  private peek: number | null = null;
+  /** Dragging the field to look around (while dead). */
+  private camDrag: { id: number; x: number; y: number } | null = null;
   private lastDir = { dx: 0, dy: 0 };
   private queue: Command[] = [];
   private mouse = { x: 0, y: 0 };
@@ -90,6 +96,10 @@ export class Input {
 
   destroy() {
     this.abort.abort();
+  }
+
+  get peeking() {
+    return this.peek !== null || this.camDrag !== null;
   }
 
   /** Called once per simulation tick. */
@@ -165,7 +175,21 @@ export class Input {
     const mm = this.renderer.minimapRect();
     if (sx >= mm.x && sy >= mm.y && sx <= mm.x + mm.size && sy <= mm.y + mm.size) {
       const k = this.world().map.size / mm.size;
-      this.queue.push({ type: 'moveTo', unitId: this.heroId(), x: (sx - mm.x) * k, y: (sy - mm.y) * k });
+      const wx = (sx - mm.x) * k;
+      const wy = (sy - mm.y) * k;
+      if (e.pointerType === 'mouse' && e.button === 2) {
+        this.queue.push({ type: 'moveTo', unitId: this.heroId(), x: wx, y: wy });
+      } else {
+        this.peek = e.pointerId;
+        this.renderer.lookAt(wx, wy);
+      }
+      return;
+    }
+
+    // Dead: the whole field becomes a camera drag surface.
+    const me = this.world().unit(this.heroId());
+    if (me && !me.alive) {
+      this.camDrag = { id: e.pointerId, x: sx, y: sy };
       return;
     }
 
@@ -187,6 +211,29 @@ export class Input {
     if (!me || castBlocker(me, slot) !== null) return;
     const { x, y } = toLocal(e.clientX, e.clientY);
     this.drag = { id: e.pointerId, slot, ox: x, oy: y, moved: false };
+    // Show the arrow right away, pointing where a quick-cast would go.
+    const def = abilityDef(me, slot)!;
+    if (def.targeting === 'passive') return;
+    const auto = this.autoAim(w, me, def.targeting, def.castRange);
+    this.aimToward(auto.x - me.x, auto.y - me.y, 1, false);
+  }
+
+  /** Where a quick-cast would aim: nearest visible enemy hero, else nearest enemy, else ahead. */
+  private autoAim(w: World, me: Unit, targeting: string, range: number) {
+    if (targeting === 'ally') {
+      const ally = w.units
+        .filter((a) => a.hero && a.alive && a.team === me.team && a !== me && Math.hypot(a.x - me.x, a.y - me.y) <= range)
+        .sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
+      if (ally && ally.hp / ally.maxHp < me.hp / me.maxHp) return { x: ally.x, y: ally.y };
+      return { x: me.x, y: me.y }; // heal yourself
+    }
+    const enemies = w.units.filter(
+      (u) => u.alive && u.team !== me.team && u.kind !== 'structure' && w.canSee(me.team, u) && Math.hypot(u.x - me.x, u.y - me.y) <= range + 2,
+    );
+    const d = (u: Unit) => Math.hypot(u.x - me.x, u.y - me.y);
+    const t = enemies.filter((u) => u.kind === 'hero').sort((a, b) => d(a) - d(b))[0] ?? enemies.sort((a, b) => d(a) - d(b))[0];
+    if (t) return { x: t.x, y: t.y };
+    return { x: me.x + Math.cos(me.facing) * range, y: me.y + Math.sin(me.facing) * range };
   }
 
   /** Tap/click on an enemy = attack it; on ground = walk there. */
@@ -205,6 +252,20 @@ export class Input {
   private onPointerMove(e: PointerEvent) {
     const local = toLocal(e.clientX, e.clientY);
     if (e.pointerType === 'mouse') this.mouse = local;
+    if (this.peek === e.pointerId) {
+      const mm = this.renderer.minimapRect();
+      const k = this.world().map.size / mm.size;
+      const cx = Math.max(0, Math.min(mm.size, local.x - mm.x));
+      const cy = Math.max(0, Math.min(mm.size, local.y - mm.y));
+      this.renderer.lookAt(cx * k, cy * k);
+      return;
+    }
+    if (this.camDrag && this.camDrag.id === e.pointerId) {
+      this.renderer.pan(local.x - this.camDrag.x, local.y - this.camDrag.y);
+      this.camDrag.x = local.x;
+      this.camDrag.y = local.y;
+      return;
+    }
     if (this.joy && e.pointerId === this.joy.id) {
       let dx = local.x - this.joy.ox;
       let dy = local.y - this.joy.oy;
@@ -231,6 +292,12 @@ export class Input {
   }
 
   private onPointerUp(e: PointerEvent, cancelled = false) {
+    if (this.peek === e.pointerId) {
+      this.peek = null;
+      const me = this.world().unit(this.heroId());
+      if (me?.alive) this.renderer.follow();
+    }
+    if (this.camDrag?.id === e.pointerId) this.camDrag = null;
     if (this.joy && e.pointerId === this.joy.id) {
       this.joy = null;
       this.joyBase.style.display = 'none';
@@ -243,8 +310,8 @@ export class Input {
       this.cancelZone.classList.remove('show');
       if (cancelled) return;
       const id = this.heroId();
-      if (!moved) {
-        this.queue.push({ type: 'cast', unitId: id, slot }); // quick-cast, sim auto-targets
+      if (!moved && !aim) {
+        this.queue.push({ type: 'cast', unitId: id, slot }); // passive / no preview: let the sim decide
       } else if (aim && !aim.cancel) {
         this.queue.push(
           aim.targetId !== undefined
@@ -262,22 +329,50 @@ export class Input {
 
   /** Map a drag from the ability button to an aimed world point / unit. */
   private updateAim(dx: number, dy: number, cancel: boolean) {
+    const t = Math.min(1, Math.hypot(dx, dy) / MAX_DRAG);
+    this.aimToward(dx, dy, t, cancel);
+  }
+
+  /**
+   * Aim in direction (dx, dy) — any direction, including behind the hero.
+   * `t` (0..1) scales the distance for ground-targeted abilities.
+   */
+  private aimToward(dx: number, dy: number, t: number, cancel: boolean) {
     const w = this.world();
     const me = w.unit(this.heroId());
     if (!me || !this.drag) return;
     const def = HEROES[me.hero!.defId].abilities[this.drag.slot];
-    const len = Math.hypot(dx, dy) || 1;
-    const t = Math.min(1, len / MAX_DRAG);
-    const reach = def.targeting === 'direction' ? def.castRange : def.castRange * t;
-    const x = me.x + (dx / len) * reach;
-    const y = me.y + (dy / len) * reach;
-    const aim: Aim = { slot: this.drag.slot, x, y, cancel };
-    if (def.targeting === 'enemy' || def.targeting === 'ally') {
-      aim.targetId = this.pickUnit(w, me, def.targeting, x, y, 4)?.id;
-    }
+    const len = Math.hypot(dx, dy);
+    const ux = len > 0.001 ? dx / len : Math.cos(me.facing);
+    const uy = len > 0.001 ? dy / len : Math.sin(me.facing);
+    const reach = def.targeting === 'point' ? def.castRange * Math.max(0.05, Math.min(1, t)) : def.castRange;
+    const aim: Aim = { slot: this.drag.slot, x: me.x + ux * reach, y: me.y + uy * reach, cancel };
     if (def.targeting === 'none') {
       aim.x = me.x;
       aim.y = me.y;
+    } else if (def.targeting === 'ally' || def.targeting === 'enemy') {
+      // The unit closest to the arrow (within a 30° cone) gets it; allies fall back to yourself.
+      const cone = Math.cos(Math.PI / 6);
+      const cands = w.units.filter(
+        (u) =>
+          u.alive &&
+          u !== me &&
+          u.kind !== 'structure' &&
+          (def.targeting === 'ally' ? u.team === me.team && !!u.hero : u.team !== me.team && w.canSee(me.team, u)) &&
+          Math.hypot(u.x - me.x, u.y - me.y) <= def.castRange + 2,
+      );
+      let best: Unit | undefined;
+      let bestDot = cone;
+      for (const u of cands) {
+        const d = Math.hypot(u.x - me.x, u.y - me.y) || 1;
+        const dot = ((u.x - me.x) * ux + (u.y - me.y) * uy) / d;
+        if (dot > bestDot) {
+          bestDot = dot;
+          best = u;
+        }
+      }
+      if (len < 0.001 && def.targeting === 'ally') best = undefined;
+      aim.targetId = best?.id ?? (def.targeting === 'ally' ? me.id : undefined);
     }
     this.aim = aim;
   }

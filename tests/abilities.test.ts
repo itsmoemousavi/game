@@ -142,31 +142,42 @@ describe('abilities', () => {
     expect(hits[3]).toBeCloseTo(hits[0] * 1.4);
   });
 
-  it('Fireball explodes on the target and splashes nearby enemies', () => {
+  it('Fireball flies where it is aimed, explodes on the first enemy and splashes nearby enemies', () => {
     const { w, hero } = arena();
     const o = hero(0, 'orin');
     const [a, b] = [hero(1, 'brakk'), hero(1, 'vexa')];
-    place(o, 46, 104);
-    place(a, 54, 104);
-    place(b, 55, 106);
+    place(o, 42, 105);
+    place(a, 52, 104);
+    place(b, 53, 106);
     learn(w, o, 0);
-    w.applyCommand({ type: 'cast', unitId: o.id, slot: 0, targetId: a.id });
-    run(w, 0.8);
+    w.applyCommand({ type: 'cast', unitId: o.id, slot: 0, x: 60, y: 104 });
+    run(w, 0.6);
     expect(a.hp).toBeLessThan(a.maxHp);
     expect(b.hp).toBeLessThan(b.maxHp);
   });
 
-  it('Fireball walks into range when the target is too far', () => {
+  it('Fireball can be aimed backwards and can miss', () => {
     const { w, hero } = arena();
     const o = hero(0, 'orin');
     const a = hero(1, 'brakk');
-    place(o, 40, 104);
-    place(a, 58, 104);
+    place(o, 46, 104);
+    place(a, 34, 107);
+    o.facing = 0; // facing away (east); enemy is behind (west)
     learn(w, o, 0);
-    w.applyCommand({ type: 'cast', unitId: o.id, slot: 0, targetId: a.id });
-    expect(o.hero!.order.type).toBe('cast');
-    run(w, 2.5);
+    w.applyCommand({ type: 'cast', unitId: o.id, slot: 0, x: 34, y: 107 });
+    run(w, 0.8);
     expect(a.hp).toBeLessThan(a.maxHp);
+
+    // Aim straight up instead: no one there, the fireball misses.
+    const { w: w2, hero: hero2 } = arena();
+    const o2 = hero2(0, 'orin');
+    const a2 = hero2(1, 'brakk');
+    place(o2, 46, 104);
+    place(a2, 58.5, 104); // outside auto-attack range
+    learn(w2, o2, 0);
+    w2.applyCommand({ type: 'cast', unitId: o2.id, slot: 0, x: 46, y: 90 });
+    run(w2, 1);
+    expect(a2.hp).toBe(a2.maxHp);
   });
 
   it('Mending Flame heals an ally over time', () => {

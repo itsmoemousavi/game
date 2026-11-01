@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TICK_RATE, World } from '../src/sim';
+import { ITEMS, TICK_RATE, World } from '../src/sim';
 import { botSlots, newWorld } from './helpers';
 
 const run = (w: World, seconds: number) => {
@@ -55,7 +55,9 @@ describe('simulation', () => {
     const w = newWorld();
     run(w, 180);
     for (const h of w.heroes) {
-      expect(h.hero!.gold).toBeGreaterThan(600);
+      // Bots spend gold, so count what they own too.
+      const owned = h.hero!.items.reduce((sum, it) => sum + (it ? ITEMS[it.id].cost * it.count : 0), 0) + h.hero!.tpCount * 50;
+      expect(h.hero!.gold + owned).toBeGreaterThan(600);
       expect(Number.isFinite(h.x) && Number.isFinite(h.y)).toBe(true);
     }
     expect(w.heroes.some((h) => h.hero!.level > 1)).toBe(true);

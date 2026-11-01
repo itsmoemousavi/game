@@ -23,6 +23,20 @@ export const ULTIMATE_LEVEL = 6;
 /** Cumulative XP required to reach level index+1 (index 0 = level 1). */
 export const XP_TABLE = [0, 230, 600, 1080, 1660, 2260, 2980, 3730, 4510, 5320, 6160, 7030, 7930, 8860, 9820];
 
+/** Day/night cycle: night shrinks vision (fog of war). Matches start at dawn. */
+export const DAY_SECONDS = 180;
+export const NIGHT_SECONDS = 120;
+/** Fog-of-war grid updates this many times per second. */
+export const VISION_HZ = 10;
+
+/** Neutral camps (re)spawn on every full minute when empty. */
+export const CAMP_FIRST_SPAWN = 30;
+export const CAMP_RESPAWN = 60;
+export const NEUTRAL_LEASH = 11;
+
 export type Team = 0 | 1;
+/** Side a unit belongs to: a team, or 2 for neutral jungle monsters. */
+export type Side = Team | 2;
+export const NEUTRAL: Side = 2;
 export const TEAM_NAMES = ['Azure', 'Crimson'] as const;
 export const otherTeam = (t: Team): Team => (t === 0 ? 1 : 0);

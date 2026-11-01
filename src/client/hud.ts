@@ -1,4 +1,4 @@
-import { HEROES, MAX_LEVEL, TEAM_NAMES, Team, Unit, World, XP_TABLE, castBlocker, maxAbilityLevel } from '../sim';
+import { HEROES, MAX_LEVEL, TEAM_NAMES, Team, Unit, World, XP_TABLE, castBlocker, isNight, maxAbilityLevel, phaseTimeLeft } from '../sim';
 
 const fmtTime = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 
@@ -31,6 +31,7 @@ export class Hud {
       'respawn-time',
       'gameover',
       'gameover-title',
+      'daynight',
     ]) {
       this.el[id] = root.querySelector(`#${id}`)!;
     }
@@ -66,6 +67,7 @@ export class Hud {
       const blocker = castBlocker(me, i);
       const canLearn = h.skillPoints > 0 && st.level < maxAbilityLevel(a, h.level);
       const cd = Math.ceil(st.cooldown);
+      const cost = a.manaCost[Math.max(0, st.level - 1)];
       const key = `${st.level}|${blocker}|${cd}|${canLearn}`;
       if (key === this.abilityKeys[i]) return;
       this.abilityKeys[i] = key;
@@ -75,6 +77,7 @@ export class Hud {
       b.classList.toggle('cooling', blocker === 'cooldown');
       b.querySelector('.cd')!.textContent = blocker === 'cooldown' ? String(cd) : '';
       b.querySelectorAll('.pips i').forEach((p, k) => p.classList.toggle('on', k < st.level));
+      b.querySelector('.mana')!.textContent = a.targeting === 'passive' ? '' : String(cost);
       this.learnButtons[i].classList.toggle('show', canLearn);
     });
   }
@@ -114,7 +117,12 @@ export class Hud {
     this.el.gold.textContent = String(Math.floor(h.gold));
     this.el.kda.textContent = `${h.kills} / ${h.deaths} · LH ${h.lastHits}`;
 
-    this.el.respawn.style.display = !me.alive && w.winner === null ? 'flex' : 'none';
+    this.el.respawn.style.display = !me.alive && w.winner === null ? 'block' : 'none';
+    const night = isNight(w.time);
+    const left = Math.ceil(phaseTimeLeft(w.time));
+    this.el.daynight.textContent = `${night ? '☾' : '☀'} ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+    this.el.daynight.classList.toggle('night', night);
+    this.el.daynight.title = night ? 'Night: everyone sees less' : 'Day';
     this.el['respawn-time'].textContent = String(Math.max(0, Math.ceil(h.respawnTimer)));
 
     if (w.winner !== null) {

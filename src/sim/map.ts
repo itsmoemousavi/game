@@ -27,6 +27,8 @@ export interface GameMap {
   shrines: [Vec2, Vec2];
   fountains: [Vec2, Vec2];
   structures: StructureSpawn[];
+  /** Neutral jungle camp spots (both halves). */
+  camps: Vec2[];
 }
 
 /**
@@ -205,6 +207,7 @@ export function createMap(): GameMap {
     shrines,
     fountains: [FOUNTAIN0, mirror(FOUNTAIN0)],
     structures,
+    camps: [...JUNGLE_ROOMS.map((r) => r.c), ...JUNGLE_ROOMS.map((r) => mirror(r.c))],
   };
 }
 

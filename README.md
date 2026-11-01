@@ -25,9 +25,10 @@ npx vite-node scripts/simulate.ts [seed] [minutes]   # headless all-bot match lo
 |---|---|---|
 | Move | Drag anywhere on the left half (virtual joystick) | Arrow keys, or right-click the ground |
 | Attack | **Attack** button (auto-target, heroes first) or tap an enemy | Space, or click an enemy |
-| Abilities | **Tap** Q/W/R to quick-cast · **drag** to aim, release to cast · release on ✕ Cancel to abort | Q / W / R cast at the cursor |
+| Abilities | **Hold** Q/W/R: arrow appears · **drag** any direction to aim · release to cast · release on ✕ Cancel to abort | Q / W / R cast at the cursor |
+| Items | Tap an item to use it (salves) · 🛒 opens the shop (buy at base) · **TP** slot: tap, then pick a friendly building | same (click) |
 | Learn ability | Tap the yellow **+** next to the button | Ctrl + Q / W / R |
-| Map | Tap the minimap to walk there | Click the minimap; mouse wheel to zoom |
+| Camera | Hold/drag the minimap to look; release to return · while dead, drag anywhere to look around | Hold minimap to look, right-click minimap to walk there, wheel to zoom |
 
 The game always plays in landscape: on a phone held upright the game is shown sideways, so just turn the phone.
 
@@ -37,6 +38,8 @@ The game always plays in landscape: on a phone held upright the game is shown si
 src/sim/        deterministic game simulation (no rendering), reusable on a future server
   data/         heroes, creeps, structures (all balance numbers)
   abilities.ts  how every ability works (numbers live in data/heroes.ts)
+  inventory.ts  shop, items, teleport (numbers live in data/items.ts)
+  vision.ts     fog of war, day/night
   ai/bots.ts    bot heroes
   map.ts        map, lanes, maze, structure placement
   world.ts      units, combat, creep waves, protection rules, win condition

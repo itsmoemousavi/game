@@ -1,4 +1,4 @@
-import { GameMap, HEROES, LANE_IDS, Team, Unit, World } from '../sim';
+import { GameEvent, GameMap, HEROES, LANE_IDS, Side, Team, Unit, World, isNight } from '../sim';
 import type { Aim } from './input';
 
 /**
@@ -6,8 +6,8 @@ import type { Aim } from './input';
  * (Three.js / Babylon.js) later does not touch game logic. World (x, y) maps to the
  * 3D ground plane (x, z).
  */
-export const TEAM_COLORS: Record<Team, string> = { 0: '#3d8bfd', 1: '#e5484d' };
-const TEAM_DARK: Record<Team, string> = { 0: '#1d4f9e', 1: '#8f2226' };
+export const TEAM_COLORS: Record<Side, string> = { 0: '#3d8bfd', 1: '#e5484d', 2: '#b08a55' };
+const TEAM_DARK: Record<Side, string> = { 0: '#1d4f9e', 1: '#8f2226', 2: '#6b5232' };
 const PX_PER_UNIT_BAKED = 6;
 
 export class Renderer {
@@ -21,8 +21,14 @@ export class Renderer {
   private dpr = 1;
   private cssW = 0;
   private cssH = 0;
-  /** Recent attack flashes for melee swings. */
-  private flashes: { x: number; y: number; t: number }[] = [];
+  /** Melee swing arcs (attacker position, direction, reach). */
+  private swings: { x: number; y: number; ang: number; reach: number; t: number; color: string }[] = [];
+  private lunges = new Map<number, { ang: number; t: number }>();
+  private blasts: { x: number; y: number; r: number; t: number; color: string }[] = [];
+  /** Free camera: set while dead, or while the player holds the minimap. */
+  private lookTarget: { x: number; y: number } | null = null;
+  private fogCanvas: HTMLCanvasElement;
+  private fogData: ImageData;
 
   constructor(
     readonly canvas: HTMLCanvasElement,
@@ -30,7 +36,54 @@ export class Renderer {
   ) {
     this.ctx = canvas.getContext('2d')!;
     this.mapImage = bakeMap(map);
+    this.fogCanvas = document.createElement('canvas');
+    this.fogCanvas.width = this.fogCanvas.height = map.grid;
+    this.fogData = this.fogCanvas.getContext('2d')!.createImageData(map.grid, map.grid);
     this.resize();
+  }
+
+  get terrain(): HTMLCanvasElement {
+    return this.mapImage;
+  }
+
+  /** Point the camera somewhere else (minimap peek / looking around while dead). */
+  lookAt(x: number, y: number) {
+    this.lookTarget = { x, y };
+  }
+
+  /** Pan the free camera by a screen-space delta. */
+  pan(dxPx: number, dyPx: number) {
+    const base = this.lookTarget ?? { x: this.camX, y: this.camY };
+    this.lookTarget = { x: base.x - dxPx / this.zoom, y: base.y - dyPx / this.zoom };
+  }
+
+  /** Return the camera to the hero. */
+  follow() {
+    this.lookTarget = null;
+  }
+
+  get freeCamera() {
+    return this.lookTarget !== null;
+  }
+
+  /** Feed every simulation step's events (several steps can run per frame). */
+  pushEvents(w: World, events: GameEvent[]) {
+    for (const e of events) {
+      if (e.type === 'attack') {
+        const src = w.unit(e.sourceId);
+        const tgt = w.unit(e.targetId);
+        if (!src || !tgt || src.projectileSpeed !== 0 || src.kind === 'structure') continue;
+        const ang = Math.atan2(tgt.y - src.y, tgt.x - src.x);
+        const color = src.kind === 'hero' ? '#ffffff' : 'rgba(255,255,255,0.7)';
+        this.swings.push({ x: src.x, y: src.y, ang, reach: src.radius + src.attackRange + tgt.radius * 0.5, t: 0.2, color });
+        this.lunges.set(src.id, { ang, t: 0.16 });
+      } else if (e.type === 'explosion') {
+        this.blasts.push({ x: e.x, y: e.y, r: e.radius, t: 0.35, color: '255,140,40' });
+      } else if (e.type === 'teleport') {
+        const u = w.unit(e.unitId);
+        if (u) this.blasts.push({ x: u.x, y: u.y, r: 3, t: 0.5, color: '140,200,255' });
+      }
+    }
   }
 
   resize() {
@@ -64,17 +117,13 @@ export class Renderer {
       y: u.py + (u.y - u.py) * alpha,
     });
 
-    // Camera follows the player's hero (or their fountain while dead).
-    const anchor = focus && focus.alive ? lerp(focus) : w.map.fountains[viewTeam];
-    this.camX += (anchor.x - this.camX) * 0.25;
-    this.camY += (anchor.y - this.camY) * 0.25;
-
-    for (const e of w.events) {
-      if (e.type !== 'attack') continue;
-      const src = w.unit(e.sourceId);
-      const tgt = w.unit(e.targetId);
-      if (src && tgt && src.projectileSpeed === 0) this.flashes.push({ x: tgt.x, y: tgt.y, t: 0.15 });
-    }
+    // Camera follows the hero, unless the player is looking around (minimap / while dead).
+    const anchor = this.lookTarget ?? (focus && focus.alive ? lerp(focus) : { x: this.camX, y: this.camY });
+    const k = this.lookTarget ? 0.35 : 0.25;
+    this.camX += (Math.max(0, Math.min(w.map.size, anchor.x)) - this.camX) * k;
+    this.camY += (Math.max(0, Math.min(w.map.size, anchor.y)) - this.camY) * k;
+    const sees = (u: Unit) => w.canSee(viewTeam, u);
+    const seesPoint = (team: Side, x: number, y: number) => team === viewTeam || w.vision.seesPoint(viewTeam, x, y);
 
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.fillStyle = '#0d150f';
@@ -97,13 +146,28 @@ export class Renderer {
     }
 
     const structures = w.units.filter((u) => u.kind === 'structure');
-    const creeps = w.units.filter((u) => u.kind === 'creep' && u.alive);
-    const heroes = w.units.filter((u) => u.kind === 'hero' && u.alive);
+    const creeps = w.units.filter((u) => (u.kind === 'creep' || u.kind === 'neutral') && u.alive && sees(u));
+    const heroes = w.units.filter((u) => u.kind === 'hero' && u.alive && sees(u));
+    const at = (u: Unit) => {
+      const p = lerp(u);
+      const l = this.lunges.get(u.id);
+      if (l) {
+        const push = Math.sin((l.t / 0.16) * Math.PI) * 0.45;
+        p.x += Math.cos(l.ang) * push;
+        p.y += Math.sin(l.ang) * push;
+      }
+      return p;
+    };
 
     for (const s of structures) this.drawStructure(s);
-    this.drawAreas(w);
+    this.drawAreas(w, seesPoint);
+    this.drawTeleports(w, viewTeam);
     for (const c of creeps) {
-      const p = lerp(c);
+      const p = at(c);
+      if (c.neutral) {
+        this.drawNeutral(c, p);
+        continue;
+      }
       ctx.fillStyle = c.creep!.super ? TEAM_DARK[c.team] : TEAM_COLORS[c.team];
       ctx.strokeStyle = 'rgba(0,0,0,0.6)';
       ctx.lineWidth = 0.12;
@@ -122,7 +186,7 @@ export class Renderer {
     }
 
     for (const h of heroes) {
-      const p = lerp(h);
+      const p = at(h);
       const def = HEROES[h.hero!.defId];
       const isMe = h === focus;
       ctx.fillStyle = 'rgba(0,0,0,0.35)';
@@ -156,7 +220,8 @@ export class Renderer {
       ctx.fillText(`${h.hero!.level} ${def.name}`, p.x, p.y - h.radius - 1.2);
     }
 
-    for (const u of [...creeps, ...heroes]) this.drawStatus(u, lerp(u), w.time);
+    for (const u of [...creeps, ...heroes]) this.drawStatus(u, at(u), w.time);
+    this.drawSwings();
 
     // Target marker for the player's current target.
     const tgt = focus ? w.unit(focus.targetId) : undefined;
@@ -173,6 +238,7 @@ export class Renderer {
 
     for (const pr of w.projectiles) {
       const p = lerp(pr);
+      if (!seesPoint(pr.team, p.x, p.y)) continue;
       if (pr.spell) {
         ctx.fillStyle = 'rgba(255,140,40,0.35)';
         ctx.beginPath();
@@ -191,6 +257,24 @@ export class Renderer {
     }
     for (const sk of w.skillshots) {
       const p = lerp(sk);
+      if (!seesPoint(sk.team, p.x, p.y)) continue;
+      if (sk.kind === 'fireball') {
+        ctx.strokeStyle = 'rgba(255,120,30,0.45)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(p.x - sk.dx * 2.2, p.y - sk.dy * 2.2);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,140,40,0.4)';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 1.1, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffd36a';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 0.6, 0, Math.PI * 2);
+        ctx.fill();
+        continue;
+      }
       ctx.strokeStyle = '#d9fff0';
       ctx.lineWidth = 0.35;
       ctx.beginPath();
@@ -204,24 +288,129 @@ export class Renderer {
       ctx.lineTo(p.x, p.y);
       ctx.stroke();
     }
-    if (aim && focus && focus.alive) this.drawAim(w, focus, lerp(focus), aim);
-
-    this.flashes = this.flashes.filter((f) => (f.t -= 1 / 60) > 0);
-    for (const f of this.flashes) {
-      ctx.strokeStyle = `rgba(255,255,255,${f.t * 5})`;
-      ctx.lineWidth = 0.15;
+    this.blasts = this.blasts.filter((b) => (b.t -= 1 / 60) > 0);
+    for (const b of this.blasts) {
+      const k = 1 - b.t / 0.4;
+      ctx.strokeStyle = `rgba(${b.color},${Math.min(1, b.t * 3)})`;
+      ctx.lineWidth = 0.4;
       ctx.beginPath();
-      ctx.arc(f.x, f.y, 1.2 - f.t * 2, 0, Math.PI * 2);
+      ctx.arc(b.x, b.y, b.r * (0.4 + k * 0.7), 0, Math.PI * 2);
       ctx.stroke();
     }
-    ctx.restore();
 
-    this.drawMinimap(w, focus);
+    this.drawFog(w, viewTeam);
+    if (aim && focus && focus.alive) this.drawAim(w, focus, lerp(focus), aim);
+    ctx.restore();
+    if (isNight(w.time)) {
+      ctx.fillStyle = 'rgba(10,20,60,0.22)';
+      ctx.fillRect(0, 0, this.cssW, this.cssH);
+    }
+
+    this.drawMinimap(w, focus, viewTeam);
   }
 
-  private drawAreas(w: World) {
+  /** Darken everything outside the team's vision (smoothly upscaled from the vision grid). */
+  private drawFog(w: World, team: Team) {
+    const g = w.vision.grids[team];
+    const d = this.fogData.data;
+    const a = isNight(w.time) ? 175 : 140;
+    for (let i = 0; i < g.length; i++) {
+      d[i * 4] = 8;
+      d[i * 4 + 1] = 12;
+      d[i * 4 + 2] = 20;
+      d[i * 4 + 3] = g[i] ? 0 : a;
+    }
+    this.fogCanvas.getContext('2d')!.putImageData(this.fogData, 0, 0);
+    const ctx = this.ctx;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(this.fogCanvas, 0, 0, w.map.size, w.map.size);
+  }
+
+  private drawSwings() {
+    const ctx = this.ctx;
+    this.swings = this.swings.filter((s) => (s.t -= 1 / 60) > 0);
+    for (const [id, l] of this.lunges) if ((l.t -= 1 / 60) <= 0) this.lunges.delete(id);
+    for (const s of this.swings) {
+      const k = 1 - s.t / 0.2; // 0 → 1 over the swing
+      const sweep = Math.PI * 0.75;
+      const a0 = s.ang - sweep / 2 + sweep * Math.max(0, k - 0.35);
+      const a1 = s.ang - sweep / 2 + sweep * Math.min(1, k + 0.15);
+      ctx.globalAlpha = Math.min(1, s.t * 7);
+      // Faint wedge + bright arc so the swing reads clearly on a small phone screen.
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y);
+      ctx.arc(s.x, s.y, s.reach, a0, a1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = 0.5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.reach * 0.85, a0, a1);
+      ctx.stroke();
+      // Impact spark at the end of the swing.
+      if (k > 0.5) {
+        const ix = s.x + Math.cos(s.ang) * s.reach;
+        const iy = s.y + Math.sin(s.ang) * s.reach;
+        ctx.fillStyle = '#ffe9a8';
+        ctx.beginPath();
+        ctx.arc(ix, iy, 0.35 * (1 - k) + 0.12, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      ctx.lineCap = 'butt';
+    }
+  }
+
+  private drawNeutral(c: Unit, p: { x: number; y: number }) {
+    const ctx = this.ctx;
+    ctx.fillStyle = TEAM_COLORS[2];
+    ctx.strokeStyle = '#2b2116';
+    ctx.lineWidth = 0.15;
+    ctx.beginPath();
+    // Spiky silhouette so jungle monsters read differently from lane creeps.
+    const spikes = 7;
+    for (let i = 0; i <= spikes * 2; i++) {
+      const a = (i / (spikes * 2)) * Math.PI * 2 + c.facing;
+      const r = i % 2 ? c.radius * 0.75 : c.radius * 1.1;
+      ctx.lineTo(p.x + Math.cos(a) * r, p.y + Math.sin(a) * r);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    if (c.hp < c.maxHp) this.hpBar(p.x, p.y - c.radius - 0.6, 2.2, 0.3, c.hp / c.maxHp, '#d9a25f');
+  }
+
+  /** Channelling teleports: ring around the hero and a marker on the destination. */
+  private drawTeleports(w: World, viewTeam: Team) {
+    const ctx = this.ctx;
+    for (const h of w.units) {
+      const c = h.hero?.channel;
+      if (!c || !h.alive) continue;
+      const k = 1 - c.t / c.total;
+      const visible = w.canSee(viewTeam, h);
+      if (visible) {
+        ctx.strokeStyle = 'rgba(140,200,255,0.9)';
+        ctx.lineWidth = 0.25;
+        ctx.beginPath();
+        ctx.arc(h.x, h.y, 1.8, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k);
+        ctx.stroke();
+      }
+      const t = w.unit(c.targetId);
+      if (t && (h.team === viewTeam || visible)) {
+        ctx.fillStyle = `rgba(140,200,255,${0.15 + 0.2 * k})`;
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, t.radius + 3 + Math.sin(w.time * 8) * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  private drawAreas(w: World, seesPoint: (team: Side, x: number, y: number) => boolean) {
     const ctx = this.ctx;
     for (const z of w.zones) {
+      if (!seesPoint(z.team, z.x, z.y)) continue;
       const fade = Math.min(1, (z.duration - z.t) * 3);
       ctx.globalAlpha = fade;
       if (z.kind === 'arrowStorm') {
@@ -248,6 +437,7 @@ export class Renderer {
       ctx.globalAlpha = 1;
     }
     for (const b of w.blasts) {
+      if (!seesPoint(b.team, b.x, b.y)) continue;
       const k = Math.min(1, b.t / b.delay);
       ctx.strokeStyle = b.kind === 'cataclysm' ? 'rgba(255,90,40,0.9)' : 'rgba(230,190,90,0.9)';
       ctx.lineWidth = 0.25;
@@ -312,65 +502,108 @@ export class Renderer {
     }
   }
 
+  /**
+   * Aim indicator while an ability button is held: range circle, an arrow from the
+   * hero toward the aim (works in any direction, including backwards), and the
+   * ability's footprint (line width, area, or the ally that will be targeted).
+   */
   private drawAim(w: World, me: Unit, p: { x: number; y: number }, aim: Aim) {
     const ctx = this.ctx;
     const def = HEROES[me.hero!.defId].abilities[aim.slot];
-    const color = aim.cancel ? 'rgba(255,80,80,' : 'rgba(120,200,255,';
+    const rgb = aim.cancel ? '255,80,80' : '120,200,255';
     ctx.lineWidth = 0.15;
     if (def.castRange > 0) {
-      ctx.strokeStyle = `${color}0.6)`;
+      ctx.strokeStyle = `rgba(${rgb},0.55)`;
       ctx.beginPath();
       ctx.arc(p.x, p.y, def.castRange, 0, Math.PI * 2);
       ctx.stroke();
     }
-    ctx.fillStyle = `${color}0.25)`;
-    ctx.strokeStyle = `${color}0.9)`;
-    switch (def.targeting) {
-      case 'direction': {
-        const dx = aim.x - p.x;
-        const dy = aim.y - p.y;
-        const l = Math.hypot(dx, dy) || 1;
-        const nx = -dy / l;
-        const ny = dx / l;
-        const hw = def.radius;
+    const dx = aim.x - p.x;
+    const dy = aim.y - p.y;
+    const l = Math.hypot(dx, dy);
+    const ux = l > 0.01 ? dx / l : Math.cos(me.facing);
+    const uy = l > 0.01 ? dy / l : Math.sin(me.facing);
+    ctx.fillStyle = `rgba(${rgb},0.22)`;
+    ctx.strokeStyle = `rgba(${rgb},0.9)`;
+
+    if (def.targeting === 'direction') {
+      // Footprint of the skillshot / dash, then the arrow on top.
+      const hw = def.id === 'fireball' ? 0.7 : def.radius;
+      const nx = -uy;
+      const ny = ux;
+      const ex = p.x + ux * def.castRange;
+      const ey = p.y + uy * def.castRange;
+      ctx.beginPath();
+      ctx.moveTo(p.x + nx * hw, p.y + ny * hw);
+      ctx.lineTo(ex + nx * hw, ey + ny * hw);
+      ctx.lineTo(ex - nx * hw, ey - ny * hw);
+      ctx.lineTo(p.x - nx * hw, p.y - ny * hw);
+      ctx.closePath();
+      ctx.fill();
+      if (def.id === 'fireball') {
         ctx.beginPath();
-        ctx.moveTo(p.x + nx * hw, p.y + ny * hw);
-        ctx.lineTo(aim.x + nx * hw, aim.y + ny * hw);
-        ctx.lineTo(aim.x - nx * hw, aim.y - ny * hw);
-        ctx.lineTo(p.x - nx * hw, p.y - ny * hw);
-        ctx.closePath();
-        ctx.fill();
+        ctx.arc(ex, ey, def.radius, 0, Math.PI * 2);
         ctx.stroke();
-        break;
       }
-      case 'point':
-      case 'none':
-        ctx.beginPath();
-        ctx.arc(aim.x, aim.y, def.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        break;
-      case 'enemy':
-      case 'ally': {
-        const t = w.unit(aim.targetId);
-        ctx.beginPath();
-        ctx.arc(aim.x, aim.y, 0.5, 0, Math.PI * 2);
-        ctx.fill();
-        if (t) {
-          ctx.lineWidth = 0.3;
-          ctx.beginPath();
-          ctx.arc(t.x, t.y, t.radius + 0.6, 0, Math.PI * 2);
-          ctx.stroke();
-          if (def.radius > 0) {
-            ctx.lineWidth = 0.1;
-            ctx.beginPath();
-            ctx.arc(t.x, t.y, def.radius, 0, Math.PI * 2);
-            ctx.stroke();
-          }
-        }
-        break;
-      }
+      this.arrow(p.x, p.y, ex, ey, rgb);
+      return;
     }
+    if (def.targeting === 'point') {
+      this.arrow(p.x, p.y, aim.x, aim.y, rgb);
+      ctx.fillStyle = `rgba(${rgb},0.22)`;
+      ctx.strokeStyle = `rgba(${rgb},0.9)`;
+      ctx.lineWidth = 0.15;
+      ctx.beginPath();
+      ctx.arc(aim.x, aim.y, def.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      return;
+    }
+    if (def.targeting === 'none') {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, def.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      return;
+    }
+    // Unit-targeted (ally / enemy): arrow toward the aim, ring on the unit it will hit.
+    const t = w.unit(aim.targetId);
+    const end = t ? { x: t.x, y: t.y } : { x: p.x + ux * def.castRange, y: p.y + uy * def.castRange };
+    if (!t || t !== me) this.arrow(p.x, p.y, end.x, end.y, rgb);
+    if (t) {
+      ctx.strokeStyle = `rgba(${rgb},1)`;
+      ctx.lineWidth = 0.3;
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, t.radius + 0.6, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  private arrow(x0: number, y0: number, x1: number, y1: number, rgb: string) {
+    const ctx = this.ctx;
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const l = Math.hypot(dx, dy);
+    if (l < 0.5) return;
+    const ux = dx / l;
+    const uy = dy / l;
+    const head = Math.min(2.2, l * 0.35);
+    const start = 1.4; // start just outside the hero
+    ctx.strokeStyle = `rgba(${rgb},0.95)`;
+    ctx.lineWidth = 0.45;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x0 + ux * start, y0 + uy * start);
+    ctx.lineTo(x1 - ux * head * 0.6, y1 - uy * head * 0.6);
+    ctx.stroke();
+    ctx.fillStyle = `rgba(${rgb},0.95)`;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x1 - ux * head - uy * head * 0.6, y1 - uy * head + ux * head * 0.6);
+    ctx.lineTo(x1 - ux * head + uy * head * 0.6, y1 - uy * head - ux * head * 0.6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.lineCap = 'butt';
   }
 
   private drawStructure(s: Unit) {
@@ -457,7 +690,7 @@ export class Renderer {
     ctx.fillRect(x - w / 2, y - h / 2, w * Math.max(0, ratio), h);
   }
 
-  private drawMinimap(w: World, focus: Unit | undefined) {
+  private drawMinimap(w: World, focus: Unit | undefined, viewTeam: Team) {
     const ctx = this.ctx;
     const { x, y, size } = this.minimapRect();
     const k = size / w.map.size;
@@ -467,8 +700,12 @@ export class Renderer {
     ctx.fillRect(x - 2, y - 2, size + 4, size + 4);
     ctx.drawImage(this.mapImage, x, y, size, size);
     ctx.globalAlpha = 1;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(this.fogCanvas, x, y, size, size);
     for (const u of w.units) {
       if (!u.alive && u.kind !== 'structure') continue;
+      if (!w.canSee(viewTeam, u)) continue;
+      if (u.kind === 'neutral') continue;
       const ux = x + u.x * k;
       const uy = y + u.y * k;
       ctx.fillStyle = u.alive ? TEAM_COLORS[u.team] : '#555';
@@ -484,7 +721,7 @@ export class Renderer {
     }
     const vw = (this.cssW / this.zoom) * k;
     const vh = (this.cssH / this.zoom) * k;
-    ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+    ctx.strokeStyle = this.lookTarget ? '#ffe066' : 'rgba(255,255,255,0.8)';
     ctx.lineWidth = 1;
     ctx.strokeRect(x + this.camX * k - vw / 2, y + this.camY * k - vh / 2, vw, vh);
     ctx.restore();

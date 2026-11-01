@@ -1,7 +1,10 @@
+import type { Team } from '../constants';
 import { teamLanePath } from '../map';
 import { dist, pointAlong, projectOnPolyline } from '../math';
 import type { Unit, World } from '../world';
 import { abilityDef, botLearn, castBlocker } from '../abilities';
+import { BUILDS, ITEMS, TELEPORT } from '../data/items';
+import { buyBlocker, inShop, teleportTargets, tpBlocker } from '../inventory';
 
 /**
  * Bot heroes. Bots issue the exact same Commands a human does, so later on a bot
@@ -15,24 +18,32 @@ import { abilityDef, botLearn, castBlocker } from '../abilities';
  *  - Fight: last-hit/kill creeps, attack weak enemy heroes, siege structures only
  *    when friendly creeps are tanking the tower.
  *  - Otherwise follow the front of our creep wave in the assigned lane.
- * Items and coordinated team fights come in later milestones.
+ *  - Shop at the fountain (fixed build per hero, always carry a teleport) and
+ *    teleport back to the lane after respawning / healing.
+ *  - Bots only react to enemies they can actually see (fog of war).
+ *  - Fight back if a jungle camp attacks them.
+ * Coordinated team fights and ganking come in a later milestone.
  */
 export function botThink(w: World, me: Unit) {
   const h = me.hero!;
   const hpRatio = me.hp / me.maxHp;
   if (h.skillPoints > 0) botLearn(w, me);
+  if (h.channel) return; // teleporting
+  if (inShop(w, me)) shop(w, me);
+  if (hpRatio < 0.45) useSalve(w, me);
   if (supportAllies(w, me)) return;
 
   if (hpRatio < 0.3) h.bot.retreating = true;
   if (h.bot.retreating && hpRatio > 0.9) h.bot.retreating = false;
   if (h.bot.retreating) {
-    const f = w.respawnPoint(me.team, h.slot);
+    const f = w.respawnPoint(me.team as Team, h.slot);
     if (dist(me.x, me.y, f.x, f.y) > 2) w.applyCommand({ type: 'moveTo', unitId: me.id, x: f.x, y: f.y });
     return;
   }
 
-  const path = teamLanePath(w.map, me.team, h.lane);
+  const path = teamLanePath(w.map, me.team as Team, h.lane);
   const myProgress = projectOnPolyline(path, me);
+  if (inShop(w, me) && hpRatio > 0.85 && teleportToLane(w, me, path)) return;
 
   // Under fire from a tower with nothing else to soak it? Step back.
   const shootingMe = w.units.find(
@@ -100,7 +111,14 @@ function isSafe(w: World, me: Unit, x: number, y: number): boolean {
 
 function chooseTarget(w: World, me: Unit, hpRatio: number): Unit | undefined {
   const scan = Math.max(me.attackRange + 6, 11);
-  const enemies = w.enemiesNear(me, me.x, me.y, scan);
+  // Only what we can see; neutrals only if they're already fighting us.
+  const enemies = w.enemiesNear(
+    me,
+    me.x,
+    me.y,
+    scan,
+    (e) => w.canSee(me.team, e) && (e.kind !== 'neutral' || e.targetId === me.id),
+  );
   if (!enemies.length) return undefined;
 
   const alliedHeroes = w.units.filter((u) => u.hero && u.alive && u.team === me.team && dist(u.x, u.y, me.x, me.y) < 15).length;
@@ -189,4 +207,48 @@ function useAbilities(w: World, me: Unit, target: Unit): boolean {
     }
   }
   return false;
+}
+
+/** Buy along the hero's build; keep one teleport scroll. */
+function shop(w: World, me: Unit) {
+  const h = me.hero!;
+  if (h.tpCount === 0 && h.gold >= TELEPORT.cost) w.applyCommand({ type: 'buyTp', unitId: me.id });
+  const build = BUILDS[h.defId];
+  for (let guard = 0; guard < 3 && h.bot.buildIndex < build.length; guard++) {
+    const next = build[h.bot.buildIndex];
+    const blocked = buyBlocker(w, me, next);
+    if (blocked === 'gold') return;
+    if (blocked === 'full') {
+      // Make room by selling the cheapest item (never the Crown).
+      let cheapest = -1;
+      h.items.forEach((s, i) => {
+        if (s && s.id !== 'crownOfAscension' && (cheapest < 0 || ITEMS[s.id].cost < ITEMS[h.items[cheapest]!.id].cost)) cheapest = i;
+      });
+      if (cheapest < 0 || ITEMS[h.items[cheapest]!.id].cost >= ITEMS[next].cost) {
+        h.bot.buildIndex++;
+        continue;
+      }
+      w.applyCommand({ type: 'sell', unitId: me.id, slot: cheapest });
+    }
+    w.applyCommand({ type: 'buy', unitId: me.id, itemId: next });
+    h.bot.buildIndex++;
+  }
+}
+
+function useSalve(w: World, me: Unit) {
+  if (me.buffs.some((b) => b.key === 'salve')) return;
+  const slot = me.hero!.items.findIndex((s) => s?.id === 'healingSalve');
+  if (slot >= 0) w.applyCommand({ type: 'useItem', unitId: me.id, slot });
+}
+
+/** From the fountain, teleport to our furthest standing building in our lane. */
+function teleportToLane(w: World, me: Unit, path: { x: number; y: number }[]): boolean {
+  if (tpBlocker(me)) return false;
+  const lane = me.hero!.lane;
+  const targets = teleportTargets(w, me.team as Team).filter((s) => s.structure!.lane === lane);
+  if (!targets.length) return false;
+  const best = targets.sort((a, b) => projectOnPolyline(path, b) - projectOnPolyline(path, a))[0];
+  if (dist(me.x, me.y, best.x, best.y) < 50) return false;
+  w.applyCommand({ type: 'teleport', unitId: me.id, targetId: best.id });
+  return true;
 }

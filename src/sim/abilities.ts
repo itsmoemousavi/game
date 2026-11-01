@@ -31,6 +31,15 @@ export function abilityLevel(u: Unit, id: AbilityId): number {
 
 const val = (def: AbilityDef, key: string, level: number) => def.values[key][level - 1];
 
+/** Crown of Ascension: ultimates hit 25% harder. */
+const ultMult = (u: Unit, def: AbilityDef) => (def.ultimate && u.hero?.bonus.ultUpgrade ? 1.25 : 1);
+
+/** Final cooldown after item cooldown reduction (and the Crown for ultimates). */
+export function effectiveCooldown(u: Unit, def: AbilityDef, level: number): number {
+  const b = u.hero!.bonus;
+  return def.cooldown[level - 1] * (1 - b.cdrPct / 100) * (def.ultimate && b.ultUpgrade ? 0.7 : 1);
+}
+
 /** Why an ability can't be used right now, or null if it can. */
 export function castBlocker(u: Unit, slot: number): 'unlearned' | 'passive' | 'cooldown' | 'mana' | 'stunned' | null {
   const def = abilityDef(u, slot);
@@ -47,7 +56,9 @@ export function castBlocker(u: Unit, slot: number): 'unlearned' | 'passive' | 'c
 function autoTarget(w: World, u: Unit, def: AbilityDef, req: CastRequest) {
   const byDist = (a: Unit, b: Unit) => dist(u.x, u.y, a.x, a.y) - dist(u.x, u.y, b.x, b.y);
   const enemies = (r: number) =>
-    w.units.filter((e) => e.alive && e.team !== u.team && e.kind !== 'structure' && dist(u.x, u.y, e.x, e.y) <= r + e.radius);
+    w.units.filter(
+      (e) => e.alive && e.team !== u.team && e.kind !== 'structure' && w.canSee(u.team, e) && dist(u.x, u.y, e.x, e.y) <= r + e.radius,
+    );
 
   switch (def.targeting) {
     case 'enemy':
@@ -69,9 +80,7 @@ function autoTarget(w: World, u: Unit, def: AbilityDef, req: CastRequest) {
     case 'direction':
     case 'point':
       if (req.x === undefined || req.y === undefined) {
-        const t =
-          enemies(def.castRange + 2).filter((e) => e.kind === 'hero').sort(byDist)[0] ??
-          (def.targeting === 'point' ? enemies(def.castRange).sort(byDist)[0] : undefined);
+        const t = enemies(def.castRange + 2).filter((e) => e.kind === 'hero').sort(byDist)[0] ?? enemies(def.castRange).sort(byDist)[0];
         if (t) {
           req.x = t.x;
           req.y = t.y;
@@ -134,7 +143,8 @@ function execute(w: World, u: Unit, slot: number, def: AbilityDef, x: number, y:
   const st = h.abilities[slot];
   const lvl = st.level;
   u.mana -= def.manaCost[lvl - 1];
-  st.cooldown = def.cooldown[lvl - 1];
+  st.cooldown = effectiveCooldown(u, def, lvl);
+  const m = ultMult(u, def);
   u.castLock = CAST_POINT;
   u.path = null;
   const dx = x - u.x;
@@ -169,7 +179,7 @@ function execute(w: World, u: Unit, slot: number, def: AbilityDef, x: number, y:
         radius: def.radius,
         t: 0,
         delay: windup,
-        damage: val(def, 'damage', lvl),
+        damage: val(def, 'damage', lvl) * m,
         stun: val(def, 'stun', lvl),
       });
       break;
@@ -204,23 +214,28 @@ function execute(w: World, u: Unit, slot: number, def: AbilityDef, x: number, y:
         radius: def.radius,
         t: 0,
         duration: val(def, 'duration', lvl),
-        dps: val(def, 'dps', lvl),
+        dps: val(def, 'dps', lvl) * m,
         slowPct: val(def, 'slowPct', lvl),
       });
       break;
     case 'fireball':
-      w.projectiles.push({
+      w.skillshots.push({
         id: w.newId(),
+        kind: 'fireball',
         team: u.team,
+        sourceId: u.id,
         x: u.x,
         y: u.y,
         px: u.x,
         py: u.y,
-        sourceId: u.id,
-        targetId: target!.id,
-        speed: 22,
+        dx: dx / len,
+        dy: dy / len,
+        speed: 24,
+        remaining: def.castRange,
+        width: 1.4,
         damage: val(def, 'damage', lvl),
-        spell: { kind: 'fireball', aoe: def.radius },
+        hit: [],
+        explode: def.radius,
       });
       break;
     case 'mendingFlame': {
@@ -240,9 +255,9 @@ function execute(w: World, u: Unit, slot: number, def: AbilityDef, x: number, y:
         radius: def.radius,
         t: 0,
         delay: val(def, 'delay', lvl),
-        damage: val(def, 'damage', lvl),
+        damage: val(def, 'damage', lvl) * m,
         stun: 0,
-        burn: { dps: val(def, 'burnDps', lvl), duration: val(def, 'burnDuration', lvl) },
+        burn: { dps: val(def, 'burnDps', lvl) * m, duration: val(def, 'burnDuration', lvl) },
       });
       break;
     case 'ironHide':

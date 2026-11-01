@@ -33,7 +33,7 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #topbar .t0 { color: #6fb0ff; } #topbar .t1 { color: #ff7b7f; }
 #clock { font-variant-numeric: tabular-nums; min-width: 44px; text-align: center; }
 
-#herobar { position: absolute; left: 50%; bottom: max(6px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; gap: 8px; align-items: center; background: rgba(0,0,0,0.6); border-radius: 10px; padding: 6px 10px; width: min(420px, 46vw); pointer-events: none; }
+#herobar { position: absolute; left: 50%; bottom: max(4px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; gap: 8px; align-items: center; background: rgba(0,0,0,0.6); border-radius: 10px; padding: 6px 10px; width: min(420px, 46vw); pointer-events: none; }
 #portrait { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #111; }
 #herobar .bars { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .bar { position: relative; height: 13px; background: #222; border-radius: 3px; overflow: hidden; }
@@ -74,9 +74,54 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 @media (pointer: coarse) { #hint { display: none; } }
 
 .overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; pointer-events: none; }
-#respawn { background: rgba(0,0,0,0.35); font-size: 22px; }
+#respawn { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); display: none; padding: 6px 14px; border-radius: 8px; background: rgba(120,20,20,0.75); font-size: 15px; pointer-events: none; white-space: nowrap; }
 #gameover { background: rgba(0,0,0,0.7); pointer-events: auto; }
 #gameover .box { text-align: center; }
 #gameover h2 { font-size: 48px; margin: 0; } #gameover h2.win { color: #6fb0ff; } #gameover h2.lose { color: #ff7b7f; }
 #btn-restart { margin-top: 12px; padding: 10px 22px; border-radius: 10px; border: 0; background: #3d8bfd; font-weight: 700; }
 
+
+#daynight { font-size: 14px; font-weight: 600; opacity: 0.9; }
+#daynight.night { color: #9db7ff; }
+
+/* ability mana cost */
+.ability .mana { font-size: 8px; color: #8cc4ff; line-height: 1; }
+
+/* ---------- item bar ---------- */
+#itembar { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(max(4px, env(safe-area-inset-bottom)) + 58px); display: flex; gap: 4px; align-items: center; }
+#itembar button { position: relative; width: 34px; height: 34px; border-radius: 7px; border: 2px solid rgba(255,255,255,0.3); background: rgba(20,30,24,0.8); padding: 0; display: grid; place-items: center; touch-action: none; }
+#itembar .item .lbl { font-size: 8px; font-weight: 800; color: #111; text-shadow: 0 0 2px rgba(255,255,255,0.6); }
+#itembar .item.empty { background: rgba(0,0,0,0.45); border-style: dashed; }
+#itembar .item .cnt { position: absolute; right: 1px; bottom: 0; font-size: 10px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000; }
+#itembar .item.usable { border-color: #4ade80; }
+#itembar .item.selling { border-color: #ffd23f; animation: pulse 0.8s infinite alternate; }
+#itembar .tp { margin-left: 6px; background: #2b5f9e !important; border-color: #8cc4ff; }
+#itembar .tp .lbl { color: #fff; text-shadow: none; }
+#itembar .tp.none { opacity: 0.55; }
+#itembar .tp.channel { border-color: #fff; animation: pulse 0.4s infinite alternate; }
+#itembar .tp .cd { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,0.6); border-radius: 5px; font-size: 13px; font-weight: 800; }
+#itembar .tp .cd:empty { display: none; }
+#btn-shop { margin-left: 6px; font-size: 17px; background: #6b4e16 !important; border-color: #ffd23f !important; }
+
+/* ---------- shop ---------- */
+#shop { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(620px, 74%); max-height: 84%; display: flex; flex-direction: column; background: rgba(14,22,17,0.96); border: 2px solid #3a5242; border-radius: 12px; padding: 10px; z-index: 5; }
+.shop-head { display: flex; gap: 10px; align-items: center; }
+.shop-head .gold { color: #ffd23f; margin-right: auto; }
+.shop-head button { padding: 6px 10px; border-radius: 8px; border: 0; background: #2b5f9e; font-weight: 700; }
+.shop-head button.off { opacity: 0.4; }
+#shop-close { background: #5a2a2a !important; }
+#shop-note { margin: 6px 0; font-size: 12px; opacity: 0.75; }
+#shop-items { overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 6px; }
+.shop-item { display: flex; gap: 8px; align-items: center; text-align: left; padding: 6px; border-radius: 8px; border: 1px solid #2c3d31; background: #172219; }
+.shop-item.off { opacity: 0.45; }
+.shop-item i { flex: none; width: 34px; height: 34px; border-radius: 6px; display: grid; place-items: center; font-style: normal; font-size: 9px; font-weight: 800; color: #111; }
+.shop-item div { flex: 1; min-width: 0; font-size: 12px; }
+.shop-item em { color: #ffd23f; font-style: normal; }
+.shop-item small { display: block; font-size: 10px; opacity: 0.7; line-height: 1.25; }
+.shop-item .cost { color: #ffd23f; font-weight: 800; font-size: 13px; }
+
+/* ---------- teleport picker ---------- */
+#tp-picker { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(10,16,12,0.96); border: 2px solid #8cc4ff; border-radius: 12px; padding: 8px; z-index: 6; }
+.tp-head { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; font-size: 13px; }
+#tp-close { margin-left: auto; padding: 4px 10px; border-radius: 8px; border: 0; background: #5a2a2a; }
+#tp-canvas { display: block; border-radius: 6px; touch-action: none; }

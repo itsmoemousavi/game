@@ -92,15 +92,32 @@ Ability levels: basic abilities max level 4 (and at most ⌈hero level / 2⌉), 
 - Unit-target spells walk into range automatically; ground-target spells are capped at max range.
 
 ### Mobile ability controls (implemented)
-- **Tap:** quick-cast on the best target. Enemy heroes come first; heals go to the most hurt ally; aimed spells point at the nearest enemy hero.
-- **Drag the button:** aim, then release to cast. The aim indicator shows range, line width, area or the chosen target. Release over **✕ Cancel** to abort.
+- **Hold the button:** an arrow appears immediately, pointing where a quick-cast would go.
+- **Drag in any direction, including behind you,** to aim. The arrow follows. Release to cast; you can miss.
+- **Tap without dragging:** casts where the arrow pointed (enemy heroes first; heals go to the most hurt ally, otherwise yourself).
+- **Cancel:** release over **✕ Cancel** to abort.
+- **Mana cost** is shown on each button.
 - **"+" badge:** shown when a skill point can be spent; tap it to learn the ability.
 - **Button states:** cooldown seconds, blue when out of mana, dim until learned, dots for the ability's level, dashed border for passives.
 - **Desktop:** Q/W/R cast at the cursor, Ctrl+Q/W/R to learn.
 
-## 6. Items (proposal)
+## 6. Items (implemented, milestone 4)
 
-6 inventory slots. Buying is only allowed in the base (near the fountain). A "recommended build" quick-buy button keeps it touch-friendly.
+**Inventory and shop:**
+- **6 inventory slots, plus a separate Teleport slot.** The TP slot shows how many scrolls you carry, 0 if none. You can buy as many as you like.
+- **The 🛒 shop** opens anywhere, but buying and selling only work near your fountain. Selling refunds 50%.
+- **Recommended items** for your hero are marked ★ and listed first.
+- **Healing Salves** stack up to 3 in one slot; tap the slot to use one.
+- **While the shop is open,** tapping one of your items sells it.
+
+**Teleport:**
+- 50 gold each.
+- Tap the TP slot to open a big map, then tap any friendly building.
+- 3 s channel, then you appear on the home side of that building. 60 s cooldown.
+- Moving, attacking, casting or being stunned cancels it.
+- With 0 scrolls at base, tapping the TP slot buys one.
+
+Item numbers are in `src/sim/data/items.ts`.
 
 | Item | Effect |
 |---|---|
@@ -115,6 +132,35 @@ Ability levels: basic abilities max level 4 (and at most ⌈hero level / 2⌉), 
 | Lifedrinker | attack lifesteal |
 | **Crown of Ascension** | upgrades the hero's Ultimate (stronger effect, −30% cooldown) |
 | Healing Salve | consumable, heal over time |
+| Teleport Scroll | own slot, unlimited stack (see above) |
+
+## 6b. Fog of war, day & night, jungle
+
+**Fog of war:**
+- Each team only sees what its heroes, creeps and buildings see.
+- Enemies outside vision are hidden on screen and on the minimap, and can't be targeted.
+- Bots play by the same rules.
+- Buildings are always visible.
+- Trees don't block sight yet; that could come later.
+
+**Day and night:**
+- 3 min day, 2 min night.
+- At night hero vision drops from 17 m to 10 m, and the screen darkens.
+- The top bar shows ☀ or ☾ and the time until the next change.
+
+**Jungle camps:**
+- 3 camps per side, in the jungle rooms. Each has 1 brute and 2 imps.
+- They spawn at 0:30 and refill every minute when empty.
+- They stay passive until attacked, fight back as a group, give up past 11 m from home, and heal at camp.
+- Rewards: gold to the killer, XP to the killer's team.
+
+**Camera:**
+- Hold or drag on the minimap to look anywhere; release to snap back to your hero.
+- While dead, drag anywhere to look around (for example, to see who needs help).
+
+**Combat feedback:**
+- Melee attacks show a swing arc, a small lunge and an impact spark.
+- Fireball explosions and teleport arrivals flash.
 
 ## 7. Bots
 
@@ -124,6 +170,8 @@ Ability levels: basic abilities max level 4 (and at most ⌈hero level / 2⌉), 
   - use nukes and stuns on enemy heroes; save ultimates for weakened targets or groups
   - farm creep waves with area spells when mana is high
   - Orin heals hurt allies
+  - buy items along a fixed build when at base, always carry a TP, teleport back to their lane after healing, use salves when hurt
+  - only react to enemies they can see; fight back against jungle camps
   - lane assignment
   - follow the creep wave
   - last-hit / harass
@@ -137,7 +185,7 @@ Ability levels: basic abilities max level 4 (and at most ⌈hero level / 2⌉), 
 1. ✅ Project setup, map + maze, camera, touch joystick / click-to-move, pathfinding
 2. ✅ Combat, creep waves, towers + protection rules, barracks → super creeps, shrine win condition, basic bots, hero select, HUD, minimap
 3. ✅ Abilities for the 3 heroes (data-driven ability system, buffs/debuffs, stuns, slows, projectiles, areas), skill points, mobile aim-and-release casting, bots use abilities, always-landscape
-4. Items, shop UI, gold sinks; neutral jungle camps
+4. ✅ Items, shop, teleport slot, neutral jungle camps, fog of war, day/night, free camera, melee feedback, aimable arrow casting (Fireball is now an aimed shot that can miss)
 5. Smarter bots: abilities, items, teamfights, difficulty settings
 6. Polish: sound, effects, fog of war, scoreboard, settings, tutorial; **balance target: 15–20 min matches** (an all-bot match currently takes ~30–45 min; items should shorten it)
 7. Capacitor packaging, on-device performance tests (low-end Android), test builds via TestFlight / Play internal testing
