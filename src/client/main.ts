@@ -347,4 +347,4 @@ function frame(now: number) {
 requestAnimationFrame(frame);
 
 // Debug handle for console / automated tests.
-(window as unknown as { game: unknown }).game = { get world() { return world; }, get heroId() { return myHeroId; } };
+(window as unknown as { game: unknown }).game = { get world() { return world; }, get heroId() { return myHeroId; }, get renderer() { return renderer; } };

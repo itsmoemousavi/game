@@ -12,6 +12,9 @@ import {
   World,
   effectiveCooldown,
   isNight,
+  heightAt,
+  CREEPS,
+  isWalkable,
   lineClear,
 } from '../src/sim';
 
@@ -162,16 +165,67 @@ describe('fog of war & day/night', () => {
   });
 });
 
+describe('high ground', () => {
+  it('cannot see up onto a base plateau from below, but can see down from it', () => {
+    const { w, hero } = humans();
+    const me = hero(1, 'vexa'); // enemy approaching Azure's base
+    const foe = hero(0, 'brakk');
+    const shrine = w.map.shrines[0];
+    place(foe, shrine.x + 10, shrine.y - 10); // on Azure's plateau
+    place(me, shrine.x + 24, shrine.y - 24); // down the mid lane, ~14 m away
+    expect(heightAt(w.map, foe.x, foe.y)).toBe(2);
+    expect(heightAt(w.map, me.x, me.y)).toBe(1);
+    run(w, 0.2);
+    expect(w.canSee(1, foe)).toBe(false); // can't see up
+    expect(w.canSee(0, me)).toBe(true); // but they see down
+  });
+
+  it('a ward on a hill sees over the forest into the paths', () => {
+    const { w, hero } = humans();
+    const hill = w.map.hills[0];
+    expect(heightAt(w.map, hill.x, hill.y)).toBe(3);
+    const o = hero(0, 'orin');
+    o.hero!.gold = 500;
+    w.applyCommand({ type: 'buy', unitId: o.id, itemId: 'observerWard' });
+    place(o, hill.x, hill.y);
+    w.applyCommand({ type: 'placeWard', unitId: o.id, slot: 0, x: hill.x, y: hill.y });
+    place(o, 20, 186);
+    // Find a spot 10–14 m from the hill that a ground-level viewer couldn't see (trees in between).
+    let spot: { x: number; y: number } | null = null;
+    for (let a = 0; a < 360 && !spot; a += 7) {
+      for (const r of [10, 12, 14]) {
+        const p = { x: hill.x + Math.cos((a * Math.PI) / 180) * r, y: hill.y + Math.sin((a * Math.PI) / 180) * r };
+        if (isWalkable(w.map, p.x, p.y) && heightAt(w.map, p.x, p.y) === 1 && !lineClear(w.map, hill, p)) {
+          spot = p;
+          break;
+        }
+      }
+    }
+    expect(spot).not.toBeNull();
+    const foe = hero(1, 'vexa');
+    place(foe, spot!.x, spot!.y);
+    run(w, 0.2);
+    expect(w.canSee(0, foe)).toBe(true);
+  });
+});
+
 describe('trees block sight', () => {
   it('cannot see through the forest, but can see along an open lane at the same distance', () => {
     const { w, hero } = humans();
     const me = hero(0, 'vexa');
     const foe = hero(1, 'brakk');
-    // Jungle room (52,104) and a point 12 m north-west of it, through solid forest.
+    // Jungle room (52,104) and a point 12 m away in a direction blocked by solid forest.
     place(me, 52, 104);
-    place(foe, 52 - 8.5, 104 - 8.5);
+    let blocked: { x: number; y: number } | null = null;
+    for (let a = 0; a < 360 && !blocked; a += 5) {
+      const p = { x: 52 + Math.cos((a * Math.PI) / 180) * 12, y: 104 + Math.sin((a * Math.PI) / 180) * 12 };
+      // Clearly behind trees: blocked even with the line shifted 1.5 m either side.
+      const shifted = [-1.5, 0, 1.5].every((o) => !lineClear(w.map, { x: me.x + o, y: me.y + o }, { x: p.x + o, y: p.y - o }));
+      if (shifted && isWalkable(w.map, p.x, p.y)) blocked = p;
+    }
+    expect(blocked).not.toBeNull();
+    place(foe, blocked!.x, blocked!.y);
     run(w, 0.2);
-    expect(lineClear(w.map, me, foe)).toBe(false); // trees in between
     expect(w.canSee(0, foe)).toBe(false);
     // Same 12 m but along the open corridor toward the river.
     place(foe, 52 + 12 * 0.41, 104 - 12 * 0.91);
@@ -195,6 +249,12 @@ describe('movement around buildings', () => {
         // A creep with nothing to fight that hasn't reached the end of its route must be moving.
         if (prev && c.targetId === null && c.creep.wp < c.creep.path.length && c.stunTimer <= 0) {
           const near = w.units.some((s) => s.structure && s.alive && Math.hypot(s.x - c.x, s.y - c.y) < s.radius + 3);
+          // Waiting behind other units (a creep queue at a fight) isn't being stuck on a building.
+          const crowded = w.units.some((o) => o !== c && o.alive && !o.structure && Math.hypot(o.x - c.x, o.y - c.y) < 3);
+          if (crowded) {
+            seen.set(c.id, { x: c.x, y: c.y, t: w.time });
+            continue;
+          }
           if (near) expect(Math.hypot(c.x - prev.x, c.y - prev.y), `creep stuck at ${c.x.toFixed(1)},${c.y.toFixed(1)}`).toBeGreaterThan(1);
         }
         seen.set(c.id, { x: c.x, y: c.y, t: w.time });
@@ -242,5 +302,34 @@ describe('jungle camps', () => {
     for (const n of neutrals.filter((x) => x.alive)) {
       expect(Math.hypot(n.x - n.neutral!.homeX, n.y - n.neutral!.homeY)).toBeLessThan(1);
     }
+  });
+});
+
+describe('uphill attacks', () => {
+  it('attacks from low ground onto high ground sometimes miss', () => {
+    const { w, hero } = humans();
+    const v = hero(1, 'vexa');
+    const b = hero(0, 'brakk');
+    const shrine = w.map.shrines[0];
+    place(b, shrine.x + 13, shrine.y - 13); // on the plateau edge
+    place(v, shrine.x + 21, shrine.y - 21); // below, in range
+    b.maxHp = b.hp = 1e6;
+    v.maxHp = v.hp = 1e6; // (the base towers shoot at her)
+    // Vexa's team needs vision up there (a ward or a creep would provide it).
+    w.spawnUnit('creep', 1, { x: shrine.x + 15, y: shrine.y - 15 }, CREEPS.melee).hp = 1e6;
+    let misses = 0;
+    let hits = 0;
+    run(w, 0.2);
+    w.applyCommand({ type: 'attack', unitId: v.id, targetId: b.id });
+    for (let i = 0; i < 40 * TICK_RATE; i++) {
+      w.step();
+      for (const e of w.events) {
+        if (e.type === 'miss' && e.sourceId === v.id) misses++;
+        if (e.type === 'attack' && e.sourceId === v.id) hits++;
+      }
+    }
+    expect(hits).toBeGreaterThan(15);
+    expect(misses).toBeGreaterThan(0);
+    expect(misses).toBeLessThan(hits * 0.5);
   });
 });

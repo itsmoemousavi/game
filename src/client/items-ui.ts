@@ -15,6 +15,7 @@ import {
 } from '../sim';
 import { TEAM_COLORS } from './renderer';
 import { toLocal } from './screen';
+import { itemIcon } from './icons';
 
 /**
  * Item bar (6 slots + teleport slot), shop panel and teleport destination picker.
@@ -77,6 +78,8 @@ export class ItemsUi {
       if (h.tpCount > 0) this.openPicker();
       else this.toggleShop(true);
     });
+    root.querySelector('#btn-shop')!.innerHTML = itemIcon('shop');
+    this.tpSlot.querySelector('.lbl')!.innerHTML = itemIcon('tp');
     tap(root.querySelector('#btn-shop')!, () => this.toggleShop());
     tap(root.querySelector('#btn-quickbuy')!, () => {
       const c = this.ctx();
@@ -128,7 +131,7 @@ export class ItemsUi {
       const card = document.createElement('button');
       card.className = 'shop-item';
       card.dataset.buy = id;
-      card.innerHTML = `<i style="background:${d.icon}">${d.short}</i>
+      card.innerHTML = `<i>${itemIcon(id)}</i>
         <div><b>${d.name}</b>${build.includes(id) ? ' <em>★</em>' : ''}<small>${d.summary}</small></div>
         <span class="cost">${d.cost}</span>`;
       card.addEventListener('pointerdown', (e) => {
@@ -161,8 +164,7 @@ export class ItemsUi {
         el.classList.toggle('usable', !!d?.consumable);
         el.classList.toggle('selling', !!d && this.shopOpen);
         el.classList.toggle('placing', this.placingSlot === i);
-        el.style.background = d ? d.icon : '';
-        el.querySelector('.lbl')!.textContent = d ? d.short : '';
+        el.querySelector('.lbl')!.innerHTML = d ? itemIcon(d.id) : '';
         el.querySelector('.cnt')!.textContent = s && s.count > 1 ? String(s.count) : '';
         el.title = d ? `${d.name}: ${d.summary}${this.shopOpen ? ' (tap to sell for half price)' : ''}` : 'Empty slot';
       });
@@ -181,7 +183,7 @@ export class ItemsUi {
       qb.dataset.key = qk;
       qb.classList.toggle('none', !next);
       if (next) {
-        qb.querySelector('.lbl')!.textContent = ITEMS[next].short;
+        qb.querySelector('.lbl')!.innerHTML = itemIcon(next);
         qb.querySelector('.cost')!.textContent = String(ITEMS[next].cost);
         qb.title = `Quick-buy: ${ITEMS[next].name} (${ITEMS[next].cost})`;
         qb.classList.toggle('off', !atShop || h.gold < ITEMS[next].cost);

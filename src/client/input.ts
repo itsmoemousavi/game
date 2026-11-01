@@ -32,7 +32,7 @@ const TAP_SLOP = 12;
 export class Input {
   aim: Aim | null = null;
   private keys = new Set<string>();
-  private joy: { id: number; ox: number; oy: number; dx: number; dy: number } | null = null;
+  private joy: { id: number; ox: number; oy: number; dx: number; dy: number; at: number; moved: boolean } | null = null;
   private drag: { id: number; slot: number; ox: number; oy: number; moved: boolean } | null = null;
   /** Finger/mouse held on the minimap: camera peeks there until released. */
   private peek: number | null = null;
@@ -256,9 +256,15 @@ export class Input {
     }
 
     if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+      // Looking around with the minimap: the joystick is off and taps on the map are orders
+      // (walk there / attack that). Letting go of the minimap brings the joystick back.
+      if (this.peek !== null) {
+        this.commandAt(sx, sy);
+        return;
+      }
       const onJoySide = this.leftHanded ? sx > this.canvas.clientWidth * 0.5 : sx < this.canvas.clientWidth * 0.5;
       if (onJoySide && !this.joy) {
-        this.joy = { id: e.pointerId, ox: sx, oy: sy, dx: 0, dy: 0 };
+        this.joy = { id: e.pointerId, ox: sx, oy: sy, dx: 0, dy: 0, at: performance.now(), moved: false };
         this.showJoystick(sx, sy, 0, 0);
       } else {
         this.commandAt(sx, sy);
@@ -355,6 +361,7 @@ export class Input {
       let dy = local.y - this.joy.oy;
       const max = this.joyRadius;
       const l = Math.hypot(dx, dy);
+      if (l > 10) this.joy.moved = true;
       if (l > max) {
         dx = (dx / l) * max;
         dy = (dy / l) * max;
@@ -385,8 +392,12 @@ export class Input {
     }
     if (this.camDrag?.id === e.pointerId) this.camDrag = null;
     if (this.joy && e.pointerId === this.joy.id) {
+      // A quick tap (no drag) on the joystick side is a tap-to-move / tap-to-attack.
+      const tap = !this.joy.moved && performance.now() - this.joy.at < 260;
+      const { ox, oy } = this.joy;
       this.joy = null;
       this.joyBase.style.display = 'none';
+      if (tap && !cancelled) this.commandAt(ox, oy);
     }
     let tipWasShown = false;
     if (this.tip && this.tip.pointer === e.pointerId) {

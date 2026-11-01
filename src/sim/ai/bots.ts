@@ -295,7 +295,11 @@ function grabRune(w: World, me: Unit): boolean {
 function plantWard(w: World, me: Unit, path: { x: number; y: number }[]): boolean {
   const slot = me.hero!.items.findIndex((s) => s?.id === 'observerWard');
   if (slot < 0) return false;
-  const spot = pointAlong(path, polylineLength(path) * 0.42);
+  // Prefer a hill on our side (sees over the trees), otherwise where the lane meets the river.
+  const laneSpot = pointAlong(path, polylineLength(path) * 0.42);
+  const ownSide = (p: { x: number; y: number }) => (me.team === 0 ? p.y > p.x : p.y < p.x);
+  const hill = w.map.hills.filter(ownSide).sort((a, b) => dist(a.x, a.y, laneSpot.x, laneSpot.y) - dist(b.x, b.y, laneSpot.x, laneSpot.y))[0];
+  const spot = hill && dist(hill.x, hill.y, laneSpot.x, laneSpot.y) < 45 ? hill : laneSpot;
   const covered = w.units.some((u) => u.ward && u.alive && u.team === me.team && dist(u.x, u.y, spot.x, spot.y) < 15);
   if (covered || dist(me.x, me.y, spot.x, spot.y) > 30) return false;
   w.applyCommand({ type: 'placeWard', unitId: me.id, slot, x: spot.x, y: spot.y });

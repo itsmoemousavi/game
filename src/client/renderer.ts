@@ -84,6 +84,11 @@ export class Renderer {
         if (u) this.floaters.push({ x: u.x, y: u.y - 2.4, t: 1, text: `+${Math.round(e.amount)}`, color: '#ffd23f' });
         continue;
       }
+      if (e.type === 'miss') {
+        const t = w.unit(e.targetId);
+        if (t && (e.sourceId === meId || e.targetId === meId)) this.floaters.push({ x: t.x, y: t.y - 1.6, t: 0.8, text: 'miss', color: '#d1d5db' });
+        continue;
+      }
       if (e.type === 'damage') {
         const t = w.unit(e.targetId);
         if (!t || (e.sourceId !== meId && e.targetId !== meId && !e.crit)) continue;
@@ -956,6 +961,54 @@ function bakeMap(map: GameMap): HTMLCanvasElement {
         g.fill();
       }
     }
+  }
+  // Forest paths: faint trails so the escape routes read on the map.
+  g.strokeStyle = 'rgba(120,100,70,0.35)';
+  g.lineWidth = 1.6 * px;
+  g.setLineDash([2 * px, 1.5 * px]);
+  for (const path of map.forestPaths) {
+    g.beginPath();
+    path.forEach((p, i) => (i ? g.lineTo(p.x * px, p.y * px) : g.moveTo(p.x * px, p.y * px)));
+    g.stroke();
+  }
+  g.setLineDash([]);
+
+  // High ground: lighter ground on plateaus / hills (drawn as one mask, so no seams),
+  // with a dark cliff edge where the ground drops to a lower level.
+  const n = map.grid;
+  for (const level of [2, 3]) {
+    const mask = document.createElement('canvas');
+    mask.width = mask.height = c.width;
+    const mg = mask.getContext('2d')!;
+    mg.fillStyle = level >= 3 ? 'rgb(235,225,180)' : 'rgb(220,210,190)';
+    for (let cy = 0; cy < n; cy++) {
+      for (let cx = 0; cx < n; cx++) {
+        if (map.height[cy * n + cx] === level && map.walkable[cy * n + cx]) mg.fillRect(cx * cs, cy * cs, cs + 1, cs + 1);
+      }
+    }
+    g.globalAlpha = level >= 3 ? 0.22 : 0.1;
+    g.drawImage(mask, 0, 0);
+    g.globalAlpha = 1;
+  }
+  for (let cy = 0; cy < n; cy++) {
+    for (let cx = 0; cx < n; cx++) {
+      const hgt = map.height[cy * n + cx];
+      if (hgt <= 1) continue;
+      g.fillStyle = 'rgba(0,0,0,0.45)';
+      const edge = Math.max(1.5, cs * 0.18);
+      const lower = (x: number, y: number) => x >= 0 && y >= 0 && x < n && y < n && map.height[y * n + x] < hgt;
+      if (lower(cx, cy + 1)) g.fillRect(cx * cs, (cy + 1) * cs - edge, cs, edge);
+      if (lower(cx + 1, cy)) g.fillRect((cx + 1) * cs - edge, cy * cs, edge, cs);
+      if (lower(cx, cy - 1)) g.fillRect(cx * cs, cy * cs, cs, edge * 0.6);
+      if (lower(cx - 1, cy)) g.fillRect(cx * cs, cy * cs, edge * 0.6, cs);
+    }
+  }
+  for (const h of map.hills) {
+    g.strokeStyle = 'rgba(255,240,190,0.35)';
+    g.lineWidth = 2;
+    g.beginPath();
+    g.arc(h.x * px, h.y * px, 3.2 * px, 0, Math.PI * 2);
+    g.stroke();
   }
   return c;
 }

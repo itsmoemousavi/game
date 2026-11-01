@@ -19,6 +19,15 @@ export interface GameMap {
   grid: number;
   /** 1 = walkable, 0 = wall. Indexed [cy * grid + cx]. */
   walkable: Uint8Array;
+  /**
+   * Ground level per cell: 1 = normal, 2 = base plateau, 3 = ward hill. You can only see
+   * ground at your level or lower, and trees block sight unless you stand above their tops.
+   */
+  height: Uint8Array;
+  /** Raised clearings in the jungle: wards (or heroes) there see over the forest. */
+  hills: Vec2[];
+  /** Narrow paths through the forest (both halves), for drawing. */
+  forestPaths: Vec2[][];
   /** Lane polylines, ordered from team 0's base to team 1's base. */
   lanes: Record<LaneId, Vec2[]>;
   /** Creep routes per team: lane polyline from own base, ending at the enemy shrine. */
@@ -70,6 +79,8 @@ const SHRINE0: Vec2 = { x: 24, y: 176 };
 const FOUNTAIN0: Vec2 = { x: 10, y: 190 };
 const BASE0: Vec2 = { x: 26, y: 174 };
 const BASE_RADIUS = 24;
+/** The base sits on a plateau a little wider than the base clearing. */
+const BASE_PLATEAU = 26;
 
 /** Jungle "maze" for team 0's half; mirrored for team 1. Rooms are where neutral camps will go. */
 const JUNGLE_ROOMS: { c: Vec2; r: number }[] = [
@@ -77,6 +88,29 @@ const JUNGLE_ROOMS: { c: Vec2; r: number }[] = [
   { c: { x: 100, y: 148 }, r: 7 },
   { c: { x: 64, y: 140 }, r: 6 },
 ];
+/**
+ * Narrow paths through the forest ("juke paths") for hiding, ganking and escaping.
+ * Trees on both sides still block sight. Polylines, team-0 half; mirrored for team 1.
+ */
+const FOREST_PATHS: Vec2[][] = [
+  [{ x: 22, y: 70 }, { x: 40, y: 62 }, { x: 58, y: 59 }],
+  [{ x: 22, y: 96 }, { x: 34, y: 91 }, { x: 47, y: 100 }],
+  [{ x: 22, y: 124 }, { x: 40, y: 128 }, { x: 59, y: 139 }],
+  [{ x: 64, y: 112 }, { x: 84, y: 104 }, { x: 95, y: 96 }],
+  [{ x: 80, y: 180 }, { x: 83, y: 165 }, { x: 98, y: 151 }],
+  [{ x: 120, y: 180 }, { x: 123, y: 166 }, { x: 132, y: 157 }, { x: 146, y: 147 }],
+  [{ x: 152, y: 180 }, { x: 157, y: 168 }, { x: 160, y: 161 }],
+  [{ x: 87, y: 128 }, { x: 90, y: 144 }],
+];
+const FOREST_PATH_WIDTH = 3.8;
+/** Ward hills (height 3) on the forest paths. */
+const HILLS: Vec2[] = [
+  { x: 34, y: 86 },
+  { x: 128, y: 162 },
+  { x: 87, y: 127 },
+];
+const HILL_RADIUS = 3.6;
+
 const JUNGLE_PATHS: [Vec2, Vec2][] = [
   [{ x: 18, y: 112 }, { x: 52, y: 104 }],
   [{ x: 52, y: 104 }, { x: 68, y: 68 }],
@@ -137,6 +171,8 @@ export function createMap(): GameMap {
   carveCircle(BASE0, BASE_RADIUS);
   for (const room of JUNGLE_ROOMS) carveCircle(room.c, room.r);
   for (const [a, b] of JUNGLE_PATHS) carveSeg(a, b, JUNGLE_WIDTH);
+  for (const path of FOREST_PATHS) for (let i = 1; i < path.length; i++) carveSeg(path[i - 1], path[i], FOREST_PATH_WIDTH);
+  for (const h of HILLS) carveCircle(h, HILL_RADIUS);
 
   // Structures (team 0, then mirrored for team 1). Dota-style layout:
   //   lane: tier-1 tower out in the lane → tier-2 tower + barracks as a gate where the
@@ -224,11 +260,29 @@ export function createMap(): GameMap {
   };
   const teamLanes = ([0, 1] as Team[]).map((t) => ({ top: route(t, 'top'), mid: route(t, 'mid'), bot: route(t, 'bot') })) as GameMap['teamLanes'];
 
+  // Ground levels: base plateaus (2) and ward hills (3); everything else is 1.
+  const height = new Uint8Array(GRID * GRID).fill(1);
+  const hills = [...HILLS, ...HILLS.map(mirror)];
+  for (let cy = 0; cy < GRID; cy++) {
+    for (let cx = 0; cx < GRID; cx++) {
+      const x = (cx + 0.5) * CELL;
+      const y = (cy + 0.5) * CELL;
+      const i = cy * GRID + cx;
+      const b0 = Math.hypot(x - BASE0.x, y - BASE0.y);
+      const b1 = Math.hypot(MAP_SIZE - x - BASE0.x, MAP_SIZE - y - BASE0.y);
+      if (Math.min(b0, b1) <= BASE_PLATEAU) height[i] = 2;
+      if (hills.some((h) => Math.hypot(x - h.x, y - h.y) <= HILL_RADIUS)) height[i] = 3;
+    }
+  }
+
   return {
     size: MAP_SIZE,
     cell: CELL,
     grid: GRID,
     walkable,
+    height,
+    hills,
+    forestPaths: [...FOREST_PATHS, ...FOREST_PATHS.map((p) => p.map(mirror))],
     lanes: LANES,
     teamLanes,
     river: RIVER,
@@ -279,3 +333,11 @@ export function lineClear(map: GameMap, a: Vec2, b: Vec2, r = 0): boolean {
 }
 
 export const laneProgress = (path: Vec2[], p: Vec2) => projectOnPolyline(path, p);
+
+/** Ground level at a world position (1 outside the map). */
+export function heightAt(map: GameMap, x: number, y: number): number {
+  const cx = Math.floor(x / map.cell);
+  const cy = Math.floor(y / map.cell);
+  if (cx < 0 || cy < 0 || cx >= map.grid || cy >= map.grid) return 1;
+  return map.height[cy * map.grid + cx];
+}

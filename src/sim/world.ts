@@ -9,6 +9,7 @@ import {
   RANGED_PER_WAVE,
   STARTING_GOLD,
   CAMP_FIRST_SPAWN,
+  UPHILL_MISS_CHANCE,
   CREEP_GROWTH_PER_5MIN,
   CHARM_DURATION,
   DENY_CREEP,
@@ -33,7 +34,7 @@ import { ItemId, ItemStats } from './data/items';
 import { ItemSlot, buyItem, buyTeleport, emptyInventory, itemBonuses, sellItem, startTeleport, updateChannel, useItem } from './inventory';
 import { Vision, isInvisible } from './vision';
 import { Rune, activateGlyph, buyback, placeWard, spawnBoss, updateObjectives } from './objectives';
-import { GameMap, LaneId, StructureTier, createMap, fits, isWalkable, lineClear, teamLanePath } from './map';
+import { GameMap, LaneId, StructureTier, createMap, fits, heightAt, isWalkable, lineClear, teamLanePath } from './map';
 import { Vec2, dist, distV } from './math';
 
 const distToSeg = (px: number, py: number, ax: number, ay: number, bx: number, by: number) => {
@@ -231,6 +232,8 @@ export interface NeutralState {
   homeX: number;
   homeY: number;
   boss?: boolean;
+  /** Stays angry until this time (refreshed whenever it is hit). */
+  aggroUntil: number;
 }
 
 export interface WardState {
@@ -323,6 +326,8 @@ export interface Projectile {
   /** Spell projectiles deal spell damage (and may explode). */
   spell?: { kind: 'fireball'; aoe: number };
   crit?: boolean;
+  /** Uphill attack that will miss. */
+  miss?: boolean;
 }
 
 export type GameEvent =
@@ -343,6 +348,7 @@ export type GameEvent =
   | { type: 'bossKilled'; killerId: number | null; team: Side }
   | { type: 'revive'; unitId: number }
   | { type: 'purchase'; unitId: number }
+  | { type: 'miss'; sourceId: number; targetId: number }
   /** Notable damage (spells, critical hits) for floating numbers. */
   | { type: 'damage'; sourceId: number; targetId: number; amount: number; kind: DamageKind; crit: boolean };
 
@@ -393,7 +399,7 @@ export class World {
     this.map = opts.map ?? createMap();
     this.nav = { ...this.map, walkable: new Uint8Array(this.map.walkable) };
     this.rng = new Rng(opts.seed);
-    this.vision = new Vision(this.map.grid, this.map.cell, this.map.walkable);
+    this.vision = new Vision(this.map.grid, this.map.cell, this.map.walkable, this.map.height);
     for (const s of this.map.structures) this.spawnStructure(s.team, s.tier, s.lane, s.pos);
     this.refreshVulnerability();
     this.rebuildNav();
@@ -788,7 +794,7 @@ export class World {
       ];
       for (const [kind, ox, oy] of pack) {
         const u = this.newUnit('neutral', 2, { x: c.x + ox, y: c.y + oy }, NEUTRALS[kind]);
-        u.neutral = { camp, homeX: u.x, homeY: u.y };
+        u.neutral = { camp, homeX: u.x, homeY: u.y, aggroUntil: 0 };
       }
     });
   }
@@ -1063,20 +1069,31 @@ export class World {
   }
 
   /** Neutrals idle at camp; when attacked they fight back, but never stray far from home. */
+  /**
+   * Neutrals idle at camp. When hit they fight back for a while: they chase within their
+   * leash range (waiting at the edge if the attacker stands further out), and only heal
+   * up once they've been left alone at home.
+   */
   private updateNeutral(u: Unit) {
     const n = u.neutral!;
-    const home = dist(u.x, u.y, n.homeX, n.homeY);
+    const angry = this.time < n.aggroUntil;
     let t = this.unit(u.targetId);
-    if (t && (!t.alive || home > NEUTRAL_LEASH || dist(t.x, t.y, n.homeX, n.homeY) > NEUTRAL_LEASH + 3)) {
-      u.targetId = null;
-      t = undefined;
-    }
+    if (t && (!t.alive || !angry)) t = undefined;
+    u.targetId = t?.id ?? null;
     if (t) {
-      if (!this.tryAttack(u, t)) this.steerTo(u, t.x, t.y);
+      if (this.tryAttack(u, t)) return;
+      // Chase, but never further than the leash from home.
+      const d = dist(t.x, t.y, n.homeX, n.homeY);
+      if (d <= NEUTRAL_LEASH) this.steerTo(u, t.x, t.y);
+      else {
+        const k = NEUTRAL_LEASH / d;
+        this.steerTo(u, n.homeX + (t.x - n.homeX) * k, n.homeY + (t.y - n.homeY) * k);
+      }
       return;
     }
+    const home = dist(u.x, u.y, n.homeX, n.homeY);
     if (home > 0.3) this.steerTo(u, n.homeX, n.homeY);
-    else u.hp = Math.min(u.maxHp, u.hp + u.maxHp * 0.1 * DT); // regenerate quickly at camp
+    else if (this.time > n.aggroUntil + 2) u.hp = Math.min(u.maxHp, u.hp + u.maxHp * 0.1 * DT); // heal at camp
   }
 
   private updateProjectiles() {
@@ -1093,7 +1110,8 @@ export class World {
               this.dealDamage(p.sourceId, e, p.damage, 'spell');
             }
           }
-        } else this.dealDamage(p.sourceId, t, p.damage, 'attack', { crit: p.crit });
+        } else if (p.miss) this.events.push({ type: 'miss', sourceId: p.sourceId, targetId: t.id });
+        else this.dealDamage(p.sourceId, t, p.damage, 'attack', { crit: p.crit });
         continue;
       }
       p.x += ((t.x - p.x) / d) * step;
@@ -1241,6 +1259,8 @@ export class World {
     this.reveal(u);
     let damage = applyAttackPassives(this, u);
     const crit = !!u.hero?.lastCrit;
+    // High ground: attacks from lower ground onto higher ground miss 25% of the time.
+    const miss = heightAt(this.map, u.x, u.y) < heightAt(this.map, t.x, t.y) && this.rng.next() < UPHILL_MISS_CHANCE;
     for (const b of u.buffs) if (b.damageMult) damage *= b.damageMult;
     if (u.projectileSpeed > 0) {
       this.projectiles.push({
@@ -1255,7 +1275,10 @@ export class World {
         speed: u.projectileSpeed,
         damage,
         crit,
+        miss,
       });
+    } else if (miss) {
+      this.events.push({ type: 'miss', sourceId: u.id, targetId: t.id });
     } else {
       this.dealDamage(u.id, t, damage, 'attack', { crit });
     }
@@ -1286,10 +1309,13 @@ export class World {
     if (kind === 'attack' && src?.hero && src.hero.bonus.lifestealPct > 0) {
       this.heal(src, (amount * src.hero.bonus.lifestealPct) / 100);
     }
-    // Wake the whole camp when a neutral is hit.
-    if (target.neutral && src && src.team !== 2) {
+    // Wake the whole camp when a neutral is hit (and keep it angry while it's being hit).
+    if (target.neutral && src && src.team !== 2 && src.kind !== 'structure') {
       for (const n of this.units) {
-        if (n.neutral?.camp === target.neutral.camp && n.alive && n.targetId === null) n.targetId = src.id;
+        if (n.neutral?.camp !== target.neutral.camp || !n.alive) continue;
+        n.neutral.aggroUntil = this.time + 5;
+        const cur = this.unit(n.targetId);
+        if (!cur || !cur.alive || n === target) n.targetId = src.id;
       }
     }
 

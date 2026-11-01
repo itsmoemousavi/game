@@ -72,6 +72,9 @@ export const WARD_CAST_RANGE = 7;
 /** Sentry wards reveal invisible enemies (wards, invisible heroes) in this radius. */
 export const TRUE_SIGHT_RADIUS = 10;
 
+/** Attacks from lower ground onto higher ground miss this often. */
+export const UPHILL_MISS_CHANCE = 0.25;
+
 export type Team = 0 | 1;
 /** Side a unit belongs to: a team, or 2 for neutral jungle monsters. */
 export type Side = Team | 2;

@@ -19,6 +19,8 @@ import {
   maxAbilityLevel,
 } from '../sim';
 
+import { itemIcon } from './icons';
+
 const fmtTime = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 
 /** DOM overlay: scores, timer, hero status, ability buttons, respawn + game-over screens. */
@@ -246,7 +248,7 @@ export class Hud {
       for (const r of rows.filter((x) => x.u.team === team).sort((a, b) => b.worth - a.worth)) {
         const def = HEROES[r.h.defId];
         const items = r.h.items
-          .map((it) => (it ? `<i style="background:${ITEMS[it.id].icon}">${esc(ITEMS[it.id].short)}</i>` : '<i class="empty"></i>'))
+          .map((it) => (it ? `<i title="${esc(ITEMS[it.id].name)}">${itemIcon(it.id)}${it.count > 1 ? `<b>${it.count}</b>` : ''}</i>` : '<i class="empty"></i>'))
           .join('');
         const status = r.u.alive ? '' : ` <span class="dead">☠ ${Math.ceil(r.h.respawnTimer)}s</span>`;
         html += `<tr class="${r.u.id === meId ? 'me' : ''}">
@@ -254,7 +256,7 @@ export class Hud {
           <td>${r.h.kills} / ${r.h.deaths} / ${r.h.assists}</td>
           <td>${r.h.lastHits} / ${r.h.denies}</td>
           <td>${r.worth}</td>
-          <td><span class="items">${items}</span>${team === myTeam ? ` <small>TP ${r.h.tpCount}</small>` : ''}</td>
+          <td><span class="items">${items}</span>${team === myTeam ? ` <small>TP×${r.h.tpCount}</small>` : ''}</td>
         </tr>`;
       }
     }

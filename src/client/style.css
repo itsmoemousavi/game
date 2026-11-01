@@ -224,3 +224,14 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 /* The ability area is a layout box only: let taps through to whatever is under its empty parts. */
 #actions { pointer-events: none; }
 #actions button { pointer-events: auto; }
+
+/* ---------- item icons ---------- */
+svg.icon { display: block; width: 100%; height: 100%; }
+#itembar .item .lbl { position: absolute; inset: 1px; display: block; }
+#itembar .item .cnt { z-index: 1; }
+#itembar .tp .lbl { inset: 1px; }
+#btn-shop { padding: 1px !important; }
+#btn-quickbuy .lbl { width: 22px; height: 22px; display: block; }
+.shop-item i { overflow: hidden; padding: 0; }
+#score-body .items i { position: relative; overflow: hidden; }
+#score-body .items i b { position: absolute; right: 1px; bottom: 0; font-size: 8px; color: #fff; text-shadow: 0 1px 1px #000; }

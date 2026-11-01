@@ -9,6 +9,12 @@ import type { Unit, World } from './world';
  * Trees (wall cells) block line of sight: a cell is visible only if the straight line
  * from the viewer to it crosses no tree. The first trees along a line are lit, so you
  * see the edge of the forest but not through it. Buildings don't block sight.
+ *
+ * High ground: every cell has a ground level (1 normal, 2 base plateau, 3 ward hill).
+ *  - You can't see ground higher than you're standing on (no seeing up a cliff).
+ *  - A tree's top is one level above its ground; trees only block you if their tops are
+ *    at or above your level. So a ward on a hill (3) sees over normal forest (top 2)
+ *    straight into the forest paths, but not over the trees around a base (top 3).
  */
 /** Wards are always invisible; heroes are while an invisibility buff is active. */
 export const isInvisible = (u: Unit) => !!u.ward || u.buffs.some((b) => b.invisible);
@@ -24,6 +30,7 @@ export class Vision {
     private grid: number,
     private cell: number,
     private walkable: Uint8Array,
+    private height: Uint8Array,
   ) {
     this.grids = [new Uint8Array(grid * grid), new Uint8Array(grid * grid)];
     this.trueSight = [new Uint8Array(grid * grid), new Uint8Array(grid * grid)];
@@ -65,15 +72,21 @@ export class Vision {
     if (ox < 0 || oy < 0 || ox >= n || oy >= n) return;
     const p = this.pattern(r);
     const walk = this.walkable;
+    const hgt = this.height;
+    const eye = hgt[oy * n + ox];
     g[oy * n + ox] = 1;
     outer: for (let i = 0; i < p.dx.length; i++) {
       const tx = ox + p.dx[i];
       const ty = oy + p.dy[i];
       if (tx < 0 || ty < 0 || tx >= n || ty >= n) continue;
+      if (hgt[ty * n + tx] > eye) continue; // can't see up onto higher ground
       for (let k = p.lineStart[i]; k < p.lineStart[i + 1]; k++) {
         const lx = ox + p.lineX[k];
         const ly = oy + p.lineY[k];
-        if (lx < 0 || ly < 0 || lx >= n || ly >= n || !walk[ly * n + lx]) continue outer;
+        if (lx < 0 || ly < 0 || lx >= n || ly >= n) continue outer;
+        const c = ly * n + lx;
+        if (hgt[c] > eye) continue outer; // a cliff in the way
+        if (!walk[c] && hgt[c] + 1 >= eye) continue outer; // trees at least as tall as our eye
       }
       g[ty * n + tx] = 1;
     }

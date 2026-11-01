@@ -295,3 +295,36 @@ describe('settings & match controls', () => {
     expect(events).toContain('spell');
   });
 });
+
+describe('jungle camps & boss fight back', () => {
+  it('a ranged hero can kill the Warden from range; the Warden fights back instead of healing', () => {
+    const { w, hero } = humans();
+    const boss = w.units.find((u) => u.neutral?.boss)!;
+    const v = hero(0, 'vexa');
+    v.damage = 1200; // speed the test up
+    v.maxHp = v.hp = 50000; // and survive the fight
+    place(v, boss.x - 11, boss.y - 3); // outside the pit, in attack range
+    run(w, 0.2);
+    w.applyCommand({ type: 'attack', unitId: v.id, targetId: boss.id });
+    run(w, 2);
+    const hpAfterHits = boss.hp;
+    expect(hpAfterHits).toBeLessThan(boss.maxHp - 500);
+    expect(boss.targetId).toBe(v.id); // it's after Vexa
+    run(w, 12);
+    expect(boss.alive).toBe(false);
+  });
+
+  it('melee heroes can fight a camp and the camp hits back', () => {
+    const { w, hero } = humans();
+    run(w, 31);
+    const camp = w.map.camps[1];
+    const b = hero(0, 'brakk');
+    place(b, camp.x - 2, camp.y);
+    run(w, 0.2);
+    const brute = w.units.find((u) => u.neutral?.camp === 1 && u.maxHp > 500)!;
+    w.applyCommand({ type: 'attack', unitId: b.id, targetId: brute.id });
+    run(w, 3);
+    expect(brute.hp).toBeLessThan(brute.maxHp);
+    expect(b.hp).toBeLessThan(b.maxHp);
+  });
+});
