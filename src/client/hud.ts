@@ -463,6 +463,8 @@ export class Hud {
       Math.floor(h.xp),
       h.kills,
       h.deaths,
+      h.lastHits,
+      h.denies,
       me.alive,
       Math.ceil(h.respawnTimer),
       w.winner,
@@ -482,7 +484,7 @@ export class Hud {
     this.el['xp-fill'].style.width = h.level >= MAX_LEVEL ? '100%' : `${((h.xp - cur) / (next - cur)) * 100}%`;
     this.el.level.textContent = String(h.level);
     this.el.gold.textContent = String(Math.floor(h.gold));
-    this.el.kda.textContent = `${h.kills} / ${h.deaths} · LH ${h.lastHits}`;
+    this.el.kda.textContent = `K/D ${h.kills}/${h.deaths} · LH/Deny ${h.lastHits}/${h.denies}`;
 
     this.el.respawn.style.display = !me.alive && w.winner === null ? 'block' : 'none';
     const night = isNight(w.time);

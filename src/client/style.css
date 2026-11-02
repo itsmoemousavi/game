@@ -88,7 +88,7 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 /* Bottom group, just left of the ability buttons: status icons above the hero bar, items to its right. */
 #bottom-hud { position: absolute; right: calc(max(12px, env(safe-area-inset-right)) + 222px); bottom: max(0px, calc(env(safe-area-inset-bottom) - 6px)); display: flex; flex-direction: column; align-items: flex-start; gap: 4px; pointer-events: none; }
 /* One glassy black panel holding the hero bar, items, TP and shop. */
-#hud-panel { display: flex; align-items: center; gap: 8px; padding: 5px 8px 5px 6px; border-radius: 12px; background: rgba(8,10,12,0.55); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 4px 18px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08); -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); pointer-events: none; }
+#hud-panel { position: relative; display: flex; align-items: center; gap: 8px; padding: 5px 42px 5px 6px; border-radius: 12px; background: rgba(8,10,12,0.55); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 4px 18px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08); -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); pointer-events: none; }
 #app.lefty #bottom-hud { right: auto; left: calc(max(12px, env(safe-area-inset-left)) + 222px); }
 #herobar { position: relative; display: flex; gap: 8px; align-items: center; padding: 0 2px 4px; width: clamp(170px, 27vw, 330px); box-sizing: border-box; pointer-events: none; }
 #portrait { flex: none; width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #111; border: 2px solid rgba(255,255,255,0.55); box-sizing: border-box; }
@@ -101,8 +101,10 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 .bar span { position: absolute; inset: 0; font-size: 10px; line-height: 13px; text-align: center; text-shadow: 0 1px 1px #000; }
 .bar.hp > div { background: #3fbf5f; } .bar.mana > div { background: #3d7bfd; }
 .bar.xp { height: 4px; } .bar.xp > div { background: #c58bff; }
-#pstats { grid-column: 4 / span 2; grid-row: 2; align-self: center; display: flex; flex-direction: column; align-items: center; line-height: 1.2; font-size: 10px; white-space: nowrap; pointer-events: none; }
-#pstats b { color: #ffd23f; font-size: 12px; }
+#pstats { grid-column: 4; grid-row: 2; align-self: center; justify-self: start; margin-left: 4px; display: flex; align-items: center; gap: 3px; white-space: nowrap; pointer-events: none; }
+#pstats .coin { width: 13px; height: 13px; flex: none; }
+#pstats b { color: #ffd23f; font-size: 13px; font-weight: 900; }
+#kda { font-size: 10px; line-height: 1.1; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
 
 #actions { position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); width: 210px; height: 190px; }
 #actions button { position: absolute; border-radius: 50%; border: 2px solid rgba(255,255,255,0.35); background: rgba(20,30,24,0.75); display: grid; place-items: center; touch-action: none; }
@@ -153,10 +155,10 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 .ability .cd { z-index: 2; text-shadow: 0 1px 3px #000; }
 
 /* ---------- item bar ---------- */
-#itembar { position: relative; pointer-events: auto; display: grid; grid-template-columns: repeat(3, 34px) auto auto; grid-template-rows: 34px 34px; column-gap: 4px; grid-auto-flow: row; gap: 4px; align-items: center; }
-#itembar .tp, #btn-shop { grid-row: 1; align-self: center; }
+#itembar { position: relative; pointer-events: auto; display: grid; grid-template-columns: repeat(3, 34px) auto; grid-template-rows: 34px 34px; column-gap: 4px; grid-auto-flow: row; gap: 4px; align-items: center; }
+#itembar .tp { grid-row: 1; align-self: center; }
 #itembar .tp { grid-column: 4; }
-#btn-shop { grid-column: 5; }
+
 /* long-press an item: Drop button above it */
 #item-drop { position: absolute !important; width: auto !important; height: 26px !important; padding: 0 10px !important; transform: translate(-50%, calc(-100% - 6px)); background: #7f1d1d !important; border-color: #fca5a5 !important; color: #fff; font-size: 12px; font-weight: 900; letter-spacing: 0.08em; z-index: 3; box-shadow: 0 3px 10px rgba(0,0,0,0.5); }
 #item-drop.hidden { display: none !important; }
@@ -172,7 +174,8 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #itembar .tp.channel { border-color: #fff; animation: pulse 0.4s infinite alternate; }
 #itembar .tp .cd { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,0.6); border-radius: 5px; font-size: 13px; font-weight: 800; }
 #itembar .tp .cd:empty { display: none; }
-#btn-shop { margin-left: 4px; font-size: 17px; background: #6b4e16 !important; border-color: #ffd23f !important; width: 40px !important; height: 40px !important; border-radius: 50% !important; overflow: hidden; }
+/* Shop: a round button sitting on the panel's bottom-right corner. */
+#btn-shop { position: absolute; right: -20px; bottom: 3px; z-index: 2; width: 46px; height: 46px; border-radius: 50%; border: 2px solid #ffd23f; background: #6b4e16; padding: 1px; display: grid; place-items: center; overflow: hidden; pointer-events: auto; touch-action: none; box-shadow: 0 3px 10px rgba(0,0,0,0.55); }
 #btn-shop svg { border-radius: 50%; }
 
 /* ---------- shop ---------- */
@@ -328,7 +331,7 @@ svg.icon { display: block; width: 100%; height: 100%; }
 #itembar .item .lbl { position: absolute; inset: 1px; display: block; }
 #itembar .item .cnt { z-index: 1; }
 #itembar .tp .lbl { inset: 1px; }
-#btn-shop { padding: 1px !important; }
+
 .shop-item i { overflow: hidden; padding: 0; }
 #score-body .items i { position: relative; overflow: hidden; }
 #score-body .items i b { position: absolute; right: 1px; bottom: 0; font-size: 8px; color: #fff; text-shadow: 0 1px 1px #000; }
