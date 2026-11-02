@@ -16,6 +16,7 @@ const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as
 
 const canvas = $<HTMLCanvasElement>('#game');
 const canvas3d = $<HTMLCanvasElement>('#game3d');
+declare const __BUILD__: string;
 const app = $<HTMLElement>('#app');
 const select = $<HTMLElement>('#select');
 
@@ -226,18 +227,33 @@ function applySettings() {
 }
 
 /** 3D view, or the lighter top-down 2D view. Falls back to 2D if WebGL isn't available. */
+let gfxNote = '';
 function makeRenderer(map: World['map']): Renderer {
   (renderer as Renderer3D | null)?.destroy?.();
   if (settings.graphics === '3d') {
     try {
       canvas3d.classList.remove('hidden');
-      return new Renderer3D(canvas, canvas3d, map);
+      const r = new Renderer3D(canvas, canvas3d, map);
+      showGfx('3D');
+      return r;
     } catch (err) {
-      console.warn('3D view unavailable, using 2D', err);
+      gfx3dFailed(err);
     }
   }
   canvas3d.classList.add('hidden');
+  if (settings.graphics === '2d') showGfx('2D');
   return new Renderer(canvas, map);
+}
+function showGfx(view: string) {
+  $<HTMLElement>('#gfx-status').textContent = `Showing: ${view}${gfxNote ? ` (${gfxNote})` : ''} · build ${__BUILD__}`;
+}
+/** 3D couldn't start or crashed: carry on in 2D and say why. */
+function gfx3dFailed(err: unknown) {
+  console.warn('3D view unavailable, using 2D', err);
+  gfxNote = `3D failed: ${err instanceof Error ? err.message : String(err)}`.slice(0, 140);
+  canvas3d.classList.add('hidden');
+  showGfx('2D');
+  hud.toast(`3D view could not start, showing 2D. ${gfxNote}`, '#ffb4b4');
 }
 document.querySelectorAll<HTMLElement>('#set-gfx button').forEach((b) =>
   b.addEventListener('click', () => {
@@ -485,7 +501,18 @@ function frame(now: number) {
     } else renderer.marker = null;
     // Back from the dead (or done peeking): camera returns to the hero.
     if (me.alive && renderer.freeCamera && !input.peeking) renderer.follow();
-    renderer.render(world, acc / DT, me, myTeam, input.aim);
+    try {
+      renderer.render(world, acc / DT, me, myTeam, input.aim);
+    } catch (err) {
+      if (!(renderer instanceof Renderer3D)) throw err;
+      gfx3dFailed(err);
+      const prev = renderer;
+      renderer = new Renderer(canvas, world.map);
+      renderer.setZoomFactor(settings.zoom);
+      renderer.camX = prev.camX;
+      renderer.camY = prev.camY;
+      input.renderer = renderer;
+    }
     hud.update(world, me, myTeam);
     if (!statsPanel.classList.contains('hidden')) hud.updateStats(world, me);
     if (!scorePanel.classList.contains('hidden')) hud.updateScoreboard(world, myTeam, myHeroId);
