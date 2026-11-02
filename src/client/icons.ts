@@ -1,4 +1,4 @@
-import type { ItemId } from '../sim';
+import type { ItemId, StatusId } from '../sim';
 
 /**
  * Hand-made 24×24 SVG icons for items (original artwork, no external assets).
@@ -103,3 +103,80 @@ export function itemImage(id: ItemId): HTMLImageElement {
   }
   return img;
 }
+
+/** Status effect icons (same hand-made 24×24 style as the item icons). */
+const STATUS_ICONS: Record<StatusId, string> = {
+  stun: svg(
+    '<path d="M12 4l1.4 3 3.3.3-2.5 2.2.8 3.2L12 11l-3 1.7.8-3.2-2.5-2.2 3.3-.3z" fill="#fde047" stroke="#713f12" stroke-width="0.8"/><ellipse cx="12" cy="17" rx="7" ry="2.6" fill="none" stroke="#fde047" stroke-width="1.4" stroke-dasharray="2.5 1.5"/>',
+    '#3f2a0a',
+  ),
+  slow: svg(
+    '<path d="M4 17c0-3.5 2.6-6 6-6s6 2.5 6 6z" fill="#7dd3fc" stroke="#0c4a6e" stroke-width="1"/><circle cx="10" cy="14.5" r="2" fill="none" stroke="#0c4a6e" stroke-width="1"/><path d="M16 17h4M18 11v5" stroke="#bae6fd" stroke-width="1.3" stroke-linecap="round"/><circle cx="18" cy="10" r="1.3" fill="#bae6fd"/>',
+    '#0b2537',
+  ),
+  arrowStorm: svg(
+    '<path d="M6 3v12M12 5v12M18 3v12" stroke="#e5e7eb" stroke-width="1.3"/><path d="M4.5 13.5L6 17l1.5-3.5zM10.5 15.5L12 19l1.5-3.5zM16.5 13.5L18 17l1.5-3.5z" fill="#f87171"/>',
+    '#3b0d0d',
+  ),
+  maelstrom: svg(
+    '<path d="M12 12m-1.5 0a1.5 1.5 0 1 0 3 0a3.5 3.5 0 1 0-7 0a5.5 5.5 0 1 0 11 0a7.5 7.5 0 1 0-15 0" fill="none" stroke="#38bdf8" stroke-width="1.5" stroke-linecap="round"/>',
+    '#0b2537',
+  ),
+  burn: svg(
+    '<path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2.5 1.5-3.5 2-5.5 1 1.5 1.5 2.5 1.5 3.5C11.5 8 11 6 12 3z" fill="#fb923c" stroke="#7c2d12" stroke-width="0.9"/><path d="M12 12c.8 1.5 2.3 2.3 2.3 4a2.3 2.3 0 0 1-4.6 0c0-1.2.8-1.8 1.3-2.4z" fill="#fde047"/>',
+    '#431407',
+  ),
+  haste: svg('<path d="M13.5 3L6 13.5h5L9.5 21 18 10h-5z" fill="#fde047" stroke="#713f12" stroke-width="0.9" stroke-linejoin="round"/>', '#1e3a2a'),
+  doubleDamage: svg(
+    '<path d="M5 4l9 9-1.5 1.5-9-9zM19 4l-9 9 1.5 1.5 9-9z" fill="#e5e7eb" stroke="#334155" stroke-width="0.7"/><path d="M5.5 15.5l3 3-2 2-3-3zM18.5 15.5l-3 3 2 2 3-3z" fill="#60a5fa"/>',
+    '#172554',
+  ),
+  regen: svg(
+    '<circle cx="12" cy="12" r="7.5" fill="#22c55e" stroke="#14532d" stroke-width="1"/><path d="M10.5 7.5h3v3h3v3h-3v3h-3v-3h-3v-3h3z" fill="#fff"/>',
+    '#052e16',
+  ),
+  invisibility: svg(
+    '<path d="M6 20V11a6 6 0 0 1 12 0v9l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5z" fill="#c4b5fd" fill-opacity="0.75" stroke="#4c1d95" stroke-width="1"/><circle cx="10" cy="11" r="1.1" fill="#4c1d95"/><circle cx="14" cy="11" r="1.1" fill="#4c1d95"/>',
+    '#1e1b4b',
+  ),
+  salve: '',
+  mendingFlame: svg(
+    '<path d="M12 20s-6.5-3.8-6.5-8.4A3.6 3.6 0 0 1 12 9.5a3.6 3.6 0 0 1 6.5 2.1C18.5 16.2 12 20 12 20z" fill="#f97316" stroke="#7c2d12" stroke-width="0.9"/><path d="M12 3c.8 2 2.3 2.7 2.3 4.5a2.3 2.3 0 0 1-4.6 0C9.7 6 11 5 12 3z" fill="#fde047"/>',
+    '#431407',
+  ),
+  veil: svg(
+    '<path d="M3 12s3.5-5.5 9-5.5S21 12 21 12s-3.5 5.5-9 5.5S3 12 3 12z" fill="#a78bfa" fill-opacity="0.6" stroke="#2e1065" stroke-width="1"/><path d="M5 19L19 5" stroke="#ede9fe" stroke-width="1.6" stroke-linecap="round"/>',
+    '#1e1b4b',
+  ),
+  barkSkin: svg(
+    '<path d="M12 3l7 3v5c0 5-3.2 8.5-7 10-3.8-1.5-7-5-7-10V6z" fill="#a16207" stroke="#422006" stroke-width="1"/><path d="M9 7v9M12 6v12M15 7v9" stroke="#713f12" stroke-width="1.1"/><path d="M14 9c2-.5 3.5.5 3.5.5S16 12 14 11.5z" fill="#4ade80"/>',
+    '#1c1917',
+  ),
+  brineVeil: svg(
+    '<path d="M12 3l7 3v5c0 5-3.2 8.5-7 10-3.8-1.5-7-5-7-10V6z" fill="#0ea5e9" stroke="#0c4a6e" stroke-width="1"/><path d="M12 8c1.5 2 3 3.2 3 5a3 3 0 0 1-6 0c0-1.8 1.5-3 3-5z" fill="#e0f2fe"/>',
+    '#082f49',
+  ),
+  huntersRhythm: svg(
+    '<path d="M3 13c3-1 4-1 6 0M2 16c3-1 4-1 6 0" stroke="#bbf7d0" stroke-width="1.3" stroke-linecap="round" fill="none"/><path d="M9 19L19 5" stroke="#e5e7eb" stroke-width="1.5"/><path d="M19 5l-4 .8 3.2 3.2z" fill="#4ade80"/>',
+    '#052e16',
+  ),
+  rhythmCount: svg(
+    '<circle cx="12" cy="12" r="7.5" fill="none" stroke="#4ade80" stroke-width="1.4"/><circle cx="12" cy="12" r="3.5" fill="none" stroke="#4ade80" stroke-width="1.2"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5" stroke="#bbf7d0" stroke-width="1.3"/>',
+    '#052e16',
+  ),
+  immunity: svg(
+    '<path d="M12 3l7 3v5c0 5-3.2 8.5-7 10-3.8-1.5-7-5-7-10V6z" fill="#fde68a" stroke="#713f12" stroke-width="1"/><path d="M12 7.5l1.2 2.6 2.8.3-2.1 1.9.6 2.8-2.5-1.5-2.5 1.5.6-2.8-2.1-1.9 2.8-.3z" fill="#fff"/>',
+    '#422006',
+  ),
+  charm: svg(
+    '<circle cx="12" cy="7.5" r="3.5" fill="none" stroke="#fcd34d" stroke-width="2"/><path d="M12 11v10M7.5 14h9" stroke="#fcd34d" stroke-width="2" stroke-linecap="round"/>',
+    '#422006',
+  ),
+  ironHide: svg(
+    '<path d="M12 3l7 3v5c0 5-3.2 8.5-7 10-3.8-1.5-7-5-7-10V6z" fill="#94a3b8" stroke="#1e293b" stroke-width="1"/><path d="M8.5 11.5h7M8.5 14.5h7" stroke="#475569" stroke-width="1.3"/><circle cx="16.5" cy="17" r="3" fill="#ef4444" stroke="#450a0a" stroke-width="0.8"/>',
+    '#0f172a',
+  ),
+};
+STATUS_ICONS.salve = ICONS.healingSalve;
+
+export const statusIcon = (id: StatusId) => STATUS_ICONS[id];

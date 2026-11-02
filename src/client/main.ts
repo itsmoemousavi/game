@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import './style.css';
 import { BotDifficulty, DT, HEROES, HERO_IDS, HeroId, LANE_IDS, LaneId, PlayerSlot, Team, World, XP_TABLE } from '../sim';
 import { Hud } from './hud';
@@ -27,6 +28,8 @@ let input: Input | null = null;
 let myHeroId = 0;
 const myTeam: Team = 0;
 let pickedHero: HeroId = 'brakk';
+// Local dev server only (never in the published game): lets test scripts look at the match.
+if (import.meta.env.DEV) Object.assign(window, { dbg: { world: () => world, me: () => world?.unit(myHeroId), pick: (h: HeroId) => (pickedHero = h) } });
 let pickedLane: LaneId = 'mid';
 let pickedDifficulty: BotDifficulty = 'normal';
 try {

@@ -5,8 +5,9 @@ import {
   TELEPORT,
   effectiveCooldown,
   MAX_LEVEL,
-  RUNE_INFO,
-  RuneKind,
+  STATUS_INFO,
+  Status,
+  statusEffects,
   TEAM_NAMES,
   Team,
   Unit,
@@ -19,7 +20,7 @@ import {
   maxAbilityLevel,
 } from '../sim';
 
-import { itemIcon } from './icons';
+import { itemIcon, statusIcon } from './icons';
 
 const fmtTime = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 
@@ -56,7 +57,7 @@ export class Hud {
       'btn-buyback',
       'buyback-cost',
       'btn-glyph',
-      'buffs',
+      'status-row',
       'toasts',
       'killfeed',
       'killed-by',
@@ -95,28 +96,90 @@ export class Hud {
     const bb = buybackBlocker(w, me);
     const cost = buybackCost(h.level, w.time / 60);
     const gcd = Math.ceil(w.glyphCooldown[team]);
-    const buffs = me.buffs
-      .filter((b) => b.key === 'charm' || b.key === 'rune' || b.key === 'salve' || b.key === 'immunity')
-      .map((b) => `${b.key}:${Math.ceil(b.t)}`)
-      .join();
-    const key = `${bb}|${cost}|${Math.ceil(h.buybackCooldown)}|${gcd}|${buffs}`;
+    const key = `${bb}|${cost}|${Math.ceil(h.buybackCooldown)}|${gcd}`;
     if (key === this.teamKey) return;
     this.teamKey = key;
     this.el['buyback-cost'].textContent = bb === 'cooldown' ? `${Math.ceil(h.buybackCooldown)}s` : String(cost);
     this.el['btn-buyback'].classList.toggle('off', bb !== null);
     this.el['btn-glyph'].querySelector('.cd')!.textContent = gcd > 0 ? `${Math.floor(gcd / 60)}:${String(gcd % 60).padStart(2, '0')}` : '';
-    const chips: string[] = [];
-    for (const b of me.buffs) {
-      const secs = Math.ceil(b.t);
-      if (b.key === 'charm') chips.push(`<span style="background:#ffd23f">Revive ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}</span>`);
-      if (b.key === 'salve') chips.push(`<span style="background:#4ade80">Salve ${secs}</span>`);
-      if (b.key === 'immunity') chips.push(`<span style="background:#facc15">Immune ${secs}</span>`);
-      if (b.key === 'rune') {
-        const kind: RuneKind = b.invisible ? 'invisibility' : b.damageMult ? 'doubleDamage' : b.moveSpeedPct ? 'haste' : 'regen';
-        chips.push(`<span style="background:${RUNE_INFO[kind].color}">${RUNE_INFO[kind].name} ${secs}</span>`);
-      }
+  }
+
+  private statusKey = '';
+  private statusList: Status[] = [];
+  /** Full duration of each showing effect (for the time-left sweep). */
+  private statusTotal = new Map<string, { total: number; left: number }>();
+  private statusTip: { el: HTMLElement; until: number; id: string } | null = null;
+
+  /**
+   * Status icons above the hero bar: green border = helpful, red = harmful. A dark sweep
+   * shows how much time is left; counters (Vexa's attacks) show their number, and the
+   * icon glows when the next attack will be a critical hit. Tap an icon to see what it is.
+   */
+  private updateStatus(w: World, me: Unit) {
+    const list = statusEffects(w, me);
+    const row = this.el['status-row'];
+    const key = list.map((s) => `${s.id}:${s.count ?? ''}`).join();
+    if (key !== this.statusKey) {
+      this.statusKey = key;
+      row.innerHTML = list
+        .map(
+          (s, i) =>
+            `<button class="st ${s.good ? 'good' : 'bad'}${s.id === 'rhythmCount' && s.count === 3 ? ' ready' : ''}" data-i="${i}"><span class="ic">${statusIcon(s.id)}</span><span class="tm"></span>${s.count ? `<b>${s.count}</b>` : ''}</button>`,
+        )
+        .join('');
+      row.querySelectorAll<HTMLElement>('.st').forEach((el) =>
+        el.addEventListener('pointerdown', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const s = this.statusList[Number(el.dataset.i)];
+          if (s) this.showStatusTip(s, el);
+        }),
+      );
     }
-    this.el.buffs.innerHTML = chips.join('');
+    this.statusList = list;
+    // Time-left sweep (remember each effect's full length: the longest time left we saw).
+    const seen = new Set<string>();
+    row.querySelectorAll<HTMLElement>('.st').forEach((el, i) => {
+      const s = list[i];
+      if (!s) return;
+      seen.add(s.id);
+      const tm = el.querySelector<HTMLElement>('.tm')!;
+      if (s.left === undefined) {
+        tm.style.background = '';
+        return;
+      }
+      const prev = this.statusTotal.get(s.id);
+      const rec = !prev || s.left > prev.left + 0.05 ? { total: Math.max(s.left, 0.01), left: s.left } : { total: prev.total, left: s.left };
+      this.statusTotal.set(s.id, rec);
+      const gone = Math.round((1 - s.left / rec.total) * 100);
+      tm.style.background = gone > 0 ? `conic-gradient(rgba(0,0,0,0.62) 0 ${gone}%, transparent ${gone}% 100%)` : '';
+    });
+    for (const k of [...this.statusTotal.keys()]) if (!seen.has(k)) this.statusTotal.delete(k);
+    if (this.statusTip) {
+      const s = list.find((x) => x.id === this.statusTip!.id);
+      if (!s || performance.now() > this.statusTip.until) {
+        this.statusTip.el.remove();
+        this.statusTip = null;
+      } else this.statusTip.el.textContent = this.statusText(s);
+    }
+  }
+
+  private statusText(s: Status) {
+    const t = s.left !== undefined && s.left > 0 ? Math.ceil(s.left) : null;
+    const time = t === null ? '' : t >= 60 ? ` · ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}` : ` · ${t}s`;
+    const count = s.id === 'rhythmCount' ? ` (${s.count}/4${s.count === 3 ? ': next hit crits!' : ''})` : '';
+    return STATUS_INFO[s.id].name + count + time;
+  }
+
+  private showStatusTip(s: Status, at: HTMLElement) {
+    this.statusTip?.el.remove();
+    const el = document.createElement('div');
+    el.id = 'status-tip';
+    el.className = s.good ? 'good' : 'bad';
+    el.textContent = this.statusText(s);
+    el.style.left = `${at.offsetLeft}px`;
+    this.el['status-row'].parentElement!.appendChild(el);
+    this.statusTip = { el, until: performance.now() + 2500, id: s.id };
   }
 
   /** Cooldowns, mana, levels and learn buttons. Cheap: only touches the DOM on change. */
@@ -378,6 +441,7 @@ export class Hud {
     const h = me.hero!;
     this.updateAbilities(me);
     this.updateTeamButtons(w, me, myTeam);
+    this.updateStatus(w, me);
     const key = [
       w.teamKills[0],
       w.teamKills[1],

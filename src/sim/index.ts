@@ -20,3 +20,5 @@ export { buybackBlocker } from './objectives';
 export { isInvisible } from './vision';
 export type { BotDifficulty } from './ai/bots';
 export { Rng } from './rng';
+export { STATUS_INFO, statusEffects } from './status';
+export type { Status, StatusId } from './status';

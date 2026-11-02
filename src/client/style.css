@@ -83,7 +83,11 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #topbar .t0 { color: #6fb0ff; } #topbar .t1 { color: #ff7b7f; }
 #clock { font-variant-numeric: tabular-nums; min-width: 44px; text-align: center; }
 
-#herobar { position: absolute; left: 50%; bottom: max(4px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; gap: 8px; align-items: center; background: rgba(0,0,0,0.6); border-radius: 10px; padding: 6px 10px; width: min(420px, 46vw); pointer-events: none; }
+/* Bottom group, just left of the ability buttons: status icons above the hero bar, items to its right. */
+#bottom-hud { position: absolute; right: calc(max(12px, env(safe-area-inset-right)) + 222px); bottom: max(4px, env(safe-area-inset-bottom)); display: flex; align-items: flex-end; gap: 8px; pointer-events: none; }
+#app.lefty #bottom-hud { right: auto; left: calc(max(12px, env(safe-area-inset-left)) + 222px); }
+#hero-col { position: relative; display: flex; flex-direction: column; gap: 4px; }
+#herobar { position: relative; display: flex; gap: 8px; align-items: center; background: rgba(0,0,0,0.6); border-radius: 10px; padding: 6px 10px; width: clamp(190px, 31vw, 360px); box-sizing: border-box; pointer-events: none; }
 #portrait { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #111; }
 #herobar .bars { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .bar { position: relative; height: 13px; background: #222; border-radius: 3px; overflow: hidden; }
@@ -138,7 +142,7 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 .ability .mana { font-size: 8px; color: #8cc4ff; line-height: 1; }
 
 /* ---------- item bar ---------- */
-#itembar { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(max(4px, env(safe-area-inset-bottom)) + 58px); display: grid; grid-template-columns: repeat(3, 34px) auto auto; grid-template-rows: 34px 34px; grid-auto-flow: row; gap: 4px; align-items: center; }
+#itembar { position: relative; pointer-events: auto; display: grid; grid-template-columns: repeat(3, 34px) auto auto; grid-template-rows: 34px 34px; grid-auto-flow: row; gap: 4px; align-items: center; }
 #itembar .tp, #btn-shop { grid-row: 1 / span 2; }
 #itembar .tp { grid-column: 4; }
 #btn-shop { grid-column: 5; }
@@ -224,8 +228,6 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #btn-glyph .cd { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 50%; background: rgba(0,0,0,0.65); font-size: 11px; font-weight: 800; }
 #btn-glyph .cd:empty { display: none; }
 
-#buffs { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(max(4px, env(safe-area-inset-bottom)) + 98px); display: flex; gap: 4px; pointer-events: none; }
-#buffs span { padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 700; color: #111; }
 #toasts { position: absolute; left: 50%; top: 86px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; }
 #toasts div { padding: 4px 12px; border-radius: 8px; background: rgba(0,0,0,0.7); font-size: 13px; font-weight: 600; white-space: nowrap; animation: toast 3.2s forwards; }
 @keyframes toast { 0% { opacity: 0; transform: translateY(-6px); } 8% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; } }
@@ -357,3 +359,18 @@ svg.icon { display: block; width: 100%; height: 100%; }
 #practice { position: absolute; right: max(10px, env(safe-area-inset-right)); top: 48px; display: flex; flex-direction: column; gap: 4px; align-items: stretch; background: rgba(0,0,0,0.55); padding: 6px; border-radius: 10px; font-size: 11px; z-index: 5; }
 #practice b { text-align: center; opacity: 0.7; }
 #practice button { padding: 5px 8px; border-radius: 7px; border: 1px solid #3a5242; background: #142019; font-weight: 700; font-size: 12px; }
+
+/* ---------- status icons (above the hero bar) ---------- */
+#status-row { display: flex; gap: 4px; min-height: 26px; align-items: flex-end; padding-left: 2px; pointer-events: auto; }
+#status-row .st { position: relative; width: 26px; height: 26px; border-radius: 50%; padding: 0; border: 2px solid #4ade80; background: #111; overflow: visible; touch-action: none; }
+#status-row .st.bad { border-color: #f87171; }
+#status-row .st .ic { position: absolute; inset: 1px; border-radius: 50%; overflow: hidden; }
+#status-row .st .ic svg { width: 100%; height: 100%; transform: scale(1.25); }
+/* time left: a dark sweep that grows as the effect runs out */
+#status-row .st .tm { position: absolute; inset: 1px; border-radius: 50%; pointer-events: none; }
+#status-row .st b { position: absolute; right: -4px; bottom: -4px; min-width: 14px; height: 14px; padding: 0 2px; box-sizing: border-box; border-radius: 7px; background: #111; border: 1px solid #4ade80; color: #fff; font-size: 10px; line-height: 12px; text-align: center; font-weight: 900; }
+/* Vexa: the next attack is a critical hit */
+#status-row .st.ready { box-shadow: 0 0 0 2px rgba(250,204,21,0.6), 0 0 12px rgba(250,204,21,0.9); border-color: #facc15; animation: pulse 0.5s infinite alternate; }
+#status-row .st.ready b { border-color: #facc15; color: #facc15; }
+#status-tip { position: absolute; left: 0; bottom: calc(100% + 6px); white-space: nowrap; padding: 4px 8px; border-radius: 6px; background: rgba(10,16,12,0.95); border: 1px solid rgba(255,255,255,0.25); font-size: 11px; pointer-events: none; }
+#status-tip.bad { border-color: #f87171; } #status-tip.good { border-color: #4ade80; }

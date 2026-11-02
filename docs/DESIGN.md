@@ -124,6 +124,10 @@ Ability levels: basic abilities max level 4 (and at most ⌈hero level / 2⌉), 
 
 ## 6. Items (implemented, milestone 4)
 
+**Bottom bar layout:** the hero bar (portrait, health, mana, level, gold) sits just left of the ability buttons; the 2×3 items, TP and shop are to its right; **status icons** are in a row above the health/mana bars.
+
+**Status icons:** every effect on your hero is a small round icon. **Green border = helpful** (yours or from allies: salve, runes, Mending Flame, Bark Skin, Brine Veil, Veil, immunity, revive charm, Iron Hide while hurt…). **Red border = harmful** (stunned, slowed, standing in Arrow Storm / Maelstrom / burning ground). A dark sweep fills the icon as its time runs out. Tap an icon to see what it is and how long is left. **Counters:** Vexa's Hunter's Rhythm shows how many attacks she has made toward the next critical hit (1, 2, 3; hidden at 0). At **3 the icon glows gold: the next attack is a crit.**
+
 **Inventory and shop:**
 - **6 inventory slots in 2 rows of 3, plus a separate Teleport slot.** The TP slot shows how many scrolls you carry, 0 if none. You can buy as many as you like.
 - **The 🛒 shop** opens anywhere, but buying and selling only work near your fountain. Selling refunds 50%.

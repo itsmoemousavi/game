@@ -42,29 +42,33 @@
         <span class="team t1" id="score-1">0</span>
       </div>
 
-      <div id="herobar">
-        <div id="portrait" title="Hero stats">B<i>i</i></div>
-        <div class="bars">
-          <div class="bar hp"><div id="hp-fill"></div><span id="hp-text"></span></div>
-          <div class="bar mana"><div id="mana-fill"></div><span id="mana-text"></span></div>
-          <div class="bar xp"><div id="xp-fill"></div></div>
+      <div id="bottom-hud">
+        <div id="hero-col">
+          <div id="status-row"></div>
+          <div id="herobar">
+            <div id="portrait" title="Hero stats">B<i>i</i></div>
+            <div class="bars">
+              <div class="bar hp"><div id="hp-fill"></div><span id="hp-text"></span></div>
+              <div class="bar mana"><div id="mana-fill"></div><span id="mana-text"></span></div>
+              <div class="bar xp"><div id="xp-fill"></div></div>
+            </div>
+            <div class="stats">
+              <div>Lv <b id="level">1</b></div>
+              <div class="gold"><b id="gold">0</b></div>
+              <div id="kda">0 / 0</div>
+            </div>
+          </div>
         </div>
-        <div class="stats">
-          <div>Lv <b id="level">1</b></div>
-          <div class="gold"><b id="gold">0</b></div>
-          <div id="kda">0 / 0</div>
+        <div id="itembar">
+          <button class="item empty" data-item="0"><span class="lbl"></span><span class="cnt"></span><span class="cd"></span></button>
+          <button class="item empty" data-item="1"><span class="lbl"></span><span class="cnt"></span><span class="cd"></span></button>
+          <button class="item empty" data-item="2"><span class="lbl"></span><span class="cnt"></span><span class="cd"></span></button>
+          <button class="item empty" data-item="3"><span class="lbl"></span><span class="cnt"></span><span class="cd"></span></button>
+          <button class="item empty" data-item="4"><span class="lbl"></span><span class="cnt"></span><span class="cd"></span></button>
+          <button class="item empty" data-item="5"><span class="lbl"></span><span class="cnt"></span><span class="cd"></span></button>
+          <button class="item tp none" id="tp-slot"><span class="lbl">TP</span><span class="cnt">0</span><span class="cd"></span></button>
+          <button id="btn-shop" title="Shop">🛒</button>
         </div>
-      </div>
-
-      <div id="itembar">
-        <button class="item empty" data-item="0"><span class="lbl"></span><span class="cnt"></span><span class="cd"></span></button>
-        <button class="item empty" data-item="1"><span class="lbl"></span><span class="cnt"></span><span class="cd"></span></button>
-        <button class="item empty" data-item="2"><span class="lbl"></span><span class="cnt"></span><span class="cd"></span></button>
-        <button class="item empty" data-item="3"><span class="lbl"></span><span class="cnt"></span><span class="cd"></span></button>
-        <button class="item empty" data-item="4"><span class="lbl"></span><span class="cnt"></span><span class="cd"></span></button>
-        <button class="item empty" data-item="5"><span class="lbl"></span><span class="cnt"></span><span class="cd"></span></button>
-        <button class="item tp none" id="tp-slot"><span class="lbl">TP</span><span class="cnt">0</span><span class="cd"></span></button>
-        <button id="btn-shop" title="Shop">🛒</button>
       </div>
 
       <div id="shop" class="hidden">
@@ -144,7 +148,6 @@
         <div class="panel-head"><b id="stats-title">Stats</b><button class="close" data-close="stats">✕</button></div>
         <div id="stats-body"></div>
       </div>
-      <div id="buffs"></div>
       <div id="toasts"></div>
       <div id="killfeed"></div>
       <div id="announce"></div>
