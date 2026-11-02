@@ -51,6 +51,8 @@ interface TeamPlan {
   until: number;
   /** When the current push started. */
   since?: number;
+  /** Heroes taking part in the push. */
+  members?: number[];
 }
 
 /** What a team's bots should be doing together. */
@@ -92,7 +94,16 @@ function teamPlan(w: World, team: Team): TeamPlan {
     if (cur?.mode === 'push' && cur.lane && lanes.has(cur.lane) && w.time < (cur.since ?? 0) + 25) {
       return (cache[team] = { ...cur, until });
     }
-    if (best) return (cache[team] = { mode: 'push', lane: best.lane, until, since: w.time });
+    if (best) {
+      // Who joins: everyone except bots whose own lane has enemy creeps on our half right
+      // now (on the big map an empty lane gets pushed to the base before the group returns).
+      // Decided once per push so nobody walks back and forth.
+      const lane = best.lane;
+      const members = w.units
+        .filter((h) => h.hero && h.team === team && (h.hero.lane === lane || !laneUnderPressure(w, team, h.hero.lane)))
+        .map((h) => h.id);
+      return (cache[team] = { mode: 'push', lane, until, since: w.time, members });
+    }
   }
   return (cache[team] = { mode: 'farm', until });
 }
@@ -116,9 +127,8 @@ export function botThink(w: World, me: Unit) {
 
   const diff = h.bot.difficulty;
   let plan: TeamPlan = diff === 'easy' ? { mode: 'farm' as const, until: 0 } : teamPlan(w, me.team as Team);
-  // Don't leave our own lane to join a push while enemy creeps are already on our half of it:
-  // on the big map, an empty lane gets pushed down to the base before the group gets back.
-  if (plan.mode === 'push' && plan.lane !== h.lane && laneUnderPressure(w, me.team as Team, h.lane)) plan = { mode: 'farm', until: 0 };
+  // Bots left out of a push (their own lane was being pushed when it started) keep farming it.
+  if (plan.mode === 'push' && plan.members && !plan.members.includes(me.id)) plan = { mode: 'farm', until: 0 };
   // Defending / pushing bots work in the plan's lane instead of their own.
   const lane = plan.mode === 'farm' ? h.lane : plan.lane ?? h.lane;
   const path = teamLanePath(w.map, me.team as Team, lane);

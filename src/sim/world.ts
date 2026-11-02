@@ -1010,8 +1010,39 @@ export class World {
     u.mana = Math.min(u.maxMana, u.mana + manaRegen * DT);
   }
 
+  /**
+   * Safety net: if a hero ends up inside trees or a building (pushed by a crowd, a dash or
+   * a blink), move it to the nearest open ground so it can never be trapped.
+   */
+  private unstick(u: Unit) {
+    const m = this.nav;
+    if (u.hero?.order.type === 'idle' || fits(m, u.x, u.y, u.radius)) return;
+    const cx = Math.floor(u.x / m.cell);
+    const cy = Math.floor(u.y / m.cell);
+    for (let r = 1; r <= 6; r++) {
+      let best: { x: number; y: number; d: number } | null = null;
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const x = (cx + dx + 0.5) * m.cell;
+          const y = (cy + dy + 0.5) * m.cell;
+          if (!fits(m, x, y, u.radius)) continue;
+          const d = dist(x, y, u.x, u.y);
+          if (!best || d < best.d) best = { x, y, d };
+        }
+      }
+      if (best) {
+        u.x = best.x;
+        u.y = best.y;
+        u.path = null;
+        return;
+      }
+    }
+  }
+
   private updateHero(u: Unit) {
     const h = u.hero!;
+    this.unstick(u);
     const o = h.order;
     // Holding Attack while steering: hit whatever is in range, otherwise keep walking.
     if (h.attackHeld && (o.type === 'dir' || o.type === 'idle' || o.type === 'move')) {
