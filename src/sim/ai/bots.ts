@@ -1,5 +1,5 @@
 import type { Team } from '../constants';
-import { teamLanePath } from '../map';
+import { LaneId, teamLanePath } from '../map';
 import { dist, pointAlong, polylineLength, projectOnPolyline } from '../math';
 import type { Unit, World } from '../world';
 import { abilityDef, botLearn, castBlocker } from '../abilities';
@@ -115,7 +115,10 @@ export function botThink(w: World, me: Unit) {
   }
 
   const diff = h.bot.difficulty;
-  const plan = diff === 'easy' ? { mode: 'farm' as const, until: 0 } : teamPlan(w, me.team as Team);
+  let plan: TeamPlan = diff === 'easy' ? { mode: 'farm' as const, until: 0 } : teamPlan(w, me.team as Team);
+  // Don't leave our own lane to join a push while enemy creeps are already on our half of it:
+  // on the big map, an empty lane gets pushed down to the base before the group gets back.
+  if (plan.mode === 'push' && plan.lane !== h.lane && laneUnderPressure(w, me.team as Team, h.lane)) plan = { mode: 'farm', until: 0 };
   // Defending / pushing bots work in the plan's lane instead of their own.
   const lane = plan.mode === 'farm' ? h.lane : plan.lane ?? h.lane;
   const path = teamLanePath(w.map, me.team as Team, lane);
@@ -174,6 +177,18 @@ export function botThink(w: World, me: Unit) {
   } else if (me.hero!.order.type === 'move') {
     w.applyCommand({ type: 'stop', unitId: me.id });
   }
+}
+
+/** Enemy creeps have pushed past the middle of this lane (onto our half). */
+function laneUnderPressure(w: World, team: Team, lane: LaneId): boolean {
+  const path = teamLanePath(w.map, team, lane);
+  const half = polylineLength(path) / 2;
+  let n = 0;
+  for (const c of w.units) {
+    if (!c.creep || !c.alive || c.team === team || c.creep.lane !== lane) continue;
+    if (projectOnPolyline(path, c) < half) n++;
+  }
+  return n >= 2;
 }
 
 /** Enemy tower that would shoot at a unit standing at (x, y), if any. */
