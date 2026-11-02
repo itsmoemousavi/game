@@ -1,5 +1,6 @@
 import {
   AbilityDef,
+  HeroId,
   HEROES,
   ITEMS,
   TELEPORT,
@@ -20,9 +21,12 @@ import {
   maxAbilityLevel,
 } from '../sim';
 
-import { itemIcon, statusIcon } from './icons';
+import { abilityIcon, itemIcon, statusIcon } from './icons';
 
 const fmtTime = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+
+/** Hero headshots (image URLs), filled in by main.ts once the 3D portraits are rendered. */
+export const heroPortraits: Partial<Record<HeroId, string>> = {};
 
 /** DOM overlay: scores, timer, hero status, ability buttons, respawn + game-over screens. */
 export class Hud {
@@ -73,11 +77,13 @@ export class Hud {
 
   setHero(me: Unit) {
     const def = HEROES[me.hero!.defId];
-    this.el.portrait.textContent = def.name[0];
+    const face = this.el.portrait.querySelector<HTMLElement>('.face')!;
+    const pic = heroPortraits[me.hero!.defId];
+    face.innerHTML = pic ? `<img alt="" src="${pic}">` : def.name[0];
     this.el.portrait.style.background = def.color;
     def.abilities.forEach((a, i) => {
       const b = this.buttons[i];
-      b.querySelector('.name')!.textContent = a.name;
+      b.querySelector('.pic')!.innerHTML = abilityIcon(a.id);
       b.title = `${a.name}${a.ultimate ? ' (Ultimate)' : ''}: ${a.summary}`;
       b.classList.toggle('passive', a.targeting === 'passive');
       const pips = b.querySelector('.pips')!;

@@ -84,33 +84,39 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #clock { font-variant-numeric: tabular-nums; min-width: 44px; text-align: center; }
 
 /* Bottom group, just left of the ability buttons: status icons above the hero bar, items to its right. */
-#bottom-hud { position: absolute; right: calc(max(12px, env(safe-area-inset-right)) + 222px); bottom: max(4px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: flex-start; gap: 4px; pointer-events: none; }
+#bottom-hud { position: absolute; right: calc(max(12px, env(safe-area-inset-right)) + 222px); bottom: max(0px, calc(env(safe-area-inset-bottom) - 6px)); display: flex; flex-direction: column; align-items: flex-start; gap: 4px; pointer-events: none; }
 /* One glassy black panel holding the hero bar, items, TP and shop. */
 #hud-panel { display: flex; align-items: center; gap: 8px; padding: 5px 8px 5px 6px; border-radius: 12px; background: rgba(8,10,12,0.55); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 4px 18px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08); -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); pointer-events: none; }
 #app.lefty #bottom-hud { right: auto; left: calc(max(12px, env(safe-area-inset-left)) + 222px); }
-#herobar { position: relative; display: flex; gap: 8px; align-items: center; padding: 0 2px; width: clamp(180px, 29vw, 340px); box-sizing: border-box; pointer-events: none; }
-#portrait { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #111; }
+#herobar { position: relative; display: flex; gap: 8px; align-items: center; padding: 0 2px 4px; width: clamp(170px, 27vw, 330px); box-sizing: border-box; pointer-events: none; }
+#portrait { flex: none; width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #111; border: 2px solid rgba(255,255,255,0.55); box-sizing: border-box; }
+#portrait .face { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; display: grid; place-items: center; font-size: 18px; }
+#portrait .face img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.15); }
+#portrait #level { position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); min-width: 18px; height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 8px; background: #111; border: 1px solid #ffd23f; color: #ffd23f; font-size: 11px; font-weight: 900; line-height: 14px; text-align: center; }
 #herobar .bars { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .bar { position: relative; height: 13px; background: #222; border-radius: 3px; overflow: hidden; }
 .bar > div { height: 100%; }
 .bar span { position: absolute; inset: 0; font-size: 10px; line-height: 13px; text-align: center; text-shadow: 0 1px 1px #000; }
 .bar.hp > div { background: #3fbf5f; } .bar.mana > div { background: #3d7bfd; }
 .bar.xp { height: 4px; } .bar.xp > div { background: #c58bff; }
-#herobar .stats { font-size: 11px; line-height: 1.35; white-space: nowrap; }
-#herobar .gold b { color: #ffd23f; }
+#pstats { grid-column: 4 / span 2; grid-row: 2; align-self: center; display: flex; flex-direction: column; align-items: center; line-height: 1.2; font-size: 10px; white-space: nowrap; pointer-events: none; }
+#pstats b { color: #ffd23f; font-size: 12px; }
 
 #actions { position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); width: 210px; height: 190px; }
 #actions button { position: absolute; border-radius: 50%; border: 2px solid rgba(255,255,255,0.35); background: rgba(20,30,24,0.75); display: grid; place-items: center; touch-action: none; }
 #btn-attack { right: 0; bottom: 0; width: 88px; height: 88px; background: rgba(170,50,50,0.8) !important; font-weight: 800; font-size: 14px; }
 .ability { width: 58px; height: 58px; align-content: center; gap: 1px; overflow: hidden; }
-.ability b { font-size: 15px; line-height: 1; }
-.ability .name { font-size: 8px; line-height: 1.05; max-width: 52px; text-align: center; opacity: 0.85; }
-.ability .pips { display: flex; gap: 2px; justify-content: center; margin-top: 1px; }
+.ability { padding: 0; }
+.ability .pic { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; }
+.ability .pic svg { width: 100%; height: 100%; transform: scale(1.12); display: block; }
+.ability .pips { position: absolute; left: 0; right: 0; bottom: 5px; display: flex; gap: 2px; justify-content: center; z-index: 1; }
+.ability .pips i { box-shadow: 0 0 0 1px rgba(0,0,0,0.7); }
 .ability .pips i { width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,0.25); }
 .ability .pips i.on { background: #ffd23f; }
 .ability .cd { position: absolute; inset: 0; display: grid; place-items: center; font-size: 20px; font-weight: 800; pointer-events: none; }
 .ability.cooling { background: rgba(0,0,0,0.75) !important; }
-.ability.cooling b, .ability.cooling .name { opacity: 0.25; }
+.ability.cooling .pic { opacity: 0.3; }
+.ability.nomana .pic { filter: saturate(0.3) brightness(0.6); }
 .ability.nomana { background: rgba(30,50,120,0.8) !important; }
 .ability.unlearned { opacity: 0.35; }
 .ability.passive { border-style: dashed !important; }
@@ -140,11 +146,13 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #daynight.night { color: #9db7ff; }
 
 /* ability mana cost */
-.ability .mana { font-size: 8px; color: #8cc4ff; line-height: 1; }
+.ability .mana { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); z-index: 1; min-width: 18px; padding: 1px 3px; box-sizing: border-box; border-radius: 7px; background: rgba(10,25,60,0.9); border: 1px solid #3d7bfd; font-size: 9px; font-weight: 800; color: #bfdbfe; line-height: 1.1; }
+.ability .mana:empty { display: none; }
+.ability .cd { z-index: 2; text-shadow: 0 1px 3px #000; }
 
 /* ---------- item bar ---------- */
-#itembar { position: relative; pointer-events: auto; display: grid; grid-template-columns: repeat(3, 34px) auto auto; grid-template-rows: 34px 34px; grid-auto-flow: row; gap: 4px; align-items: center; }
-#itembar .tp, #btn-shop { grid-row: 1 / span 2; }
+#itembar { position: relative; pointer-events: auto; display: grid; grid-template-columns: repeat(3, 34px) auto auto; grid-template-rows: 34px 34px; column-gap: 4px; grid-auto-flow: row; gap: 4px; align-items: center; }
+#itembar .tp, #btn-shop { grid-row: 1; align-self: center; }
 #itembar .tp { grid-column: 4; }
 #btn-shop { grid-column: 5; }
 /* long-press an item: Drop button above it */
@@ -162,7 +170,8 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #itembar .tp.channel { border-color: #fff; animation: pulse 0.4s infinite alternate; }
 #itembar .tp .cd { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,0.6); border-radius: 5px; font-size: 13px; font-weight: 800; }
 #itembar .tp .cd:empty { display: none; }
-#btn-shop { margin-left: 6px; font-size: 17px; background: #6b4e16 !important; border-color: #ffd23f !important; }
+#btn-shop { margin-left: 4px; font-size: 17px; background: #6b4e16 !important; border-color: #ffd23f !important; width: 40px !important; height: 40px !important; border-radius: 50% !important; overflow: hidden; }
+#btn-shop svg { border-radius: 50%; }
 
 /* ---------- shop ---------- */
 #shop { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(760px, 94%); height: min(420px, 88%); display: flex; flex-direction: column; gap: 6px;
@@ -246,7 +255,7 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 /* ---------- settings / stats ---------- */
 #btn-settings { position: absolute; right: max(10px, env(safe-area-inset-right)); top: max(6px, env(safe-area-inset-top)); width: 34px; height: 34px; border-radius: 50%; border: 0; background: rgba(0,0,0,0.5); font-size: 18px; color: #e8eee9; }
 #portrait { position: relative; pointer-events: auto; cursor: pointer; }
-#portrait i { position: absolute; right: -3px; bottom: -3px; width: 16px; height: 16px; border-radius: 50%; background: #2b5f9e; color: #fff; font-size: 11px; font-style: italic; font-weight: 800; font-family: Georgia, serif; display: grid; place-items: center; border: 1px solid #fff; }
+#portrait i { position: absolute; right: -4px; top: -4px; width: 15px; height: 15px; z-index: 1; border-radius: 50%; background: #2b5f9e; color: #fff; font-size: 11px; font-style: italic; font-weight: 800; font-family: Georgia, serif; display: grid; place-items: center; border: 1px solid #fff; }
 .panel { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(14,22,17,0.96); border: 2px solid #3a5242; border-radius: 12px; padding: 10px 14px; z-index: 7; max-height: 88%; overflow-y: auto; }
 #settings { width: min(380px, 80%); }
 #stats { width: min(520px, 84%); }

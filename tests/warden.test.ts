@@ -34,7 +34,7 @@ describe("the Warden's house", () => {
     }
     expect(gaps).toBe(1);
     expect(inHouse(w.map, h.x + 4, h.y)).toBe(true);
-    expect(inHouse(w.map, doorway(w, 14).x, doorway(w, 14).y)).toBe(false);
+    expect(inHouse(w.map, doorway(w, 12).x, doorway(w, 14).y)).toBe(false);
   });
 
   it('is dark from outside, even from the doorway; you see the Warden only from inside', () => {
@@ -44,7 +44,7 @@ describe("the Warden's house", () => {
     place(v, out.x, out.y);
     run(w, 0.3);
     expect(w.canSee(0, boss())).toBe(false);
-    const inside = doorway(w, 6);
+    const inside = doorway(w, 4.5);
     place(v, inside.x, inside.y);
     run(w, 0.3);
     expect(w.canSee(0, boss())).toBe(true);
@@ -60,7 +60,7 @@ describe("the Warden's house", () => {
     w.dealDamage(v.id, boss(), 500, 'spell');
     expect(boss().hp).toBe(hp);
     // Ordered to attack from inside vision range: it walks in through the door first.
-    const inside = doorway(w, 7);
+    const inside = doorway(w, 4.5);
     place(v, inside.x, inside.y);
     run(w, 0.3);
     w.applyCommand({ type: 'attack', unitId: v.id, targetId: boss().id });
@@ -93,7 +93,7 @@ describe("the Warden's house", () => {
     const v = hero(0, 'vexa');
     v.maxHp = v.hp = 1e6;
     const home = { x: boss().x, y: boss().y };
-    const inside = doorway(w, 6);
+    const inside = doorway(w, 4.5);
     place(v, inside.x, inside.y);
     run(w, 0.3);
     w.dealDamage(v.id, boss(), 100, 'attack');

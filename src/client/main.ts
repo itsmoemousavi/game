@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import './style.css';
 import { BotDifficulty, DT, HEROES, HERO_IDS, HeroId, LANE_IDS, LaneId, PlayerSlot, Team, World, XP_TABLE } from '../sim';
-import { Hud } from './hud';
+import { Hud, heroPortraits } from './hud';
 import { Input } from './input';
 import { ItemsUi } from './items-ui';
 import { Sfx } from './audio';
@@ -74,6 +74,7 @@ for (const id of HERO_IDS) {
 }
 if (showcase) {
   const pics = showcase.portraits();
+  Object.assign(heroPortraits, pics);
   cards.querySelectorAll<HTMLElement>('.hero-card').forEach((c) => {
     c.querySelector('.portrait')!.innerHTML = `<img alt="" src="${pics[c.dataset.hero as HeroId]}">`;
   });

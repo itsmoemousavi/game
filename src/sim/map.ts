@@ -166,10 +166,10 @@ const BOSS_PIT: Vec2 = sc({ x: 150, y: 150 });
  */
 const HOUSE: House = (() => {
   const d = Math.SQRT1_2;
-  return { x: BOSS_PIT.x, y: BOSS_PIT.y, inner: 9, outer: 12, door: { x: -d, y: -d }, doorHalf: 3.6 };
+  return { x: BOSS_PIT.x, y: BOSS_PIT.y, inner: 7, outer: 10, door: { x: -d, y: -d }, doorHalf: 3.2 };
 })();
 /** Open ground around the house, so you can walk all the way round it. */
-const HOUSE_CLEARING = 16;
+const HOUSE_CLEARING = 13.5;
 
 const RIVER: [Vec2, Vec2] = [sc({ x: 20, y: 20 }), sc({ x: 180, y: 180 })];
 
@@ -208,7 +208,7 @@ export function createMap(): GameMap {
     const p = LANES[id];
     for (let i = 1; i < p.length; i++) carveSeg(p[i - 1], p[i], LANE_WIDTH);
   }
-  carveSeg(RIVER[0], RIVER[1], 12);
+  carveSeg(RIVER[0], RIVER[1], 17);
   carveCircle(BOSS_PIT, 7 * S);
   carveCircle(RUNE_SPOT, 4.5 * S);
   carveCircle(BASE0, BASE_RADIUS);

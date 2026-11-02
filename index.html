@@ -46,16 +46,11 @@
         <div id="status-row"></div>
         <div id="hud-panel">
           <div id="herobar">
-            <div id="portrait" title="Hero stats">B<i>i</i></div>
+            <div id="portrait" title="Hero stats"><span class="face"></span><span id="level">1</span><i>i</i></div>
             <div class="bars">
               <div class="bar hp"><div id="hp-fill"></div><span id="hp-text"></span></div>
               <div class="bar mana"><div id="mana-fill"></div><span id="mana-text"></span></div>
               <div class="bar xp"><div id="xp-fill"></div></div>
-            </div>
-            <div class="stats">
-              <div>Lv <b id="level">1</b></div>
-              <div class="gold"><b id="gold">0</b></div>
-              <div id="kda">0 / 0</div>
             </div>
           </div>
         <div id="itembar">
@@ -67,6 +62,7 @@
           <button class="item empty" data-item="5"><span class="lbl"></span><span class="cnt"></span><span class="cd"></span></button>
           <button class="item tp none" id="tp-slot"><span class="lbl">TP</span><span class="cnt">0</span><span class="cd"></span></button>
           <button id="btn-shop" title="Shop">🛒</button>
+          <div id="pstats"><b id="gold">0</b><span id="kda">0 / 0</span></div>
         </div>
         </div>
       </div>
@@ -97,9 +93,9 @@
       <div id="joy-base"><div id="joy-knob"></div></div>
 
       <div id="actions">
-        <button id="btn-q" class="ability" data-slot="0"><b>Q</b><span class="name"></span><span class="pips"></span><span class="mana"></span><span class="cd"></span></button>
-        <button id="btn-w" class="ability" data-slot="1"><b>W</b><span class="name"></span><span class="pips"></span><span class="mana"></span><span class="cd"></span></button>
-        <button id="btn-r" class="ability ult" data-slot="2"><b>R</b><span class="name"></span><span class="pips"></span><span class="mana"></span><span class="cd"></span></button>
+        <button id="btn-q" class="ability" data-slot="0"><span class="pic"></span><span class="pips"></span><span class="mana"></span><span class="cd"></span></button>
+        <button id="btn-w" class="ability" data-slot="1"><span class="pic"></span><span class="pips"></span><span class="mana"></span><span class="cd"></span></button>
+        <button id="btn-r" class="ability ult" data-slot="2"><span class="pic"></span><span class="pips"></span><span class="mana"></span><span class="cd"></span></button>
         <button class="learn" id="learn-q" data-learn="0">+</button>
         <button class="learn" id="learn-w" data-learn="1">+</button>
         <button class="learn" id="learn-r" data-learn="2">+</button>

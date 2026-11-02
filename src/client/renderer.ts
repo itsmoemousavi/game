@@ -1094,7 +1094,7 @@ function bakeMap(map: GameMap): HTMLCanvasElement {
   // River.
   g.strokeStyle = '#2b5f7c';
   g.lineCap = 'round';
-  g.lineWidth = 9 * px;
+  g.lineWidth = 13 * px;
   g.beginPath();
   g.moveTo(map.river[0].x * px, map.river[0].y * px);
   g.lineTo(map.river[1].x * px, map.river[1].y * px);

@@ -184,3 +184,64 @@ const STATUS_ICONS: Record<StatusId, string> = {
 STATUS_ICONS.salve = ICONS.healingSalve;
 
 export const statusIcon = (id: StatusId) => STATUS_ICONS[id];
+
+/** Ability pictures (same hand-made style; buff abilities reuse their status icon). */
+const ABILITY_ICONS: Record<string, string> = {
+  // Brakk
+  shieldCharge: svg(
+    '<path d="M2 9h5M1 12h6M2 15h5" stroke="#cbd5e1" stroke-width="1.2" stroke-linecap="round"/><path d="M14 4l6 2.5v4.5c0 4.5-2.7 7.5-6 9-3.3-1.5-6-4.5-6-9V6.5z" fill="#94a3b8" stroke="#1e293b" stroke-width="1"/><path d="M14 7v11" stroke="#475569" stroke-width="1.2"/><circle cx="14" cy="11" r="1.6" fill="#fbbf24"/>',
+    '#1e293b',
+  ),
+  ironHide: STATUS_ICONS.ironHide,
+  earthsplitter: svg(
+    '<path d="M2 18h20v4H2z" fill="#78350f"/><path d="M12 22l-1.5-4 2-2.5-1-3 1.5-2" stroke="#fb923c" stroke-width="1.4" fill="none" stroke-linejoin="round"/><path d="M6 8.5l6-5 1.6 1.8-6 5z" fill="#cbd5e1" stroke="#1e293b" stroke-width="0.8"/><path d="M10.5 6.5l5.5 7.5" stroke="#a16207" stroke-width="1.6" stroke-linecap="round"/><path d="M4 16l2-2M20 16l-2-2M17 18.5l2-1" stroke="#fde68a" stroke-width="1" stroke-linecap="round"/>',
+    '#292524',
+  ),
+  // Vexa
+  piercingArrow: svg(
+    '<path d="M3 21L19 5" stroke="#e5e7eb" stroke-width="1.6"/><path d="M21 3l-6.5 1.5 5 5z" fill="#facc15" stroke="#713f12" stroke-width="0.6"/><path d="M3 21l1-4M3 21l4-1M5 19l1-4M5 19l4-1" stroke="#4ade80" stroke-width="1.1" stroke-linecap="round"/><circle cx="12" cy="12" r="3.2" fill="none" stroke="#f87171" stroke-width="1.1" stroke-dasharray="2 1.4"/>',
+    '#052e16',
+  ),
+  huntersRhythm: STATUS_ICONS.huntersRhythm,
+  arrowStorm: STATUS_ICONS.arrowStorm,
+  // Orin
+  fireball: svg(
+    '<path d="M3 21c2-5 5-8 9-10" stroke="#fdba74" stroke-width="1.4" stroke-linecap="round" fill="none"/><path d="M5 17c2-3 3.5-4 6-5" stroke="#fde047" stroke-width="1" stroke-linecap="round" fill="none"/><circle cx="15" cy="9" r="5.5" fill="#f97316" stroke="#7c2d12" stroke-width="1"/><circle cx="15" cy="9" r="3" fill="#fde047"/>',
+    '#431407',
+  ),
+  mendingFlame: STATUS_ICONS.mendingFlame,
+  cataclysm: svg(
+    '<circle cx="12" cy="15" r="7.5" fill="#7c2d12" stroke="#fb923c" stroke-width="1"/><circle cx="12" cy="15" r="4.5" fill="#f97316"/><circle cx="12" cy="15" r="2" fill="#fde047"/><path d="M12 2v5M7 4l2 4M17 4l-2 4" stroke="#fde047" stroke-width="1.4" stroke-linecap="round"/>',
+    '#1c0a03',
+  ),
+  // Syl
+  shadowLunge: svg(
+    '<path d="M3 15c3-1 5-1 7 0M2 18.5c3-1 5-1 7 0" stroke="#a78bfa" stroke-width="1.3" stroke-linecap="round" fill="none"/><path d="M8 18L19 5" stroke="#e5e7eb" stroke-width="2" stroke-linecap="round"/><path d="M19 5l-1 4-3-3z" fill="#e5e7eb"/><path d="M7.5 15.5l3 3" stroke="#7c3aed" stroke-width="2" stroke-linecap="round"/>',
+    '#1e1b4b',
+  ),
+  veil: STATUS_ICONS.veil,
+  execution: svg(
+    '<path d="M5 19L17 7" stroke="#e5e7eb" stroke-width="2.2" stroke-linecap="round"/><path d="M19 5l-5 1.2 3.8 3.8z" fill="#e5e7eb"/><path d="M4.5 16.5l3 3" stroke="#7c3aed" stroke-width="2" stroke-linecap="round"/><path d="M12 4c-1.2 1.6-1.2 2.6 0 3.6 1.2-1 1.2-2 0-3.6zM17 14c-1.2 1.6-1.2 2.6 0 3.6 1.2-1 1.2-2 0-3.6z" fill="#ef4444"/>',
+    '#2a0a14',
+  ),
+  // Grom
+  rootSnare: svg(
+    '<path d="M4 21c1-4 3-6 3-10M12 21V9M20 21c-1-4-3-6-3-10" stroke="#a16207" stroke-width="1.8" stroke-linecap="round" fill="none"/><path d="M7 11c2 0 3.5 1.5 5 1.5S15 11 17 11" stroke="#a16207" stroke-width="1.5" fill="none"/><path d="M7 11c-1.5-1-1.5-3 0-4 1 1.2 1 2.8 0 4zM17 11c1.5-1 1.5-3 0-4-1 1.2-1 2.8 0 4zM12 9c-1.5-1.2-1.5-3.5 0-4.5 1.5 1 1.5 3.3 0 4.5z" fill="#4ade80"/>',
+    '#1c1917',
+  ),
+  barkSkin: STATUS_ICONS.barkSkin,
+  overgrowth: svg(
+    '<circle cx="12" cy="12" r="8.5" fill="none" stroke="#4ade80" stroke-width="1" stroke-dasharray="2.5 1.5"/><path d="M12 20V11M12 15c-3 0-4.5-2-4.5-4.5 3 0 4.5 2 4.5 4.5zM12 13c3 0 4.5-2 4.5-4.5-3 0-4.5 2-4.5 4.5z" fill="#22c55e" stroke="#14532d" stroke-width="0.8"/><path d="M5 19c1-2 2-3 3-3.5M19 19c-1-2-2-3-3-3.5" stroke="#a16207" stroke-width="1.4" stroke-linecap="round"/>',
+    '#052e16',
+  ),
+  // Kaela
+  tidalWave: svg(
+    '<path d="M2 17c2.5-6 6-9 11-9 3 0 5 2 5 4.5 0 2-1.5 3-3 3-1.2 0-2-.8-2-2" fill="none" stroke="#38bdf8" stroke-width="1.8" stroke-linecap="round"/><path d="M2 20c2-1 4-1 6 0s4 1 6 0 4-1 6 0" fill="none" stroke="#e0f2fe" stroke-width="1.3" stroke-linecap="round"/>',
+    '#0b2537',
+  ),
+  brineVeil: STATUS_ICONS.brineVeil,
+  maelstrom: STATUS_ICONS.maelstrom,
+};
+
+/** Picture for an ability (falls back to a plain dark square). */
+export const abilityIcon = (id: string) => ABILITY_ICONS[id] ?? svg('', '#111827');
