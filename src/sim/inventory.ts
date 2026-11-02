@@ -120,6 +120,13 @@ export function sellItem(w: World, u: Unit, slot: number): boolean {
   return true;
 }
 
+/** Seconds until blink items work again after taking damage from an enemy hero (0 = ready). */
+export function blinkLockLeft(w: World, u: Unit): number {
+  let left = 0;
+  for (const at of u.hero!.damagedBy.values()) left = Math.max(left, BLINK_DAMAGE_LOCK - (w.time - at));
+  return left;
+}
+
 /** Why the item in `slot` can't be used right now, or null. */
 export function itemBlocker(w: World, u: Unit, slot: number): 'none' | 'cooldown' | 'stunned' | 'hurt' | null {
   const s = u.hero!.items[slot];

@@ -7,7 +7,11 @@ import type { ItemId, StatusId } from '../sim';
 const svg = (body: string, bg: string) =>
   `<svg viewBox="0 0 24 24" class="icon" xmlns="http://www.w3.org/2000/svg"><rect width="24" height="24" rx="4" fill="${bg}"/>${body}</svg>`;
 
-const ICONS: Record<ItemId | 'tp' | 'shop', string> = {
+const ICONS: Record<ItemId | 'tp' | 'shop' | 'courier', string> = {
+  courier: svg(
+    '<path d="M4 12c2.5-4 5.5-5 8-5" stroke="#e9d5ff" stroke-width="1.6" stroke-linecap="round" fill="none"/><path d="M20 12c-2.5-4-5.5-5-8-5" stroke="#e9d5ff" stroke-width="1.6" stroke-linecap="round" fill="none"/><path d="M8 11h8l1 8H7z" fill="#a16207" stroke="#422006" stroke-width="1"/><path d="M10 11V9.5a2 2 0 0 1 4 0V11" stroke="#422006" stroke-width="1.2" fill="none"/><path d="M8.5 14h7" stroke="#fde68a" stroke-width="1"/>',
+    '#2e1065',
+  ),
   healingSalve: svg(
     '<path d="M9 4h6v3l3 4v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-8l3-4z" fill="#d1fae5" stroke="#065f46" stroke-width="1"/><path d="M7 13h10v6a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1z" fill="#22c55e"/><path d="M11 14.5h2v1.5h1.5v2H13v1.5h-2V18H9.5v-2H11z" fill="#fff"/>',
     '#14532d',
@@ -94,7 +98,7 @@ const ICONS: Record<ItemId | 'tp' | 'shop', string> = {
   ),
 };
 
-export const itemIcon = (id: ItemId | 'tp' | 'shop') => ICONS[id];
+export const itemIcon = (id: ItemId | 'tp' | 'shop' | 'courier') => ICONS[id];
 
 const images = new Map<string, HTMLImageElement>();
 /** The item icon as an image (for drawing on a canvas, e.g. items lying on the ground). */

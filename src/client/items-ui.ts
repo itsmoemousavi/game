@@ -14,6 +14,7 @@ import {
   priceFor,
   inShop,
   sellPrice,
+  blinkLockLeft,
   teleportTargets,
   tpBlocker,
 } from '../sim';
@@ -145,6 +146,7 @@ export class ItemsUi {
       else this.toggleShop(true);
     });
     root.querySelector('#btn-shop')!.innerHTML = itemIcon('shop');
+    root.querySelector('#btn-courier')!.innerHTML = `<span class="lbl">${itemIcon('courier')}</span>`;
     this.tpSlot.querySelector('.lbl')!.innerHTML = itemIcon('tp');
     tap(root.querySelector('#btn-shop')!, () => this.toggleShop());
     tap(root.querySelector('#shop-close')!, () => this.toggleShop(false));
@@ -358,7 +360,9 @@ export class ItemsUi {
       this.placingSlot = null; // used up / sold
       this.onWard(null);
     }
-    const key = `${h.items.map((s) => (s ? s.id + s.count + ':' + Math.ceil(s.cooldown ?? 0) : '-')).join()}|${h.tpCount}|${Math.ceil(h.tpCooldown)}|${!!h.channel}|${atShop}|${this.shopOpen}|${this.placingSlot}`;
+    // Blink items are locked for a few seconds after an enemy hero hits you.
+    const lock = Math.ceil(blinkLockLeft(w, me));
+    const key = `${lock}|${h.items.map((s) => (s ? s.id + s.count + ':' + Math.ceil(s.cooldown ?? 0) : '-')).join()}|${h.tpCount}|${Math.ceil(h.tpCooldown)}|${!!h.channel}|${atShop}|${this.shopOpen}|${this.placingSlot}`;
     if (key !== this.lastKey) {
       this.lastKey = key;
       h.items.forEach((s, i) => {
@@ -366,8 +370,10 @@ export class ItemsUi {
         const d = s ? ITEMS[s.id] : null;
         el.classList.toggle('empty', !d);
         el.classList.toggle('usable', !!d?.consumable || !!d?.active);
-        const icd = Math.ceil(s?.cooldown ?? 0);
+        const locked = d?.active?.kind === 'blink' && lock > 0;
+        const icd = Math.max(Math.ceil(s?.cooldown ?? 0), locked ? lock : 0);
         el.querySelector('.cd')!.textContent = icd > 0 ? String(icd) : '';
+        el.classList.toggle('locked', locked);
         el.classList.toggle('selling', !!d && this.shopOpen);
         el.classList.toggle('placing', this.placingSlot === i);
         el.querySelector('.lbl')!.innerHTML = d ? itemIcon(d.id) : '';

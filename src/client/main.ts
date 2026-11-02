@@ -60,7 +60,7 @@ function startDraft(m: Mode) {
   if (devPick) {
     // Test scripts: finish the draft at once with the requested hero.
     while (!d.done) {
-      if (d.humanTurn()) d.choose(d.current!.kind === 'ban' ? null : devPick);
+      if (d.humanTurn()) d.choose(d.current!.kind === 'ban' ? null : d.allowed(devPick) ? devPick : d.choices()[0]);
       else d.update(DRAFT_TIME.bot + 0.01);
     }
   }

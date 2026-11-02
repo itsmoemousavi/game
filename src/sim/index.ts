@@ -10,7 +10,7 @@ export { CREEPS, STRUCTURES } from './data/units';
 export { isNight, phaseTimeLeft } from './vision';
 export { ITEMS, ITEM_IDS, BUILDS, TELEPORT, SHOP_RADIUS, INVENTORY_SLOTS } from './data/items';
 export type { ItemId, ItemDef } from './data/items';
-export { GROUND_ITEM_LIFETIME, SELL_REFUND_WINDOW, buyBlocker, canPickUp, groundItemExpiry, inShop, itemBlocker, pickUpBlocker, priceFor, recipeParts, sellPrice, teleportTargets, tpBlocker } from './inventory';
+export { GROUND_ITEM_LIFETIME, SELL_REFUND_WINDOW, blinkLockLeft, buyBlocker, canPickUp, groundItemExpiry, inShop, itemBlocker, pickUpBlocker, priceFor, recipeParts, sellPrice, teleportTargets, tpBlocker } from './inventory';
 export type { GroundItem } from './inventory';
 export type { ItemSlot } from './inventory';
 export { effectiveCooldown } from './abilities';
