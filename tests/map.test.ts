@@ -63,7 +63,7 @@ describe('map', () => {
     expect(MAP_SIZE).toBe(300);
   });
 
-  it('buildings never squeeze a lane: at least 14 m of open ground all along every lane', () => {
+  it('buildings never squeeze a lane: at least 10 m of open ground all along every lane', () => {
     const nav = new World({ seed: 1, slots: [] }).nav;
     for (const lane of LANE_IDS) {
       const p = map.lanes[lane];
@@ -79,7 +79,7 @@ describe('map', () => {
           if (isWalkable(nav, a.x + nx * t, a.y + ny * t)) best = Math.max(best, (run += 0.25));
           else run = 0;
         }
-        expect(best, `${lane} lane at ${a.x.toFixed(0)},${a.y.toFixed(0)}`).toBeGreaterThanOrEqual(14);
+        expect(best, `${lane} lane at ${a.x.toFixed(0)},${a.y.toFixed(0)}`).toBeGreaterThanOrEqual(10);
       }
     }
   });
@@ -89,6 +89,23 @@ describe('map', () => {
     for (const s of map.structures) {
       if (s.tier === 'fountain') continue;
       for (const f of map.fountains) expect(findPath(nav, f, s.pos, 0.42), `${s.tier} ${s.lane} team ${s.team}`).not.toBeNull();
+    }
+  });
+
+  it('lane towers reach right across their lane (nobody slips past out of range)', () => {
+    const w = new World({ seed: 1, slots: [] });
+    for (const t of w.units.filter((u) => u.structure && /^tower[123]$/.test(u.structure.tier))) {
+      const lane = map.lanes[t.structure!.lane!];
+      // Closest point on the lane centre line, then the far edge of the lane from the tower.
+      let best = { d: Infinity, x: 0, y: 0 };
+      for (let d = 0; d < polylineLength(lane); d += 0.5) {
+        const p = pointAlong(lane, d);
+        const dd = Math.hypot(p.x - t.x, p.y - t.y);
+        if (dd < best.d) best = { d: dd, x: p.x, y: p.y };
+      }
+      const k = (best.d + 6.5) / best.d; // centre line + half the lane width (13 m lanes)
+      const far = { x: t.x + (best.x - t.x) * k, y: t.y + (best.y - t.y) * k };
+      expect(Math.hypot(far.x - t.x, far.y - t.y), `${t.structure!.tier} ${t.structure!.lane} team ${t.team}`).toBeLessThanOrEqual(t.attackRange + t.radius + 0.6);
     }
   });
 });

@@ -76,7 +76,7 @@ const mirrorLane = (l: LaneId): LaneId => (l === 'top' ? 'bot' : l === 'bot' ? '
 const S = MAP_SIZE / 200;
 const sc = (p: Vec2): Vec2 => ({ x: p.x * S, y: p.y * S });
 
-const LANE_WIDTH = 18;
+const LANE_WIDTH = 13;
 const JUNGLE_WIDTH = 10;
 
 const LANES_200: Record<LaneId, Vec2[]> = {
@@ -180,8 +180,11 @@ const RIVER: [Vec2, Vec2] = [sc({ x: 20, y: 20 }), sc({ x: 180, y: 180 })];
 const T1_FRACTION = 0.86;
 /** Tier-2 towers stand a bit further back toward the base. */
 const T2_FRACTION = 0.45;
-/** Towers stand at the lane edge (half in a pocket of their own) so they never narrow the lane much. */
-const TOWER_SIDE_OFFSET = LANE_WIDTH / 2 + 1;
+/**
+ * Towers stand just past the lane edge: they leave most of the lane open, and their reach
+ * (11 m + body sizes) still covers the far side of the lane.
+ */
+const TOWER_SIDE_OFFSET = LANE_WIDTH / 2 + 0.5;
 /** Tier-3 tower + barracks form a gate this far from where the lane leaves the base. */
 const GATE_DISTANCE = 5 * S;
 
