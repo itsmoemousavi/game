@@ -77,13 +77,19 @@ export const STRUCTURES: Record<StructureTier, CombatStats & { teamGold: number 
   fountain: {
     ...tower(99999, 300),
     attackInterval: 0.25,
-    attackRange: 14,
-    acquireRange: 14,
+    attackRange: 19, // covers its whole healing area
+    acquireRange: 19,
     radius: 3,
     projectileSpeed: 40,
     vision: [20, 20],
     teamGold: 0,
   },
+};
+
+/** The two barracks of a lane: melee is the tougher one. */
+export const BARRACKS: Record<'melee' | 'ranged', { hp: number; armor: number; teamGold: number }> = {
+  melee: { hp: 1800, armor: 13, teamGold: 160 },
+  ranged: { hp: 1200, armor: 8, teamGold: 120 },
 };
 
 /** Jungle monsters: passive until attacked, then fight and leash back to camp. */

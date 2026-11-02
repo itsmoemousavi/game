@@ -8,9 +8,12 @@ import {
   Team,
   Unit,
   World,
+  ItemSlot,
+  SELL_REFUND_WINDOW,
   buyBlocker,
   priceFor,
   inShop,
+  sellPrice,
   teleportTargets,
   tpBlocker,
 } from '../sim';
@@ -21,7 +24,12 @@ import { itemIcon } from './icons';
 /**
  * Item bar (6 slots + teleport slot), shop panel and teleport destination picker.
  *
- * Item slot tap: use a consumable (salve). While the shop is open, tapping an item sells it.
+ * Item slot tap: use a consumable (salve). While the shop is open, tapping an item picks it
+ * in the shop (to sell it there with the Sell button).
+ *
+ * Shop: category tabs, a grid of items and a detail panel. Tapping an item only selects it;
+ * buying and selling happen with the big button in the detail panel, so scrolling the list
+ * can never buy something by accident.
  * TP slot tap: with scrolls → choose a destination on the big map; with 0 scrolls →
  * open the shop (teleports are only bought there).
  */
@@ -33,6 +41,10 @@ export class ItemsUi {
   private pickerCanvas: HTMLCanvasElement;
   private lastKey = '';
   private shopKey = '';
+  private ownKey = '';
+  private tab: ShopTab = 'build';
+  /** Selected item in the shop: a shop item, or one of your own slots (to sell). */
+  private sel: { kind: 'shop'; id: ItemId } | { kind: 'own'; slot: number } | null = null;
   /** Slot of the ward being placed, if any. */
   placingSlot: number | null = null;
 
@@ -43,7 +55,7 @@ export class ItemsUi {
     /** Called when a ward slot is tapped (enter / leave ward placement mode). */
     private onWard: (slot: number | null) => void = () => {},
     /** Short hint message (e.g. "Go back to your base to buy"). */
-    private onHint: (text: string) => void = () => {},
+    _onHint: (text: string) => void = () => {},
   ) {
     root.querySelectorAll<HTMLElement>('[data-item]').forEach((el) => this.slots.push(el));
     this.tpSlot = root.querySelector('#tp-slot')!;
@@ -63,7 +75,9 @@ export class ItemsUi {
         const c = this.ctx();
         if (!c) return;
         const item = c.me.hero!.items[i];
-        if (this.shopOpen) this.send({ type: 'sell', unitId: c.me.id, slot: i });
+        if (this.shopOpen) {
+          if (item) this.select({ kind: 'own', slot: i });
+        }
         else if (item?.id === 'observerWard' || item?.id === 'sentryWard' || ITEMS[item?.id ?? 'healingSalve'].active?.kind === 'blink') {
           this.placingSlot = this.placingSlot === i ? null : i;
           this.onWard(this.placingSlot);
@@ -82,15 +96,6 @@ export class ItemsUi {
     root.querySelector('#btn-shop')!.innerHTML = itemIcon('shop');
     this.tpSlot.querySelector('.lbl')!.innerHTML = itemIcon('tp');
     tap(root.querySelector('#btn-shop')!, () => this.toggleShop());
-    tap(root.querySelector('#btn-quickbuy')!, () => {
-      const c = this.ctx();
-      if (!c) return;
-      const next = nextRecommended(c.me);
-      if (!next) return;
-      if (!inShop(c.w, c.me)) this.onHint('Go back to your base to buy');
-      else if (c.me.hero!.gold < ITEMS[next].cost) this.onHint(`Need ${Math.ceil(ITEMS[next].cost - c.me.hero!.gold)} more gold`);
-      else this.send({ type: 'buy', unitId: c.me.id, itemId: next });
-    });
     tap(root.querySelector('#shop-close')!, () => this.toggleShop(false));
     tap(root.querySelector('#shop-tp')!, () => {
       const c = this.ctx();
@@ -112,6 +117,8 @@ export class ItemsUi {
   toggleShop(open = !this.shopOpen) {
     this.shop.classList.toggle('hidden', !open);
     this.shopKey = '';
+    this.lastKey = '';
+    if (open) this.renderDetail();
   }
 
   reset() {
@@ -122,27 +129,136 @@ export class ItemsUi {
   }
 
   private buildShop() {
-    const list = this.root.querySelector('#shop-items')!;
+    const tabs = this.root.querySelector<HTMLElement>('#shop-tabs')!;
+    tabs.innerHTML = '';
+    for (const t of SHOP_TABS) {
+      const b = document.createElement('button');
+      b.dataset.tab = t.id;
+      b.innerHTML = `<span>${t.icon}</span>${t.name}`;
+      onTap(b, () => {
+        this.tab = t.id;
+        this.renderGrid();
+      });
+      tabs.appendChild(b);
+    }
+    this.renderGrid();
+    this.renderDetail();
+  }
+
+  private renderGrid() {
+    const list = this.root.querySelector<HTMLElement>('#shop-items')!;
     const c = this.ctx();
     const build = c ? BUILDS[c.me.hero!.defId] : [];
-    const order = [...new Set([...build, ...ITEM_IDS])];
+    const ids = this.tab === 'build' ? [...new Set(build)] : ITEM_IDS.filter((id) => categoryOf(id) === this.tab);
+    this.root.querySelectorAll<HTMLElement>('#shop-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === this.tab));
     list.innerHTML = '';
-    for (const id of order) {
+    list.scrollTop = 0;
+    for (const id of ids) {
       const d = ITEMS[id];
       const card = document.createElement('button');
       card.className = 'shop-item';
       card.dataset.buy = id;
-      card.innerHTML = `<i>${itemIcon(id)}</i>
-        <div><b>${d.name}</b>${build.includes(id) ? ' <em>★</em>' : ''}<small>${d.summary}</small></div>
-        <span class="cost">${d.cost}</span>`;
-      card.addEventListener('pointerdown', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const c2 = this.ctx();
-        if (c2) this.send({ type: 'buy', unitId: c2.me.id, itemId: id as ItemId });
-      });
+      card.innerHTML = `<i>${itemIcon(id)}</i><span class="cost">${d.cost}</span>`;
+      // Select on a clean tap only: a finger that moved (scrolling) does nothing.
+      onTap(card, () => this.select({ kind: 'shop', id: id as ItemId }), true);
       list.appendChild(card);
     }
+    this.shopKey = '';
+  }
+
+  private select(sel: NonNullable<ItemsUi['sel']>) {
+    this.sel = sel;
+    this.ownKey = '';
+    if (!this.shopOpen) this.toggleShop(true);
+    this.renderDetail();
+    this.shopKey = '';
+  }
+
+  /** Detail panel: the selected item, what it's made of, and the Buy / Sell button. */
+  private renderDetail() {
+    const box = this.root.querySelector<HTMLElement>('#shop-detail')!;
+    const c = this.ctx();
+    const sel = this.sel;
+    if (!c || !sel) {
+      box.innerHTML = '<p class="empty">Tap an item to see what it does.<br><br>Tap one of your items (bottom bar) to sell it.</p>';
+      return;
+    }
+    const h = c.me.hero!;
+    const slot: ItemSlot | null = sel.kind === 'own' ? h.items[sel.slot] : null;
+    if (sel.kind === 'own' && !slot) {
+      this.sel = null;
+      this.renderDetail();
+      return;
+    }
+    const id = sel.kind === 'own' ? slot!.id : sel.id;
+    const d = ITEMS[id];
+    const parts = (d.recipe ?? []).map((p) => `<span class="part" title="${ITEMS[p].name}">${itemIcon(p)}</span>`).join('');
+    const usedIn = ITEM_IDS.filter((x) => ITEMS[x].recipe?.includes(id));
+    box.innerHTML = `
+      <div class="d-top"><i>${itemIcon(id)}</i><div><b>${d.name}</b><span class="d-cost">${d.cost} gold</span></div></div>
+      <p class="d-sum">${d.summary}</p>
+      ${parts ? `<div class="d-row"><small>Made from</small>${parts}</div>` : ''}
+      ${usedIn.length ? `<div class="d-row"><small>Part of</small>${usedIn.map((x) => `<span class="part" title="${ITEMS[x].name}">${itemIcon(x)}</span>`).join('')}</div>` : ''}
+      <button id="shop-act"></button>
+      <small id="shop-why"></small>`;
+    onTap(box.querySelector('#shop-act')!, () => {
+      const c2 = this.ctx();
+      if (!c2 || !this.sel) return;
+      if (this.sel.kind === 'own') {
+        this.send({ type: 'sell', unitId: c2.me.id, slot: this.sel.slot });
+        this.sel = null;
+        this.lastKey = '';
+        setTimeout(() => this.renderDetail(), 50);
+      } else this.send({ type: 'buy', unitId: c2.me.id, itemId: this.sel.id });
+      this.shopKey = '';
+    });
+    box.querySelectorAll<HTMLElement>('.part').forEach((el, i) => {
+      const all = [...(d.recipe ?? []), ...usedIn];
+      onTap(el, () => this.select({ kind: 'shop', id: all[i] }));
+    });
+    this.shopKey = '';
+  }
+
+  /** Your items, inside the shop (tap one to sell it). */
+  private renderOwn(items: (ItemSlot | null)[]) {
+    const row = this.root.querySelector<HTMLElement>('#shop-own')!;
+    row.innerHTML = '<small>Your items</small>';
+    items.forEach((s, i) => {
+      const b = document.createElement('button');
+      b.className = s ? '' : 'empty';
+      b.classList.toggle('picked', this.sel?.kind === 'own' && this.sel.slot === i);
+      b.innerHTML = s ? itemIcon(s.id) : '';
+      if (s) onTap(b, () => this.select({ kind: 'own', slot: i }), true);
+      row.appendChild(b);
+    });
+  }
+
+  /** Buy / Sell button state (gold, distance to the shop, refund window). */
+  private updateAction(w: World, me: Unit) {
+    const btn = this.root.querySelector<HTMLButtonElement>('#shop-act');
+    const why = this.root.querySelector<HTMLElement>('#shop-why');
+    if (!btn || !why || !this.sel) return;
+    const h = me.hero!;
+    const atShop = !me.alive || inShop(w, me);
+    if (this.sel.kind === 'own') {
+      const s = h.items[this.sel.slot];
+      if (!s) return;
+      const price = sellPrice(w, s);
+      const left = Math.ceil(SELL_REFUND_WINDOW - (w.time - (s.boughtAt ?? -999)));
+      btn.className = 'sell';
+      btn.innerHTML = `SELL <b>+${price}</b>`;
+      btn.disabled = !atShop;
+      why.textContent = !atShop ? 'Go back to your base to sell' : left > 0 ? `Full refund for ${left} more s` : 'Sells for half price';
+      return;
+    }
+    const id = this.sel.id;
+    const price = priceFor(h, id);
+    const b = buyBlocker(w, me, id);
+    btn.className = 'buy';
+    btn.innerHTML = `BUY <b>${price < ITEMS[id].cost ? `<s>${ITEMS[id].cost}</s> ` : ''}${price}</b>`;
+    btn.disabled = b !== null;
+    why.textContent =
+      b === 'shop' ? 'Go back to your base to buy' : b === 'gold' ? `Need ${Math.ceil(price - h.gold)} more gold` : b === 'full' ? 'Your inventory is full' : price < ITEMS[id].cost ? 'Cheaper: you own some of its parts' : '';
   }
 
   update() {
@@ -150,7 +266,7 @@ export class ItemsUi {
     if (!c) return;
     const { w, me } = c;
     const h = me.hero!;
-    const atShop = inShop(w, me);
+    const atShop = inShop(w, me) || !me.alive;
     const placing = this.placingSlot !== null ? h.items[this.placingSlot] : null;
     if (this.placingSlot !== null && (!placing || (!placing.id.endsWith('Ward') && !ITEMS[placing.id].active))) {
       this.placingSlot = null; // used up / sold
@@ -170,7 +286,7 @@ export class ItemsUi {
         el.classList.toggle('placing', this.placingSlot === i);
         el.querySelector('.lbl')!.innerHTML = d ? itemIcon(d.id) : '';
         el.querySelector('.cnt')!.textContent = s && s.count > 1 ? String(s.count) : '';
-        el.title = d ? `${d.name}: ${d.summary}${this.shopOpen ? ' (tap to sell for half price)' : ''}` : 'Empty slot';
+        el.title = d ? `${d.name}: ${d.summary}${this.shopOpen ? ' (tap to pick it, then Sell)' : ''}` : 'Empty slot';
       });
       this.tpSlot.querySelector('.cnt')!.textContent = String(h.tpCount);
       const cd = Math.ceil(h.tpCooldown);
@@ -179,37 +295,30 @@ export class ItemsUi {
       this.tpSlot.classList.toggle('channel', !!h.channel);
       this.tpSlot.title = `Teleport (${TELEPORT.cost} gold each). Tap to choose an allied building.`;
     }
-    // Quick-buy button: next item of the recommended build.
-    const next = nextRecommended(me);
-    const qb = this.root.querySelector<HTMLElement>('#btn-quickbuy')!;
-    const qk = `${next}|${atShop}|${h.gold >= (next ? ITEMS[next].cost : 0)}`;
-    if (qb.dataset.key !== qk) {
-      qb.dataset.key = qk;
-      qb.classList.toggle('none', !next);
-      if (next) {
-        qb.querySelector('.lbl')!.innerHTML = itemIcon(next);
-        qb.querySelector('.cost')!.textContent = String(ITEMS[next].cost);
-        qb.title = `Quick-buy: ${ITEMS[next].name} (${ITEMS[next].cost})`;
-        qb.classList.toggle('off', !atShop || h.gold < ITEMS[next].cost);
-      }
-    }
     if (this.shopOpen) {
-      const sk = `${Math.floor(h.gold)}|${atShop}|${h.items.map((s) => s?.id ?? '-').join()}`;
+      const own = this.sel?.kind === 'own' ? h.items[this.sel.slot] : null;
+      const sk = `${Math.floor(h.gold)}|${atShop}|${me.alive}|${h.items.map((s) => s?.id ?? '-').join()}|${own ? Math.ceil(w.time - (own.boughtAt ?? 0)) : ''}`;
       if (sk !== this.shopKey) {
         this.shopKey = sk;
+        const open = atShop || !me.alive;
         this.root.querySelector('#shop-gold')!.textContent = String(Math.floor(h.gold));
-        this.root.querySelector('#shop-note')!.textContent = atShop
-          ? 'Tap an item to buy · tap one of your items to sell it for half price'
-          : 'Return to your base (fountain) to buy or sell';
-        this.root.querySelector('#shop-tp')!.classList.toggle('off', !atShop || h.gold < TELEPORT.cost);
+        this.root.querySelector('#shop-note')!.textContent = open ? (me.alive ? '' : 'You can shop while dead') : 'Go back to your base to buy or sell';
+        this.root.querySelector('#shop-tp')!.classList.toggle('off', !open || h.gold < TELEPORT.cost);
         this.root.querySelectorAll<HTMLElement>('[data-buy]').forEach((el) => {
           const id = el.dataset.buy as ItemId;
-          const b = buyBlocker(w, me, id);
-          el.classList.toggle('off', b !== null);
+          el.classList.toggle('off', buyBlocker(w, me, id) !== null);
+          el.classList.toggle('picked', this.sel?.kind === 'shop' && this.sel.id === id);
           // Owning the parts makes a combined item cheaper.
           const price = priceFor(h, id);
-          el.querySelector('.cost')!.innerHTML = price < ITEMS[id].cost ? `<s>${ITEMS[id].cost}</s> ${price}` : String(price);
+          el.querySelector('.cost')!.textContent = String(price);
+          el.classList.toggle('cheaper', price < ITEMS[id].cost);
         });
+        const ok = `${h.items.map((x) => x?.id ?? '-').join()}|${this.sel?.kind === 'own' ? this.sel.slot : ''}`;
+        if (ok !== this.ownKey) {
+          this.ownKey = ok;
+          this.renderOwn(h.items);
+        }
+        this.updateAction(w, me);
       }
     }
     if (this.pickerOpen) this.drawPicker();
@@ -290,15 +399,52 @@ function localRect(el: HTMLElement) {
   return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) };
 }
 
-/** Next item in the hero's recommended build that they don't own yet. */
-export function nextRecommended(me: Unit): ItemId | null {
-  const h = me.hero!;
-  const seen = new Map<ItemId, number>();
-  for (const id of BUILDS[h.defId]) {
-    const want = (seen.get(id) ?? 0) + 1;
-    seen.set(id, want);
-    const owned = ITEMS[id].consumable ? (h.items.some((s) => s?.id === id) ? want : 0) : h.items.filter((s) => s?.id === id).length;
-    if (owned < want) return id;
+
+type ShopTab = 'build' | 'consumable' | 'attack' | 'defense' | 'magic' | 'upgrade';
+const SHOP_TABS: { id: ShopTab; name: string; icon: string }[] = [
+  { id: 'build', name: 'For you', icon: '★' },
+  { id: 'consumable', name: 'Supplies', icon: '✚' },
+  { id: 'attack', name: 'Attack', icon: '⚔' },
+  { id: 'defense', name: 'Defense', icon: '⛨' },
+  { id: 'magic', name: 'Magic', icon: '✦' },
+  { id: 'upgrade', name: 'Upgrades', icon: '▲' },
+];
+
+/** Shop tab for an item, from what it gives. */
+function categoryOf(id: ItemId): ShopTab {
+  const d = ITEMS[id];
+  if (d.consumable) return 'consumable';
+  if (d.recipe || d.active) return 'upgrade';
+  const s = d.stats;
+  if (s.damage || s.attackSpeedPct || s.lifestealPct) return 'attack';
+  if (s.mana || s.manaRegen || s.spellAmpPct || s.cdrPct) return 'magic';
+  return 'defense';
+}
+
+/**
+ * Tap handler. With `cleanTapOnly`, the action fires on release and only if the finger
+ * barely moved (so dragging to scroll a list never triggers it).
+ */
+function onTap(el: Element, fn: () => void, cleanTapOnly = false) {
+  if (!cleanTapOnly) {
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      fn();
+    });
+    return;
   }
-  return null;
+  let start: { x: number; y: number; id: number } | null = null;
+  el.addEventListener('pointerdown', (e) => {
+    const p = e as PointerEvent;
+    e.stopPropagation();
+    start = { x: p.clientX, y: p.clientY, id: p.pointerId };
+  });
+  el.addEventListener('pointerup', (e) => {
+    const p = e as PointerEvent;
+    e.stopPropagation();
+    if (start && start.id === p.pointerId && Math.hypot(p.clientX - start.x, p.clientY - start.y) < 10) fn();
+    start = null;
+  });
+  el.addEventListener('pointercancel', () => (start = null));
 }

@@ -481,7 +481,7 @@ export class Renderer3D extends Renderer {
       if (u.kind === 'structure') {
         const tier = u.structure!.tier;
         const side = u.team === 1 ? 1 : 0;
-        if (u.alive) this.place(`structure:${tier}:${side}`, id, u.x, u.y, 0, side ? Math.PI : 0);
+        if (u.alive) this.place(`structure:${tier}:${side}${u.structure!.rax ? ':' + u.structure!.rax : ''}`, id, u.x, u.y, 0, side ? Math.PI : 0);
         else this.place(`rubble:${u.radius}`, id, u.x, u.y);
         continue;
       }

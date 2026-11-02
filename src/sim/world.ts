@@ -31,7 +31,7 @@ import {
   otherTeam,
 } from './constants';
 import { HEROES, HeroId, maxAbilityLevel } from './data/heroes';
-import { CREEPS, CombatStats, HERO_VISION, NEUTRALS, STRUCTURES, SUPER_CREEP_MULT } from './data/units';
+import { BARRACKS, CREEPS, CombatStats, HERO_VISION, NEUTRALS, STRUCTURES, SUPER_CREEP_MULT } from './data/units';
 import { ITEMS, ItemId, ItemStats, TELEPORT } from './data/items';
 import { ItemSlot, buyItem, buyTeleport, emptyInventory, itemBonuses, sellItem, startTeleport, updateChannel, useItem } from './inventory';
 import { Vision, isInvisible } from './vision';
@@ -277,6 +277,8 @@ export interface StructureState {
   backdoor: boolean;
   /** Last time it was hit while backdoor-protected. */
   backdoorHitAt: number;
+  /** Barracks: powers up the enemy's melee or ranged creeps when it falls. */
+  rax?: 'melee' | 'ranged';
 }
 
 export interface Unit {
@@ -442,7 +444,7 @@ export class World {
     this.nav = { ...this.map, walkable: new Uint8Array(this.map.walkable) };
     this.rng = new Rng(opts.seed);
     this.vision = new Vision(this.map.grid, this.map.cell, this.map.walkable, this.map.height);
-    for (const s of this.map.structures) this.spawnStructure(s.team, s.tier, s.lane, s.pos);
+    for (const s of this.map.structures) this.spawnStructure(s.team, s.tier, s.lane, s.pos, s.rax);
     this.refreshVulnerability();
     this.rebuildNav();
     opts.slots.forEach((slot, i) => this.spawnHero(slot, i));
@@ -750,9 +752,10 @@ export class World {
     return u;
   }
 
-  private spawnStructure(team: Team, tier: StructureTier, lane: LaneId | null, pos: Vec2) {
-    const u = this.newUnit('structure', team, pos, STRUCTURES[tier]);
-    u.structure = { tier, lane, vulnerable: true, aggroId: null, aggroTimer: 0, glyph: 0, backdoor: true, backdoorHitAt: -999 };
+  private spawnStructure(team: Team, tier: StructureTier, lane: LaneId | null, pos: Vec2, rax?: 'melee' | 'ranged') {
+    const stats = rax ? { ...STRUCTURES[tier], ...BARRACKS[rax] } : STRUCTURES[tier];
+    const u = this.newUnit('structure', team, pos, stats);
+    u.structure = { tier, lane, vulnerable: true, aggroId: null, aggroTimer: 0, glyph: 0, backdoor: true, backdoorHitAt: -999, rax };
   }
 
   private spawnHero(slot: PlayerSlot, index: number) {
@@ -864,7 +867,9 @@ export class World {
     for (const team of [0, 1] as Team[]) {
       for (const lane of ['top', 'mid', 'bot'] as LaneId[]) {
         const path = teamLanePath(this.map, team, lane);
-        const enemyRaxDown = this.findStructure(otherTeam(team), 'barracks', lane).some((r) => !r.alive);
+        // Each barracks that falls powers up one kind of the attackers' creeps in that lane.
+        const raxDown = (kind: 'melee' | 'ranged') =>
+          this.findStructure(otherTeam(team), 'barracks', lane).some((r) => !r.alive && r.structure!.rax === kind);
         const start = path[0];
         const dx = path[1].x - start.x;
         const dy = path[1].y - start.y;
@@ -881,6 +886,7 @@ export class World {
             y: start.y - (dy / l) * back + (dx / l) * side,
           };
           const u = this.newUnit('creep', team, pos, CREEPS[type]);
+          const enemyRaxDown = raxDown(type);
           // Creeps grow stronger as the match goes on, so games can't stall forever.
           const grow = 1 + CREEP_GROWTH_PER_5MIN * Math.floor(this.time / 300);
           u.maxHp = u.hp = Math.round(u.hp * grow);
@@ -1163,7 +1169,9 @@ export class World {
       );
       const byDist = (a: Unit, b: Unit) => dist(u.x, u.y, a.x, a.y) - dist(u.x, u.y, b.x, b.y);
       // Towers prefer creeps; heroes are hit when alone or when they attack an allied hero.
-      t = near.filter((e) => e.kind === 'creep').sort(byDist)[0] ?? near.sort(byDist)[0];
+      // The fountain shoots heroes first (no camping in the enemy's healing area).
+      const first = s.tier === 'fountain' ? 'hero' : 'creep';
+      t = near.filter((e) => e.kind === first).sort(byDist)[0] ?? near.sort(byDist)[0];
     }
     u.targetId = t ? t.id : null;
     if (t) this.tryAttack(u, t);
@@ -1360,7 +1368,8 @@ export class World {
     u.facing = Math.atan2(t.y - u.y, t.x - u.x);
     u.path = null;
     if (u.attackTimer > 0) return true;
-    u.attackTimer = u.attackInterval;
+    // The team shield (glyph) also doubles tower attack speed while it lasts.
+    u.attackTimer = u.attackInterval * (u.structure && u.structure.glyph > 0 ? 0.5 : 1);
     this.events.push({ type: 'attack', sourceId: u.id, targetId: t.id });
     this.breakInvisibility(u);
     this.reveal(u);
@@ -1536,7 +1545,7 @@ export class World {
       const tier = u.structure.tier;
       for (const h of this.units) {
         // A denied tower only pays the enemy half.
-        if (h.hero && h.team !== u.team) this.giveGold(h, Math.round(STRUCTURES[tier].teamGold * (denied ? 0.5 : 1)));
+        if (h.hero && h.team !== u.team) this.giveGold(h, Math.round((u.structure!.rax ? BARRACKS[u.structure!.rax].teamGold : STRUCTURES[tier].teamGold) * (denied ? 0.5 : 1)));
       }
       this.refreshVulnerability();
       this.rebuildNav();

@@ -121,7 +121,7 @@ export function model(key: string): THREE.Group {
 }
 
 function build(key: string): THREE.Object3D {
-  const [kind, a, b] = key.split(':');
+  const [kind, a, b, c] = key.split(':');
   resetFx();
   switch (kind) {
     case 'hero':
@@ -135,7 +135,7 @@ function build(key: string): THREE.Object3D {
     case 'warden':
       return warden();
     case 'structure':
-      return structure(a as StructureTier, Number(b) as 0 | 1);
+      return structure(a as StructureTier, Number(b) as 0 | 1, c as 'melee' | 'ranged' | undefined);
     case 'rubble':
       return rubble(Number(a));
     case 'ward':
@@ -215,7 +215,7 @@ function warden(): THREE.Object3D {
 
 // ------------------------------------------------------------------ buildings
 
-function structure(tier: StructureTier, team: 0 | 1): THREE.Object3D {
+function structure(tier: StructureTier, team: 0 | 1, rax?: 'melee' | 'ranged'): THREE.Object3D {
   const tc = TEAM_HEX[team];
   const stone = M(team === 0 ? 0x9aa3b5 : 0xa89a96);
   const stone2 = M(team === 0 ? 0x6b7487 : 0x7a6a66);
@@ -234,6 +234,17 @@ function structure(tier: StructureTier, team: 0 | 1): THREE.Object3D {
       add(g, mesh(box(0.35, 0.5, 0.35), stone2), Math.cos(a) * 1.5, top + 0.75, Math.sin(a) * 1.5);
     }
     add(g, mesh(new THREE.OctahedronGeometry(0.75), crystal), 0, top + 1.6, 0).scale.set(0.8, 1.5, 0.8);
+  } else if (tier === 'barracks' && rax === 'ranged') {
+    // Ranged barracks: a round archery hall with a dome.
+    add(g, mesh(cyl(2.6, 2.9, 0.5, 10), stone2), 0, 0.25, 0);
+    add(g, mesh(cyl(2.2, 2.3, 2.4, 10), stone), 0, 1.7, 0);
+    add(g, mesh(new THREE.SphereGeometry(2.3, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), trim), 0, 2.9, 0);
+    add(g, mesh(new THREE.OctahedronGeometry(0.35), crystal), 0, 5.4, 0);
+    add(g, mesh(box(1.0, 1.5, 0.2), M(0x3a2a1a)), 0, 1.25, 2.25);
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+      add(g, rot(mesh(box(0.08, 1.3, 0.08), M(0x5a3d26)), 0.3, a, 0), Math.cos(a) * 2.1, 3.6, Math.sin(a) * 2.1);
+    }
   } else if (tier === 'barracks') {
     add(g, mesh(box(5, 0.6, 4.4), stone2), 0, 0.3, 0);
     add(g, mesh(box(4.4, 2.8, 3.8), stone), 0, 2, 0);

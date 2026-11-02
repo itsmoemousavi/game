@@ -66,7 +66,7 @@ export class Tutorial {
         done: (w) => !w.unit(this.dummyId)?.alive,
       },
       {
-        text: 'Head back to your base and open the shop 🛒. Buy a Healing Salve (or tap the quick-buy button next to it).',
+        text: 'Head back to your base and open the shop 🛒. Tap the Healing Salve, then tap BUY.',
         marker: (w) => w.map.fountains[0],
         done: (_w, me) => me.hero!.items.some((s) => s?.id === 'healingSalve'),
       },

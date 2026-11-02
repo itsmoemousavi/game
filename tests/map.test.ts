@@ -27,7 +27,7 @@ describe('map', () => {
       counts[s.team]++;
     }
     // 3 lanes x (2 towers + barracks) + 2 shrine towers + shrine + fountain
-    expect(counts).toEqual({ 0: 16, 1: 16 });
+    expect(counts).toEqual({ 0: 19, 1: 19 });
     const t1 = map.structures.find((s) => s.team === 0 && s.tier === 'tower1' && s.lane === 'top')!;
     const mirrored = map.structures.find((s) => s.team === 1 && s.tier === 'tower1' && s.lane === 'bot')!;
     expect(mirror(t1.pos).x).toBeCloseTo(mirrored.pos.x);

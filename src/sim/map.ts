@@ -11,6 +11,8 @@ export interface StructureSpawn {
   tier: StructureTier;
   lane: LaneId | null;
   pos: Vec2;
+  /** Barracks: which creeps it powers up for the enemy when it falls. */
+  rax?: 'melee' | 'ranged';
 }
 
 export interface GameMap {
@@ -220,27 +222,32 @@ export function createMap(): GameMap {
     }
     const t1 = sideOf(path, river * T1_FRACTION);
     const t2 = sideOf(path, river * T2_FRACTION);
-    const gate = sideOf(path, GATE_DISTANCE);
     const t1Pos = { x: t1.at.x + t1.px * TOWER_SIDE_OFFSET, y: t1.at.y + t1.py * TOWER_SIDE_OFFSET };
     const t2Pos = { x: t2.at.x + t2.px * TOWER_SIDE_OFFSET, y: t2.at.y + t2.py * TOWER_SIDE_OFFSET };
-    const t3Pos = { x: gate.at.x + gate.px * TOWER_SIDE_OFFSET, y: gate.at.y + gate.py * TOWER_SIDE_OFFSET };
-    const raxPos = { x: gate.at.x - gate.px * (TOWER_SIDE_OFFSET + 1), y: gate.at.y - gate.py * (TOWER_SIDE_OFFSET + 1) };
+    // Gate: the tier-3 tower stands out front, the two barracks behind it on either side.
+    const front = sideOf(path, GATE_DISTANCE + 4);
+    const t3Pos = { x: front.at.x + front.px * TOWER_SIDE_OFFSET, y: front.at.y + front.py * TOWER_SIDE_OFFSET };
+    const back = sideOf(path, Math.max(1, GATE_DISTANCE - 3));
+    const meleePos = { x: back.at.x + back.px * (TOWER_SIDE_OFFSET + 1.5), y: back.at.y + back.py * (TOWER_SIDE_OFFSET + 1.5) };
+    const rangedPos = { x: back.at.x - back.px * (TOWER_SIDE_OFFSET + 1.5), y: back.at.y - back.py * (TOWER_SIDE_OFFSET + 1.5) };
     structures.push({ team: 0, tier: 'tower1', lane, pos: t1Pos });
     structures.push({ team: 0, tier: 'tower2', lane, pos: t2Pos });
     structures.push({ team: 0, tier: 'tower3', lane, pos: t3Pos });
-    structures.push({ team: 0, tier: 'barracks', lane, pos: raxPos });
+    structures.push({ team: 0, tier: 'barracks', lane, pos: meleePos, rax: 'melee' });
+    structures.push({ team: 0, tier: 'barracks', lane, pos: rangedPos, rax: 'ranged' });
     for (const p of [t1Pos, t2Pos, t3Pos]) carveCircle(p, 3.5);
-    carveCircle(raxPos, 4.5);
+    for (const p of [meleePos, rangedPos]) carveCircle(p, 4.5);
   }
   // Shrine towers flank the Shrine on the side facing the lanes.
   const toCenter = Math.atan2(-1, 1);
+  // Close to the Shrine and to each other, so they cover it (and each other) together.
   for (const sign of [-1, 1]) {
-    const a = toCenter + (sign * 42 * Math.PI) / 180;
+    const a = toCenter + (sign * 35 * Math.PI) / 180;
     structures.push({
       team: 0,
       tier: 'shrineTower',
       lane: null,
-      pos: { x: SHRINE0.x + Math.cos(a) * 12.5 * S, y: SHRINE0.y + Math.sin(a) * 12.5 * S },
+      pos: { x: SHRINE0.x + Math.cos(a) * 11, y: SHRINE0.y + Math.sin(a) * 11 },
     });
   }
   structures.push({ team: 0, tier: 'shrine', lane: null, pos: SHRINE0 });
@@ -251,6 +258,7 @@ export function createMap(): GameMap {
     tier: s.tier,
     lane: s.lane ? mirrorLane(s.lane) : null,
     pos: mirror(s.pos),
+    rax: s.rax,
   }));
   structures.push(...mirrored);
 

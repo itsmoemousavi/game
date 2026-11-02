@@ -324,7 +324,7 @@ Numbers are in `src/sim/constants.ts`, `data/units.ts` and `objectives.ts`.
 
 **Damage numbers:** your spell damage (purple), spell damage you take (red), and critical hits (big red "!"). A white frame around a creep's health bar means your next hit kills it, for last-hitting and denying.
 
-**Quick-buy:** the button next to the shop shows the next item of your hero's recommended build and buys it in one tap (at base).
+**Shop:** tabs (For you, Supplies, Attack, Defense, Magic, Upgrades), an item grid and a detail panel with what the item does, its parts and a BUY button. Tapping an item only selects it, so scrolling never buys by accident. Selling: tap one of your items, then SELL: full refund within 10 s of buying, half price after. Dead heroes can shop (they respawn at the fountain). (Quick-buy was removed.)
 
 **Hero stats (tap the portrait ⓘ):**
 - **Attack:** damage, attack speed and time, range, lifesteal, spell damage, cooldown reduction.
@@ -390,7 +390,7 @@ Milestone 5 (done): denying, wards, river power-ups, the Warden boss + revive ch
 - **Quick tap:** a tap anywhere (no drag) is a tap-to-move or tap-to-attack, including on the joystick side, so jungle monsters on the left can be tapped.
 - **Looking around:** while a finger holds the minimap, the joystick is off and taps on the map move your hero or attack what you tap. Letting go brings the joystick back.
 
-**Item icons:** every item, the teleport scroll and the shop have drawn icons (`src/client/icons.ts`, original artwork) in the item bar, the shop, quick-buy and the scoreboard.
+**Item icons:** every item, the teleport scroll and the shop have drawn icons (`src/client/icons.ts`, original artwork) in the item bar, the shop and the scoreboard.
 
 ## 8b. Backlog: ideas agreed to revisit
 

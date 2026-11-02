@@ -65,18 +65,24 @@
         <button class="item empty" data-item="5"><span class="lbl"></span><span class="cnt"></span><span class="cd"></span></button>
         <button class="item tp none" id="tp-slot"><span class="lbl">TP</span><span class="cnt">0</span><span class="cd"></span></button>
         <button id="btn-shop" title="Shop">🛒</button>
-        <button id="btn-quickbuy" title="Quick-buy the next recommended item"><span class="lbl"></span><span class="cost"></span></button>
       </div>
 
       <div id="shop" class="hidden">
         <div class="shop-head">
           <b>Shop</b>
           <span class="gold"><b id="shop-gold">0</b> gold</span>
-          <button id="shop-tp" title="Buy a teleport scroll">+ TP (50)</button>
+          <span id="shop-note"></span>
+          <button id="shop-tp" title="Buy a teleport scroll">+ TP <small>50</small></button>
           <button id="shop-close">✕</button>
         </div>
-        <p id="shop-note"></p>
-        <div id="shop-items"></div>
+        <div class="shop-body">
+          <div id="shop-tabs"></div>
+          <div class="shop-mid">
+            <div id="shop-items"></div>
+            <div id="shop-own"></div>
+          </div>
+          <div id="shop-detail"></div>
+        </div>
       </div>
 
       <div id="tp-picker" class="hidden">

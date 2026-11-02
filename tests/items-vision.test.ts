@@ -50,7 +50,7 @@ describe('shop & items', () => {
     expect(v.hero!.items[1]).toBeNull();
   });
 
-  it('has 6 slots, stacks salves, sells for half price', () => {
+  it('has 6 slots, stacks salves, sells for full price right after buying and half price later', () => {
     const { w, hero } = humans();
     const b = hero(0, 'brakk');
     b.hero!.gold = 10000;
@@ -58,10 +58,20 @@ describe('shop & items', () => {
     expect(b.hero!.items[0]).toMatchObject({ id: 'healingSalve', count: 3 });
     for (let i = 0; i < 6; i++) w.applyCommand({ type: 'buy', unitId: b.id, itemId: 'guardPlate' });
     expect(b.hero!.items.filter(Boolean).length).toBe(6);
-    const gold = b.hero!.gold;
-    w.applyCommand({ type: 'sell', unitId: b.id, slot: 1 });
-    expect(b.hero!.gold).toBe(gold + ITEMS.guardPlate.cost / 2);
+    let gold = b.hero!.gold;
+    w.applyCommand({ type: 'sell', unitId: b.id, slot: 1 }); // changed my mind: full refund
+    expect(b.hero!.gold).toBe(gold + ITEMS.guardPlate.cost);
     expect(b.hero!.items[1]).toBeNull();
+    w.time += 11; // later: half price
+    gold = b.hero!.gold;
+    w.applyCommand({ type: 'sell', unitId: b.id, slot: 2 });
+    expect(b.hero!.gold).toBe(gold + ITEMS.guardPlate.cost / 2);
+    // Dead heroes are back at base, so they can shop.
+    b.hp = 0;
+    b.alive = false;
+    gold = b.hero!.gold;
+    w.applyCommand({ type: 'buy', unitId: b.id, itemId: 'ironBlade' });
+    expect(b.hero!.gold).toBe(gold - ITEMS.ironBlade.cost);
   });
 
   it('Healing Salve heals over time and is consumed', () => {

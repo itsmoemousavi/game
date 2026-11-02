@@ -10,7 +10,12 @@ export interface ItemSlot {
   count: number;
   /** Seconds until an item with a button can be used again. */
   cooldown?: number;
+  /** Match time it was bought (sold within SELL_REFUND_WINDOW it refunds in full). */
+  boughtAt?: number;
 }
+
+/** Changed your mind? Selling an item within this many seconds of buying it refunds the full price. */
+export const SELL_REFUND_WINDOW = 10;
 
 /** Sum of item stats; boots don't stack and cooldown reduction is capped. */
 export function itemBonuses(items: (ItemSlot | null)[]): Required<ItemStats> {
@@ -70,7 +75,8 @@ export function priceFor(h: NonNullable<Unit['hero']>, id: ItemId): number {
 /** Why `id` can't be bought right now, or null. */
 export function buyBlocker(w: World, u: Unit, id: ItemId): 'shop' | 'gold' | 'full' | null {
   const h = u.hero!;
-  if (!u.alive || !inShop(w, u)) return 'shop';
+  // While dead you're back at base (you respawn at the fountain), so the shop is open.
+  if (u.alive && !inShop(w, u)) return 'shop';
   if (h.gold < priceFor(h, id)) return 'gold';
   const def = ITEMS[id];
   const stack = def.consumable && h.items.some((s) => s?.id === id && s.count < def.consumable!.maxStack);
@@ -87,18 +93,26 @@ export function buyItem(w: World, u: Unit, id: ItemId): boolean {
   // Combining: the parts are used up.
   for (const i of recipeParts(h, id)) h.items[i] = null;
   const stack = def.consumable ? h.items.find((s) => s?.id === id && s.count < def.consumable!.maxStack) : undefined;
-  if (stack) stack.count++;
-  else h.items[h.items.indexOf(null)] = { id, count: 1, cooldown: 0 };
+  if (stack) {
+    stack.count++;
+    stack.boughtAt = w.time;
+  } else h.items[h.items.indexOf(null)] = { id, count: 1, cooldown: 0, boughtAt: w.time };
   w.applyHeroStats(u);
   w.events.push({ type: 'purchase', unitId: u.id });
   return true;
 }
 
+/** What an item sells for: full price just after buying it, half price after that. */
+export function sellPrice(w: World, s: ItemSlot): number {
+  const full = ITEMS[s.id].cost * s.count;
+  return w.time - (s.boughtAt ?? -999) <= SELL_REFUND_WINDOW ? full : Math.floor(full / 2);
+}
+
 export function sellItem(w: World, u: Unit, slot: number): boolean {
   const h = u.hero!;
   const s = h.items[slot];
-  if (!s || !inShop(w, u)) return false;
-  h.gold += Math.floor((ITEMS[s.id].cost * s.count) / 2);
+  if (!s || (u.alive && !inShop(w, u))) return false;
+  h.gold += sellPrice(w, s);
   h.items[slot] = null;
   w.applyHeroStats(u);
   return true;
@@ -165,7 +179,7 @@ export function useItem(w: World, u: Unit, slot: number, x?: number, y?: number)
 
 export function buyTeleport(w: World, u: Unit): boolean {
   const h = u.hero!;
-  if (!u.alive || !inShop(w, u) || h.gold < TELEPORT.cost) return false;
+  if ((u.alive && !inShop(w, u)) || h.gold < TELEPORT.cost) return false;
   h.gold -= TELEPORT.cost;
   h.tpCount++;
   w.events.push({ type: 'purchase', unitId: u.id });
