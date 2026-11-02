@@ -771,9 +771,9 @@ export class World {
       facing: team === 0 ? -Math.PI / 4 : (3 * Math.PI) / 4,
       path: null,
       pathGoal: null,
-      repathAt: 0,
+      repathAt: -1e9,
       stunTimer: 0,
-      revealUntil: -1,
+      revealUntil: -1e9, // far in the past (the clock starts below zero during the warm-up)
       castLock: 0,
       buffs: [],
       dash: null,
@@ -889,7 +889,7 @@ export class World {
       ];
       for (const [kind, ox, oy] of pack) {
         const u = this.newUnit('neutral', 2, { x: c.x + ox, y: c.y + oy }, NEUTRALS[kind]);
-        u.neutral = { camp, homeX: u.x, homeY: u.y, aggroUntil: 0 };
+        u.neutral = { camp, homeX: u.x, homeY: u.y, aggroUntil: -1e9 };
       }
     });
   }
@@ -1274,7 +1274,7 @@ export class World {
     // Gave chase too far: give up and go home.
     if (t && dist(t.x, t.y, n.homeX, n.homeY) > WARDEN_LEASH) {
       t = undefined;
-      n.aggroUntil = 0;
+      n.aggroUntil = -1e9;
     }
     // Still angry but its target is gone: anyone in the house will do.
     if (!t && this.time < n.aggroUntil) {

@@ -123,7 +123,7 @@ function pickRune(w: World, h: Unit, r: Rune) {
 export function spawnBoss(w: World) {
   const p = w.map.bossPit;
   const u = w.spawnUnit('neutral', 2, p, BOSS);
-  u.neutral = { camp: -1, homeX: p.x, homeY: p.y, boss: true, aggroUntil: 0 };
+  u.neutral = { camp: -1, homeX: p.x, homeY: p.y, boss: true, aggroUntil: -1e9 };
 }
 
 // ------------------------------------------------------------------ wards

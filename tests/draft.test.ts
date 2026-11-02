@@ -68,4 +68,16 @@ describe('warm-up', () => {
     for (let i = 0; i < 1 * TICK_RATE; i++) w.step();
     expect(w.units.some((u) => u.creep)).toBe(true);
   });
+
+  it('during the warm-up enemies stay hidden in the fog, and the Warden is calm', () => {
+    const slots: PlayerSlot[] = [];
+    for (const team of [0, 1] as Team[]) HERO_IDS.slice(0, 3).forEach((heroId, i) => slots.push({ team, heroId, controller: 'human', lane: LANE_IDS[i] }));
+    const w = new World({ seed: 4, slots, warmup: WARMUP_SECONDS });
+    for (let i = 0; i < 2 * TICK_RATE; i++) w.step();
+    expect(w.time).toBeLessThan(0);
+    for (const foe of w.heroes.filter((h) => h.team === 1)) expect(w.canSee(0, foe)).toBe(false);
+    const boss = w.units.find((u) => u.neutral?.boss)!;
+    expect(w.canSee(0, boss)).toBe(false);
+    expect(w.time < boss.neutral!.aggroUntil).toBe(false);
+  });
 });

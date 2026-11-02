@@ -76,8 +76,8 @@ const mirrorLane = (l: LaneId): LaneId => (l === 'top' ? 'bot' : l === 'bot' ? '
 const S = MAP_SIZE / 200;
 const sc = (p: Vec2): Vec2 => ({ x: p.x * S, y: p.y * S });
 
-const LANE_WIDTH = 14;
-const JUNGLE_WIDTH = 7;
+const LANE_WIDTH = 18;
+const JUNGLE_WIDTH = 10;
 
 const LANES_200: Record<LaneId, Vec2[]> = {
   top: [
@@ -133,7 +133,7 @@ const FOREST_PATHS_200: Vec2[][] = [
   [{ x: 87, y: 128 }, { x: 90, y: 144 }],
 ];
 const FOREST_PATHS = FOREST_PATHS_200.map((p) => p.map(sc));
-const FOREST_PATH_WIDTH = 4.2;
+const FOREST_PATH_WIDTH = 5.5;
 /** Ward hills (height 3) on the forest paths. */
 const HILLS_200: Vec2[] = [
   { x: 34, y: 86 },
@@ -166,7 +166,7 @@ const BOSS_PIT: Vec2 = sc({ x: 150, y: 150 });
  */
 const HOUSE: House = (() => {
   const d = Math.SQRT1_2;
-  return { x: BOSS_PIT.x, y: BOSS_PIT.y, inner: 5.5, outer: 8.5, door: { x: -d, y: -d }, doorHalf: 2.9 };
+  return { x: BOSS_PIT.x, y: BOSS_PIT.y, inner: 5, outer: 8, door: { x: -d, y: -d }, doorHalf: 4 };
 })();
 /** Open ground around the house, so you can walk all the way round it. */
 const HOUSE_CLEARING = 12;
@@ -180,8 +180,8 @@ const RIVER: [Vec2, Vec2] = [sc({ x: 20, y: 20 }), sc({ x: 180, y: 180 })];
 const T1_FRACTION = 0.86;
 /** Tier-2 towers stand a bit further back toward the base. */
 const T2_FRACTION = 0.45;
-/** Towers stand beside the lane, not in the middle of it. */
-const TOWER_SIDE_OFFSET = 4.5;
+/** Towers stand at the lane edge (half in a pocket of their own) so they never narrow the lane much. */
+const TOWER_SIDE_OFFSET = LANE_WIDTH / 2 + 1;
 /** Tier-3 tower + barracks form a gate this far from where the lane leaves the base. */
 const GATE_DISTANCE = 5 * S;
 
@@ -270,8 +270,8 @@ export function createMap(): GameMap {
     structures.push({ team: 0, tier: 'tower3', lane, pos: t3Pos });
     structures.push({ team: 0, tier: 'barracks', lane, pos: meleePos, rax: 'melee' });
     structures.push({ team: 0, tier: 'barracks', lane, pos: rangedPos, rax: 'ranged' });
-    for (const p of [t1Pos, t2Pos, t3Pos]) carveCircle(p, 3.5);
-    for (const p of [meleePos, rangedPos]) carveCircle(p, 4.5);
+    for (const p of [t1Pos, t2Pos, t3Pos]) carveCircle(p, 5.5); // room to walk all the way round
+    for (const p of [meleePos, rangedPos]) carveCircle(p, 6.5);
   }
   // Shrine towers flank the Shrine on the side facing the lanes.
   const toCenter = Math.atan2(-1, 1);

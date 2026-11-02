@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LANE_IDS, MAP_SIZE, createMap, findPath, isWalkable, lineClear, mirror } from '../src/sim';
+import { LANE_IDS, MAP_SIZE, World, createMap, findPath, isWalkable, lineClear, mirror, pointAlong, polylineLength } from '../src/sim';
 
 const map = createMap();
 
@@ -61,5 +61,34 @@ describe('map', () => {
     const last = path![path!.length - 1];
     expect(Math.hypot(last.x - map.fountains[1].x, last.y - map.fountains[1].y)).toBeLessThan(2);
     expect(MAP_SIZE).toBe(300);
+  });
+
+  it('buildings never squeeze a lane: at least 14 m of open ground all along every lane', () => {
+    const nav = new World({ seed: 1, slots: [] }).nav;
+    for (const lane of LANE_IDS) {
+      const p = map.lanes[lane];
+      for (let d = 30; d < polylineLength(p) - 30; d += 1) {
+        const a = pointAlong(p, d);
+        const b = pointAlong(p, d + 0.5);
+        const l = Math.hypot(b.x - a.x, b.y - a.y);
+        const nx = -(b.y - a.y) / l;
+        const ny = (b.x - a.x) / l;
+        let best = 0;
+        let run = 0;
+        for (let t = -12; t <= 12; t += 0.25) {
+          if (isWalkable(nav, a.x + nx * t, a.y + ny * t)) best = Math.max(best, (run += 0.25));
+          else run = 0;
+        }
+        expect(best, `${lane} lane at ${a.x.toFixed(0)},${a.y.toFixed(0)}`).toBeGreaterThanOrEqual(14);
+      }
+    }
+  });
+
+  it('every building can be walked up to from both bases', () => {
+    const nav = new World({ seed: 1, slots: [] }).nav;
+    for (const s of map.structures) {
+      if (s.tier === 'fountain') continue;
+      for (const f of map.fountains) expect(findPath(nav, f, s.pos, 0.42), `${s.tier} ${s.lane} team ${s.team}`).not.toBeNull();
+    }
   });
 });

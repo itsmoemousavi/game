@@ -224,21 +224,35 @@ describe('trees block sight', () => {
     const { w, hero } = humans();
     const me = hero(0, 'vexa');
     const foe = hero(1, 'brakk');
-    // Jungle room (78,156) and a point 12 m away in a direction blocked by solid forest.
-    place(me, 78, 156);
-    let blocked: { x: number; y: number } | null = null;
-    for (let a = 0; a < 360 && !blocked; a += 5) {
-      const p = { x: 78 + Math.cos((a * Math.PI) / 180) * 12, y: 156 + Math.sin((a * Math.PI) / 180) * 12 };
-      // Clearly behind trees: blocked even with the line shifted 1.5 m either side.
-      const shifted = [-1.5, 0, 1.5].every((o) => !lineClear(w.map, { x: me.x + o, y: me.y + o }, { x: p.x + o, y: p.y - o }));
-      if (shifted && isWalkable(w.map, p.x, p.y)) blocked = p;
+    // Stand in a jungle room on our side. Some walkable spot 12-18 m away must be hidden
+    // behind trees, while a spot at the same distance with an open view is seen.
+    const at = (x: number, y: number, r: number, deg: number) => ({ x: x + Math.cos((deg * Math.PI) / 180) * r, y: y + Math.sin((deg * Math.PI) / 180) * r });
+    let hidden: { x: number; y: number } | null = null;
+    let open: { x: number; y: number } | null = null;
+    let c = w.map.camps[0];
+    for (const camp of w.map.camps.slice(0, 3)) {
+      c = camp;
+      place(me, c.x, c.y);
+      run(w, 0.2);
+      hidden = null;
+      open = null;
+      for (let r = 12; r <= 16; r += 2) {
+        for (let deg = 0; deg < 360; deg += 5) {
+          const p = at(c.x, c.y, r, deg);
+          if (!isWalkable(w.map, p.x, p.y)) continue;
+          const lines = [-1.5, 0, 1.5].map((o) => lineClear(w.map, { x: c.x + o, y: c.y + o }, { x: p.x + o, y: p.y - o }));
+          if (lines.every((l) => !l) && !w.vision.seesPoint(0, p.x, p.y)) hidden ??= p;
+          if (lines.every((l) => l) && lineClear(w.map, c, p, 1.5)) open ??= p;
+        }
+      }
+      if (hidden && open) break;
     }
-    expect(blocked).not.toBeNull();
-    place(foe, blocked!.x, blocked!.y);
+    expect(hidden).not.toBeNull();
+    expect(open).not.toBeNull();
+    place(foe, hidden!.x, hidden!.y);
     run(w, 0.2);
     expect(w.canSee(0, foe)).toBe(false);
-    // Same 12 m but along the open corridor toward the river.
-    place(foe, 78 + 12 * 0.41, 156 - 12 * 0.91);
+    place(foe, open!.x, open!.y);
     run(w, 0.2);
     expect(w.canSee(0, foe)).toBe(true);
   });
