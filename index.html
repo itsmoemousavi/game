@@ -11,18 +11,24 @@
   <body>
     <div id="root">
     <section id="select">
-      <h1>Shrinefall <small>prototype</small></h1>
-      <p class="tag">3v3 · Destroy the enemy Shrine · Empty slots are filled by bots</p>
-      <div id="hero-cards"></div>
-      <div class="row">
-        <span>Your lane</span>
-        <div id="lane-pick"></div>
-        <span>Bots</span>
-        <div id="diff-pick"></div>
-        <button id="btn-play">Play vs Bots</button>
-        <button id="btn-practice" class="alt">Practice</button>
-        <button id="btn-tutorial" class="alt">Tutorial</button>
+      <header class="menu-top">
+        <div class="logo">SHRINE<span>FALL</span></div>
+        <div class="menu-tag">3v3 · Break the towers · Destroy the enemy Shrine</div>
+      </header>
+      <div class="menu-main">
+        <div class="menu-info" id="hero-info"></div>
+        <div class="menu-stage"><canvas id="menu3d"></canvas><div class="stage-hint">Drag to turn</div></div>
+        <div class="menu-side">
+          <div class="opt"><span>Lane</span><div id="lane-pick" class="seg"></div></div>
+          <div class="opt"><span>Bots</span><div id="diff-pick" class="seg"></div></div>
+          <button id="btn-play"><b>PLAY</b><small>vs Bots</small></button>
+          <div class="menu-minor">
+            <button id="btn-practice" class="alt">Practice</button>
+            <button id="btn-tutorial" class="alt">Tutorial</button>
+          </div>
+        </div>
       </div>
+      <div id="hero-cards"></div>
     </section>
 
     <div id="app" class="hidden">

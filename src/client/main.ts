@@ -10,6 +10,7 @@ import { GameEvent, HEROES as HERO_DEFS, PingKind, RUNE_INFO, RuneKind, TEAM_NAM
 import { PING_STYLE } from './renderer';
 import { Renderer } from './renderer';
 import { Renderer3D } from './renderer3d';
+import { MenuShowcase } from './menu3d';
 import { enterImmersive, setupLandscape } from './screen';
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
@@ -37,27 +38,45 @@ try {
 // ------------------------------------------------------------- hero select
 
 const cards = $<HTMLElement>('#hero-cards');
+const info = $<HTMLElement>('#hero-info');
+let showcase: MenuShowcase | null = null;
+try {
+  showcase = new MenuShowcase($<HTMLCanvasElement>('#menu3d'));
+} catch (err) {
+  console.warn('3D hero preview unavailable', err);
+}
+function pickHero(id: HeroId) {
+  pickedHero = id;
+  const d = HEROES[id];
+  select.style.setProperty('--hc', d.color);
+  cards.querySelectorAll<HTMLElement>('.hero-card').forEach((c) => c.classList.toggle('picked', c.dataset.hero === id));
+  info.innerHTML = `
+    <div class="role">${d.role}</div>
+    <h2>${d.name}</h2>
+    <div class="title">${d.title} · ${d.projectileSpeed ? 'ranged' : 'melee'}</div>
+    <div class="abil">${d.abilities
+      .map((a) => `<div><b>${a.slot}</b><span><em>${a.name}${a.ultimate ? '<span class="ult">ULT</span>' : ''}</em><i>${a.summary}</i></span></div>`)
+      .join('')}</div>`;
+  showcase?.show(id);
+}
 for (const id of HERO_IDS) {
   const d = HEROES[id];
   const card = document.createElement('button');
   card.className = 'hero-card';
   card.dataset.hero = id;
-  card.innerHTML = `
-    <div class="portrait" style="background:${d.color}">${d.name[0]}</div>
-    <div class="info">
-      <div class="hname">${d.name} <span>${d.title}</span></div>
-      <div class="role">${d.role} · ${d.projectileSpeed ? 'Ranged' : 'Melee'}</div>
-      <ul>${d.abilities
-        .map((a) => `<li><b>${a.slot}${a.ultimate ? ' (Ult)' : ''}</b> ${a.name}${a.targeting === 'passive' ? ' <i>passive</i>' : ''}</li>`)
-        .join('')}</ul>
-    </div>`;
-  card.addEventListener('click', () => {
-    pickedHero = id;
-    cards.querySelectorAll('.hero-card').forEach((c) => c.classList.toggle('picked', c === card));
-  });
+  card.style.setProperty('--c', d.color);
+  card.innerHTML = `<div class="portrait">${d.name[0]}</div><span>${d.name}</span>`;
+  card.addEventListener('click', () => pickHero(id));
   cards.appendChild(card);
 }
-(cards.firstElementChild as HTMLElement).classList.add('picked');
+if (showcase) {
+  const pics = showcase.portraits();
+  cards.querySelectorAll<HTMLElement>('.hero-card').forEach((c) => {
+    c.querySelector('.portrait')!.innerHTML = `<img alt="" src="${pics[c.dataset.hero as HeroId]}">`;
+  });
+  showcase.start();
+}
+pickHero(pickedHero);
 
 const lanes = $<HTMLElement>('#lane-pick');
 for (const l of LANE_IDS) {
@@ -117,6 +136,7 @@ const hud = new Hud(app, () => {
   app.classList.add('hidden');
   select.classList.remove('hidden');
   world = null;
+  showcase?.start();
 });
 
 const sfx = new Sfx();
@@ -430,6 +450,7 @@ practicePanel.querySelectorAll<HTMLElement>('[data-cheat]').forEach((b) =>
 
 function startMatch(m: Mode) {
   select.classList.add('hidden');
+  showcase?.stop();
   app.classList.remove('hidden');
   const slots = m === 'bots' ? buildSlots() : [{ team: myTeam, heroId: pickedHero, controller: 'human' as const, lane: pickedLane }];
   world = new World({ seed: (Date.now() & 0xffff) + 1, slots });
@@ -462,6 +483,7 @@ function startMatch(m: Mode) {
 
 setupLandscape($<HTMLElement>('#root'), () => {
   renderer?.resize();
+  showcase?.resize();
   if (renderer) {
     const mm = renderer.minimapRect();
     $<HTMLElement>('#btn-glyph').style.top = `${mm.y + mm.size + 10}px`;
