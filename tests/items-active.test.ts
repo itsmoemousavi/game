@@ -50,12 +50,12 @@ describe('items with a button', () => {
     const b = hero(0, 'brakk');
     b.hero!.gold = 5000;
     w.applyCommand({ type: 'buy', unitId: b.id, itemId: 'shadowStep' });
-    place(b, 70, 130); // mid lane
-    w.applyCommand({ type: 'useItem', unitId: b.id, slot: 0, x: 77, y: 123 }); // 9.9 m away
-    expect(Math.hypot(b.x - 77, b.y - 123)).toBeLessThan(1.5);
+    place(b, 120, 180); // mid lane
+    w.applyCommand({ type: 'useItem', unitId: b.id, slot: 0, x: 127, y: 173 }); // 9.9 m away
+    expect(Math.hypot(b.x - 127, b.y - 173)).toBeLessThan(1.5);
     expect(b.hero!.items[0]!.cooldown).toBeGreaterThan(10);
     const x = b.x;
-    w.applyCommand({ type: 'useItem', unitId: b.id, slot: 0, x: 60, y: 140 });
+    w.applyCommand({ type: 'useItem', unitId: b.id, slot: 0, x: 110, y: 190 });
     expect(b.x).toBe(x); // on cooldown
   });
 
@@ -64,10 +64,10 @@ describe('items with a button', () => {
     const b = hero(0, 'brakk');
     b.hero!.gold = 5000;
     w.applyCommand({ type: 'buy', unitId: b.id, itemId: 'shadowStep' });
-    place(b, 70, 130);
-    w.applyCommand({ type: 'useItem', unitId: b.id, slot: 0, x: 90, y: 110 }); // 28 m away
-    expect(Math.hypot(b.x - 70, b.y - 130)).toBeLessThan(12.2);
-    expect(Math.hypot(b.x - 70, b.y - 130)).toBeGreaterThan(9.5);
+    place(b, 120, 180);
+    w.applyCommand({ type: 'useItem', unitId: b.id, slot: 0, x: 140, y: 160 }); // 28 m away
+    expect(Math.hypot(b.x - 120, b.y - 180)).toBeLessThan(12.2);
+    expect(Math.hypot(b.x - 120, b.y - 180)).toBeGreaterThan(9.5);
   });
 
   it("Shadow Step can't be used right after taking hero damage", () => {

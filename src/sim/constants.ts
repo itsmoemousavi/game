@@ -3,7 +3,7 @@ export const TICK_RATE = 30;
 export const DT = 1 / TICK_RATE;
 
 /** World is MAP_SIZE x MAP_SIZE "meters". The walk grid uses CELL-sized cells. */
-export const MAP_SIZE = 200;
+export const MAP_SIZE = 300;
 export const CELL = 2;
 export const GRID = MAP_SIZE / CELL;
 

@@ -25,7 +25,7 @@ npx vite-node scripts/simulate.ts [seed] [minutes]   # headless all-bot match lo
 
 | | Phone (landscape) | Desktop |
 |---|---|---|
-| Move | Drag anywhere on the left half (virtual joystick) · quick tap anywhere = walk there / attack what you tapped | Arrow keys, or right-click the ground |
+| Move | Drag anywhere on the left half (virtual joystick) · tap an enemy to attack it · while holding the minimap, tap the map to walk there | Arrow keys, or right-click the ground |
 | Attack | **Hold Attack** (works together with the joystick: hits what's in range, otherwise you keep walking) · tap an enemy to attack it | Hold Space, or click an enemy |
 | Abilities | **Hold** Q/W/R: arrow appears · **drag** any direction to aim · release to cast · release on ✕ Cancel to abort | Q / W / R cast at the cursor |
 | Items | Tap an item to use it (salves) · **ward**: tap its slot, then tap the ground · 🛒 opens the shop (buy at base) · **TP** slot: tap, then pick a friendly building (teleports are bought in the shop) | same (click) |

@@ -35,6 +35,7 @@ export class Renderer3D extends Renderer {
   private sky: THREE.HemisphereLight;
   private elev: Float32Array;
   private grid: number;
+  private mapSize: number;
   private terrain3d: THREE.Mesh;
   private fogTex: THREE.DataTexture;
   private fxCanvas = document.createElement('canvas');
@@ -84,6 +85,7 @@ export class Renderer3D extends Renderer {
 
     // ---- terrain with height
     this.grid = map.grid;
+    this.mapSize = map.size;
     const n = map.grid;
     this.elev = new Float32Array((n + 1) * (n + 1));
     for (let vy = 0; vy <= n; vy++) {
@@ -177,7 +179,7 @@ export class Renderer3D extends Renderer {
   /** Ground height at a world point (matches the terrain mesh). */
   elevationAt(x: number, y: number): number {
     const n = this.grid;
-    const cell = 200 / n;
+    const cell = this.mapSize / n;
     const fx = Math.max(0, Math.min(n - 0.001, x / cell));
     const fy = Math.max(0, Math.min(n - 0.001, y / cell));
     const ix = Math.floor(fx);
@@ -315,7 +317,7 @@ export class Renderer3D extends Renderer {
     c.clearRect(0, FX_PX - 2, FX_PX, 2);
     c.clearRect(0, 0, 2, FX_PX);
     c.clearRect(FX_PX - 2, 0, 2, FX_PX);
-    this.fxTex.offset.set(-this.fxX / FX_SPAN, 1 - 200 / FX_SPAN + this.fxY / FX_SPAN);
+    this.fxTex.offset.set(-this.fxX / FX_SPAN, 1 - this.mapSize / FX_SPAN + this.fxY / FX_SPAN);
     this.fxTex.needsUpdate = true;
 
     // 2. Fog of war + trees in fog + day/night.

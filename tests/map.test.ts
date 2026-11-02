@@ -45,6 +45,6 @@ describe('map', () => {
     expect(path).not.toBeNull();
     const last = path![path!.length - 1];
     expect(Math.hypot(last.x - map.fountains[1].x, last.y - map.fountains[1].y)).toBeLessThan(2);
-    expect(MAP_SIZE).toBe(200);
+    expect(MAP_SIZE).toBe(300);
   });
 });

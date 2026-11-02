@@ -45,9 +45,9 @@ describe('simulation', () => {
     expect(me.x).toBeGreaterThan(start.x);
     expect(me.y).toBeLessThan(start.y);
     // A jungle room in our own half: reaching it requires pathing through the maze.
-    w.enqueue({ type: 'moveTo', unitId: me.id, x: 52, y: 104 });
-    run(w, 25);
-    expect(Math.hypot(me.x - 52, me.y - 104)).toBeLessThan(2);
+    w.enqueue({ type: 'moveTo', unitId: me.id, x: 78, y: 156 });
+    run(w, 38);
+    expect(Math.hypot(me.x - 78, me.y - 156)).toBeLessThan(2);
     expect(me.hero!.order.type).toBe('idle');
   });
 

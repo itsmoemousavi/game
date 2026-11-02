@@ -45,10 +45,10 @@ describe('pings', () => {
     const w = new World({ seed: 32, slots });
     const me = w.heroes.find((h) => h.team === 0 && h.hero!.controller === 'human')!;
     run(w, 3);
-    const spot = { x: 52, y: 104 }; // our jungle
+    const spot = { x: 78, y: 156 }; // our jungle
     w.applyCommand({ type: 'ping', unitId: me.id, kind: 'gather', x: spot.x, y: spot.y });
     expect(w.pings.length).toBe(1);
-    run(w, 9);
+    run(w, 10);
     const bots = w.heroes.filter((h) => h.team === 0 && h.hero!.controller === 'bot');
     const close = bots.filter((b) => Math.hypot(b.x - spot.x, b.y - spot.y) < 14);
     expect(close.length).toBeGreaterThanOrEqual(1);

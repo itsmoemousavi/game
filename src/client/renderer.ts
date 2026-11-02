@@ -22,8 +22,8 @@ export class Renderer {
   /** true: draw everything top-down (2D). false: draw only the ground layer (the 3D view adds the rest). */
   protected flat = true;
   protected mapImage: HTMLCanvasElement;
-  camX = 100;
-  camY = 100;
+  camX = 150;
+  camY = 150;
   /** CSS pixels per world meter. */
   zoom = 10;
   zoomFactor = 1;

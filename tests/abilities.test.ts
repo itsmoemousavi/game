@@ -8,7 +8,7 @@ function arena() {
   const w = new World({ seed: 3, slots });
   const hero = (team: Team, id: string) => w.heroes.find((h) => h.team === team && h.hero!.defId === id)!;
   // Park everybody far apart so nothing interacts unless a test places it.
-  w.heroes.forEach((h, i) => place(h, 20 + i * 2, 186));
+  w.heroes.forEach((h, i) => place(h, 25 + i * 2, 281));
   return { w, hero };
 }
 
@@ -53,16 +53,16 @@ describe('abilities', () => {
     const { w, hero } = arena();
     const b = hero(0, 'brakk');
     const v = hero(1, 'vexa');
-    place(b, 46, 104);
-    place(v, 54, 104);
+    place(b, 72, 156);
+    place(v, 80, 156);
     learn(w, b, 0);
-    w.applyCommand({ type: 'cast', unitId: b.id, slot: 0, x: 60, y: 104 });
+    w.applyCommand({ type: 'cast', unitId: b.id, slot: 0, x: 86, y: 156 });
     expect(b.mana).toBeLessThan(b.maxMana);
     expect(b.hero!.abilities[0].cooldown).toBeGreaterThan(0);
     run(w, 0.5);
     expect(v.hp).toBeLessThan(v.maxHp);
     expect(v.stunTimer).toBeGreaterThan(0);
-    expect(b.x).toBeGreaterThan(50);
+    expect(b.x).toBeGreaterThan(76);
   });
 
   it('cannot cast on cooldown or without mana', () => {
@@ -81,9 +81,9 @@ describe('abilities', () => {
     const [e1, e2] = [hero(1, 'vexa'), hero(1, 'orin')];
     levelTo(w, b, 6);
     learn(w, b, 2);
-    place(b, 52, 104);
-    place(e1, 55, 104);
-    place(e2, 52, 108);
+    place(b, 78, 156);
+    place(e1, 81, 156);
+    place(e2, 78, 160);
     e1.hero!.order = { type: 'idle' };
     w.applyCommand({ type: 'cast', unitId: b.id, slot: 2 });
     run(w, 0.3);
@@ -98,11 +98,11 @@ describe('abilities', () => {
     const { w, hero } = arena();
     const v = hero(0, 'vexa');
     const [a, b] = [hero(1, 'brakk'), hero(1, 'orin')];
-    place(v, 46, 104);
-    place(a, 51, 104);
-    place(b, 56, 104);
+    place(v, 72, 156);
+    place(a, 77, 156);
+    place(b, 82, 156);
     learn(w, v, 0);
-    w.applyCommand({ type: 'cast', unitId: v.id, slot: 0, x: 60, y: 104 });
+    w.applyCommand({ type: 'cast', unitId: v.id, slot: 0, x: 86, y: 156 });
     run(w, 0.6);
     expect(a.hp).toBeLessThan(a.maxHp);
     expect(b.hp).toBeLessThan(b.maxHp);
@@ -114,10 +114,10 @@ describe('abilities', () => {
     const e = hero(1, 'brakk');
     levelTo(w, v, 6);
     learn(w, v, 2);
-    place(v, 46, 104);
-    place(e, 54, 104);
+    place(v, 72, 156);
+    place(e, 80, 156);
     const speed = w.speedOf(e);
-    w.applyCommand({ type: 'cast', unitId: v.id, slot: 2, x: 54, y: 104 });
+    w.applyCommand({ type: 'cast', unitId: v.id, slot: 2, x: 80, y: 156 });
     run(w, 1);
     expect(e.hp).toBeLessThan(e.maxHp);
     expect(w.speedOf(e)).toBeLessThan(speed);
@@ -128,8 +128,8 @@ describe('abilities', () => {
     const v = hero(0, 'vexa');
     const e = hero(1, 'brakk');
     learn(w, v, 1);
-    place(v, 46, 104);
-    place(e, 52, 104);
+    place(v, 72, 156);
+    place(e, 78, 156);
     const hits: number[] = [];
     const orig = w.dealDamage.bind(w);
     w.dealDamage = (src, t, raw, kind) => {
@@ -146,11 +146,11 @@ describe('abilities', () => {
     const { w, hero } = arena();
     const o = hero(0, 'orin');
     const [a, b] = [hero(1, 'brakk'), hero(1, 'vexa')];
-    place(o, 42, 105);
-    place(a, 52, 104);
-    place(b, 53, 106);
+    place(o, 68, 157);
+    place(a, 78, 156);
+    place(b, 79, 158);
     learn(w, o, 0);
-    w.applyCommand({ type: 'cast', unitId: o.id, slot: 0, x: 60, y: 104 });
+    w.applyCommand({ type: 'cast', unitId: o.id, slot: 0, x: 86, y: 156 });
     run(w, 0.6);
     expect(a.hp).toBeLessThan(a.maxHp);
     expect(b.hp).toBeLessThan(b.maxHp);
@@ -160,11 +160,11 @@ describe('abilities', () => {
     const { w, hero } = arena();
     const o = hero(0, 'orin');
     const a = hero(1, 'brakk');
-    place(o, 46, 104);
-    place(a, 34, 107);
+    place(o, 72, 156);
+    place(a, 60, 159);
     o.facing = 0; // facing away (east); enemy is behind (west)
     learn(w, o, 0);
-    w.applyCommand({ type: 'cast', unitId: o.id, slot: 0, x: 34, y: 107 });
+    w.applyCommand({ type: 'cast', unitId: o.id, slot: 0, x: 60, y: 159 });
     run(w, 0.8);
     expect(a.hp).toBeLessThan(a.maxHp);
 
@@ -172,10 +172,10 @@ describe('abilities', () => {
     const { w: w2, hero: hero2 } = arena();
     const o2 = hero2(0, 'orin');
     const a2 = hero2(1, 'brakk');
-    place(o2, 46, 104);
-    place(a2, 58.5, 104); // outside auto-attack range
+    place(o2, 72, 156);
+    place(a2, 84.5, 156); // outside auto-attack range
     learn(w2, o2, 0);
-    w2.applyCommand({ type: 'cast', unitId: o2.id, slot: 0, x: 46, y: 90 });
+    w2.applyCommand({ type: 'cast', unitId: o2.id, slot: 0, x: 72, y: 142 });
     run(w2, 1);
     expect(a2.hp).toBe(a2.maxHp);
   });
@@ -184,8 +184,8 @@ describe('abilities', () => {
     const { w, hero } = arena();
     const o = hero(0, 'orin');
     const ally = hero(0, 'brakk');
-    place(o, 46, 104);
-    place(ally, 50, 104);
+    place(o, 72, 156);
+    place(ally, 76, 156);
     ally.hp = 200;
     learn(w, o, 1);
     w.applyCommand({ type: 'cast', unitId: o.id, slot: 1, targetId: ally.id });
@@ -200,9 +200,9 @@ describe('abilities', () => {
     levelTo(w, o, 6);
     learn(w, o, 2);
     // Out of Orin's attack range (so only the spell hurts), inside cast range.
-    place(o, 42, 105);
-    place(e, 54, 104);
-    w.applyCommand({ type: 'cast', unitId: o.id, slot: 2, x: 54, y: 104 });
+    place(o, 68, 157);
+    place(e, 80, 156);
+    w.applyCommand({ type: 'cast', unitId: o.id, slot: 2, x: 80, y: 156 });
     run(w, 1);
     expect(e.hp).toBe(e.maxHp);
     run(w, 0.7);
@@ -236,12 +236,12 @@ describe('abilities', () => {
   it('stunned heroes cannot move', () => {
     const { w, hero } = arena();
     const b = hero(0, 'brakk');
-    place(b, 46, 104);
+    place(b, 72, 156);
     w.stun(b, 1);
     w.applyCommand({ type: 'moveDir', unitId: b.id, dx: 1, dy: 0 });
     run(w, 0.5);
-    expect(b.x).toBe(46);
+    expect(b.x).toBe(72);
     run(w, 1);
-    expect(b.x).toBeGreaterThan(46);
+    expect(b.x).toBeGreaterThan(72);
   });
 });

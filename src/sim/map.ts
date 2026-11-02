@@ -52,10 +52,17 @@ export interface GameMap {
 export const mirror = (p: Vec2): Vec2 => ({ x: MAP_SIZE - p.x, y: MAP_SIZE - p.y });
 const mirrorLane = (l: LaneId): LaneId => (l === 'top' ? 'bot' : l === 'bot' ? 'top' : 'mid');
 
-const LANE_WIDTH = 12;
-const JUNGLE_WIDTH = 6;
+/**
+ * The layout below is written for a 200 m map and scaled up to MAP_SIZE (so the whole map
+ * can be made bigger without redrawing it). Corridor widths stay about the same.
+ */
+const S = MAP_SIZE / 200;
+const sc = (p: Vec2): Vec2 => ({ x: p.x * S, y: p.y * S });
 
-const LANES: Record<LaneId, Vec2[]> = {
+const LANE_WIDTH = 14;
+const JUNGLE_WIDTH = 7;
+
+const LANES_200: Record<LaneId, Vec2[]> = {
   top: [
     { x: 22, y: 156 },
     { x: 18, y: 30 },
@@ -75,24 +82,30 @@ const LANES: Record<LaneId, Vec2[]> = {
   ],
 };
 
-const SHRINE0: Vec2 = { x: 24, y: 176 };
-const FOUNTAIN0: Vec2 = { x: 10, y: 190 };
-const BASE0: Vec2 = { x: 26, y: 174 };
-const BASE_RADIUS = 24;
+const LANES: Record<LaneId, Vec2[]> = {
+  top: LANES_200.top.map(sc),
+  mid: LANES_200.mid.map(sc),
+  bot: LANES_200.bot.map(sc),
+};
+
+const SHRINE0: Vec2 = sc({ x: 24, y: 176 });
+const FOUNTAIN0: Vec2 = sc({ x: 10, y: 190 });
+const BASE0: Vec2 = sc({ x: 26, y: 174 });
+const BASE_RADIUS = 24 * S;
 /** The base sits on a plateau a little wider than the base clearing. */
-const BASE_PLATEAU = 26;
+const BASE_PLATEAU = 26 * S;
 
 /** Jungle "maze" for team 0's half; mirrored for team 1. Rooms are where neutral camps will go. */
 const JUNGLE_ROOMS: { c: Vec2; r: number }[] = [
   { c: { x: 52, y: 104 }, r: 7 },
   { c: { x: 100, y: 148 }, r: 7 },
   { c: { x: 42, y: 136 }, r: 6 },
-];
+].map((room) => ({ c: sc(room.c), r: room.r * 1.25 }));
 /**
  * Narrow paths through the forest ("juke paths") for hiding, ganking and escaping.
  * Trees on both sides still block sight. Polylines, team-0 half; mirrored for team 1.
  */
-const FOREST_PATHS: Vec2[][] = [
+const FOREST_PATHS_200: Vec2[][] = [
   [{ x: 22, y: 70 }, { x: 40, y: 62 }, { x: 58, y: 59 }],
   [{ x: 22, y: 96 }, { x: 34, y: 91 }, { x: 47, y: 100 }],
   [{ x: 22, y: 124 }, { x: 40, y: 128 }, { x: 59, y: 139 }],
@@ -102,16 +115,18 @@ const FOREST_PATHS: Vec2[][] = [
   [{ x: 152, y: 180 }, { x: 157, y: 168 }, { x: 160, y: 161 }],
   [{ x: 87, y: 128 }, { x: 90, y: 144 }],
 ];
-const FOREST_PATH_WIDTH = 3.8;
+const FOREST_PATHS = FOREST_PATHS_200.map((p) => p.map(sc));
+const FOREST_PATH_WIDTH = 4.2;
 /** Ward hills (height 3) on the forest paths. */
-const HILLS: Vec2[] = [
+const HILLS_200: Vec2[] = [
   { x: 34, y: 86 },
   { x: 128, y: 162 },
   { x: 87, y: 127 },
 ];
+const HILLS = HILLS_200.map(sc);
 const HILL_RADIUS = 3.6;
 
-const JUNGLE_PATHS: [Vec2, Vec2][] = [
+const JUNGLE_PATHS_200: [Vec2, Vec2][] = [
   [{ x: 18, y: 112 }, { x: 52, y: 104 }],
   [{ x: 52, y: 104 }, { x: 68, y: 68 }],
   [{ x: 52, y: 104 }, { x: 82, y: 118 }],
@@ -122,15 +137,13 @@ const JUNGLE_PATHS: [Vec2, Vec2][] = [
   [{ x: 42, y: 136 }, { x: 40, y: 156 }],
   [{ x: 42, y: 136 }, { x: 52, y: 104 }],
 ];
+const JUNGLE_PATHS = JUNGLE_PATHS_200.map(([a, b]) => [sc(a), sc(b)] as [Vec2, Vec2]);
 /** Power-up spots: river junctions where jungle paths meet (mirror images of each other). */
-const RUNE_SPOT: Vec2 = { x: 68, y: 68 };
+const RUNE_SPOT: Vec2 = sc({ x: 68, y: 68 });
 /** Boss pit on the river (the river line y = x is equally far from both bases). */
-const BOSS_PIT: Vec2 = { x: 150, y: 150 };
+const BOSS_PIT: Vec2 = sc({ x: 150, y: 150 });
 
-const RIVER: [Vec2, Vec2] = [
-  { x: 20, y: 20 },
-  { x: 180, y: 180 },
-];
+const RIVER: [Vec2, Vec2] = [sc({ x: 20, y: 20 }), sc({ x: 180, y: 180 })];
 
 /**
  * Tier-1 towers stand this far along the way from the base gate to the river
@@ -140,7 +153,7 @@ const T1_FRACTION = 0.55;
 /** Towers stand beside the lane, not in the middle of it. */
 const TOWER_SIDE_OFFSET = 4.5;
 /** Tier-2 tower + barracks form a gate this far from where the lane leaves the base. */
-const GATE_DISTANCE = 5;
+const GATE_DISTANCE = 5 * S;
 
 export function teamLanePath(map: GameMap, team: Team, lane: LaneId): Vec2[] {
   return map.teamLanes[team][lane];
@@ -165,9 +178,9 @@ export function createMap(): GameMap {
     const p = LANES[id];
     for (let i = 1; i < p.length; i++) carveSeg(p[i - 1], p[i], LANE_WIDTH);
   }
-  carveSeg(RIVER[0], RIVER[1], 10);
-  carveCircle(BOSS_PIT, 7);
-  carveCircle(RUNE_SPOT, 4.5);
+  carveSeg(RIVER[0], RIVER[1], 12);
+  carveCircle(BOSS_PIT, 7 * S);
+  carveCircle(RUNE_SPOT, 4.5 * S);
   carveCircle(BASE0, BASE_RADIUS);
   for (const room of JUNGLE_ROOMS) carveCircle(room.c, room.r);
   for (const [a, b] of JUNGLE_PATHS) carveSeg(a, b, JUNGLE_WIDTH);
@@ -185,7 +198,7 @@ export function createMap(): GameMap {
     const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
     let px = -(b.y - a.y) / l;
     let py = (b.x - a.x) / l;
-    const dot = px * (100 - a.x) + py * (100 - a.y);
+    const dot = px * (MAP_SIZE / 2 - a.x) + py * (MAP_SIZE / 2 - a.y);
     if (dot < -0.5) {
       px = -px;
       py = -py;
@@ -222,7 +235,7 @@ export function createMap(): GameMap {
       team: 0,
       tier: 'shrineTower',
       lane: null,
-      pos: { x: SHRINE0.x + Math.cos(a) * 12.5, y: SHRINE0.y + Math.sin(a) * 12.5 },
+      pos: { x: SHRINE0.x + Math.cos(a) * 12.5 * S, y: SHRINE0.y + Math.sin(a) * 12.5 * S },
     });
   }
   structures.push({ team: 0, tier: 'shrine', lane: null, pos: SHRINE0 });

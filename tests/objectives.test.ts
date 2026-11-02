@@ -56,22 +56,22 @@ describe('wards', () => {
     o.hero!.gold = 1000;
     w.applyCommand({ type: 'buy', unitId: o.id, itemId: 'observerWard' });
     const slot = o.hero!.items.findIndex((s) => s?.id === 'observerWard');
-    place(o, 128, 128); // on the river near the enemy jungle junction
-    w.applyCommand({ type: 'placeWard', unitId: o.id, slot, x: 132, y: 132 });
+    place(o, 192, 192); // on the river near the enemy jungle junction
+    w.applyCommand({ type: 'placeWard', unitId: o.id, slot, x: 196, y: 196 });
     const ward = w.units.find((u) => u.ward)!;
     expect(ward.ward!.kind).toBe('observer');
     place(o, 20, 186); // walk away: the ward keeps watching
     const foe = hero(1, 'vexa');
-    place(foe, 142, 142); // further down the river, in the ward's sight
+    place(foe, 206, 206); // further down the river, in the ward's sight
     run(w, 0.2);
     expect(w.canSee(0, foe)).toBe(true);
     expect(w.canSee(1, ward)).toBe(false); // enemy can't see the ward...
     foe.hero!.gold = 1000;
-    place(foe, 186, 14); // at their fountain shop
+    place(foe, 283, 17); // at their fountain shop
     w.applyCommand({ type: 'buy', unitId: foe.id, itemId: 'sentryWard' });
-    place(foe, 136, 136);
+    place(foe, 200, 200);
     const s = foe.hero!.items.findIndex((x) => x?.id === 'sentryWard');
-    w.applyCommand({ type: 'placeWard', unitId: foe.id, slot: s, x: 137, y: 137 });
+    w.applyCommand({ type: 'placeWard', unitId: foe.id, slot: s, x: 201, y: 201 });
     run(w, 0.2);
     expect(w.canSee(1, ward)).toBe(true); // ...until a sentry reveals it
   });
@@ -80,9 +80,9 @@ describe('wards', () => {
     const { w, hero } = humans();
     const o = hero(0, 'orin');
     w.applyCommand({ type: 'buy', unitId: o.id, itemId: 'observerWard' });
-    w.applyCommand({ type: 'placeWard', unitId: o.id, slot: 0, x: 40, y: 160 });
+    w.applyCommand({ type: 'placeWard', unitId: o.id, slot: 0, x: 60, y: 240 });
     expect(o.hero!.order.type).toBe('ward');
-    run(w, 6);
+    run(w, 10);
     expect(w.units.some((u) => u.ward && u.team === 0)).toBe(true);
   });
 });
@@ -283,11 +283,11 @@ describe('settings & match controls', () => {
     const v = hero(0, 'vexa');
     const e = hero(1, 'brakk');
     const events: string[] = [];
-    place(v, 46, 104);
-    place(e, 52, 104);
+    place(v, 72, 156);
+    place(e, 78, 156);
     run(w, 0.2);
     w.applyCommand({ type: 'learn', unitId: v.id, slot: 0 });
-    w.applyCommand({ type: 'cast', unitId: v.id, slot: 0, x: 60, y: 104 });
+    w.applyCommand({ type: 'cast', unitId: v.id, slot: 0, x: 86, y: 156 });
     for (let i = 0; i < 30; i++) {
       w.step();
       for (const ev of w.events) if (ev.type === 'damage') events.push(ev.kind);
@@ -365,8 +365,8 @@ describe('streaks, bounties and match stats', () => {
     t1.structure!.backdoor = false;
     w.dealDamage(o.id, t1, 100, 'attack');
     ally.hp = 100;
-    place(o, 52, 104);
-    place(ally, 54, 104);
+    place(o, 78, 156);
+    place(ally, 80, 156);
     w.applyCommand({ type: 'learn', unitId: o.id, slot: 1 });
     w.applyCommand({ type: 'cast', unitId: o.id, slot: 1, targetId: ally.id });
     run(w, 4.2);

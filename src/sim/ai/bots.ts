@@ -49,6 +49,8 @@ interface TeamPlan {
   lane?: 'top' | 'mid' | 'bot';
   structureId?: number;
   until: number;
+  /** When the current push started. */
+  since?: number;
 }
 
 /** What a team's bots should be doing together. */
@@ -69,7 +71,8 @@ function teamPlan(w: World, team: Team): TeamPlan {
     const important = s.structure.tier !== 'tower1' ? 2 : 0;
     if (threat >= 3 && (!defend || threat + important > defend.threat)) defend = { s, threat: threat + important };
   }
-  if (defend) return (cache[team] = { mode: 'defend', structureId: defend.s.id, lane: defend.s.structure!.lane ?? 'mid', until });
+  // Commit to a defence for a while (on the big map, flip-flopping wastes the whole walk).
+  if (defend) return (cache[team] = { mode: 'defend', structureId: defend.s.id, lane: defend.s.structure!.lane ?? 'mid', until: w.time + 6 });
   // Push together when we have the upper hand.
   const alive = (t: Team) => w.units.filter((h) => h.hero && h.alive && h.team === t).length;
   if (w.time > PUSH_AFTER && alive(team) >= 2 && alive(team) >= alive((1 - team) as Team)) {
@@ -78,7 +81,12 @@ function teamPlan(w: World, team: Team): TeamPlan {
       if (!s.structure || !s.alive || s.team === team || !s.structure.vulnerable || !s.structure.lane) continue;
       if (!best || s.hp < best.hp) best = { lane: s.structure.lane, hp: s.hp };
     }
-    if (best) return (cache[team] = { mode: 'push', lane: best.lane, until });
+    // Stay on the lane we're already pushing (for 25 s) while it still has a target.
+    const lanes = new Set(w.units.filter((s) => s.structure && s.alive && s.team !== team && s.structure.vulnerable).map((s) => s.structure!.lane));
+    if (cur?.mode === 'push' && cur.lane && lanes.has(cur.lane) && w.time < (cur.since ?? 0) + 25) {
+      return (cache[team] = { ...cur, until });
+    }
+    if (best) return (cache[team] = { mode: 'push', lane: best.lane, until, since: w.time });
   }
   return (cache[team] = { mode: 'farm', until });
 }
@@ -120,7 +128,7 @@ export function botThink(w: World, me: Unit) {
   }
 
   // Team pings: "retreat" near us → fall back; "enemy missing" → no chasing for a while.
-  const pings = w.pings.filter((p) => p.team === me.team && p.fromId !== me.id && w.time - p.at < 10);
+  const pings = w.pings.filter((p) => p.team === me.team && p.fromId !== me.id && w.time - p.at < 20); // long enough to walk across the map
   const retreat = pings.find((p) => p.kind === 'retreat' && dist(p.x, p.y, me.x, me.y) < 35 && w.time - p.at < 5);
   if (retreat) {
     const back = pointAlong(path, Math.max(0, myProgress - 25));
@@ -426,7 +434,23 @@ function defend(w: World, me: Unit, plan: TeamPlan): boolean {
   const s = w.unit(plan.structureId);
   if (!s || !s.alive) return false;
   const d = dist(me.x, me.y, s.x, s.y);
-  if (d < 16) return false; // close enough: fight normally
+  if (d < 16) {
+    // Close enough: fight whoever is attacking it, otherwise hold here (don't wander off
+    // down the lane and walk straight back).
+    const attackers = w.units.filter(
+      (e) => e.alive && e.team !== me.team && e.team !== 2 && !e.structure && dist(e.x, e.y, s.x, s.y) < 18 && w.canAttack(me, e),
+    );
+    if (!attackers.length) {
+      if (me.hero!.order.type === 'move') w.applyCommand({ type: 'stop', unitId: me.id });
+      return true;
+    }
+    // Spells and focus on heroes are handled by the normal fight logic when one is in reach.
+    const near = attackers.sort((a, b) => (b.hero ? 1 : 0) - (a.hero ? 1 : 0) || dist(a.x, a.y, me.x, me.y) - dist(b.x, b.y, me.x, me.y))[0];
+    if (useAbilities(w, me, near)) return true;
+    const o = me.hero!.order;
+    if (o.type !== 'attack' || o.targetId !== near.id) w.applyCommand({ type: 'attack', unitId: me.id, targetId: near.id });
+    return true;
+  }
   if (d > 60 && !tpBlocker(me)) {
     w.applyCommand({ type: 'teleport', unitId: me.id, targetId: s.id });
     return true;

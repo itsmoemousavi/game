@@ -7,7 +7,7 @@ function arena(a: HeroId[], b: HeroId[]) {
   b.forEach((heroId, i) => slots.push({ team: 1, heroId, controller: 'human', lane: LANE_IDS[i] }));
   const w = new World({ seed: 41, slots });
   const hero = (team: Team, id: string) => w.heroes.find((h) => h.team === team && h.hero!.defId === id)!;
-  w.heroes.forEach((h, i) => place(h, 20 + i * 2, 186));
+  w.heroes.forEach((h, i) => place(h, 25 + i * 2, 281));
   return { w, hero };
 }
 const place = (u: Unit, x: number, y: number) => {
@@ -28,8 +28,8 @@ describe('Syl, Grom and Kaela', () => {
     const { w, hero } = arena(['syl'], ['grom']);
     const s = hero(0, 'syl');
     const g = hero(1, 'grom');
-    place(s, 46, 104);
-    place(g, 53, 104);
+    place(s, 72, 156);
+    place(g, 79, 156);
     run(w, 0.2);
     learn(w, s, 0);
     w.applyCommand({ type: 'cast', unitId: s.id, slot: 0, targetId: g.id });
@@ -56,14 +56,14 @@ describe('Syl, Grom and Kaela', () => {
     const s = hero(0, 'syl');
     const [g, k] = [hero(1, 'grom'), hero(1, 'kaela')];
     learn(w, s, 2);
-    place(s, 46, 104);
-    place(g, 48, 104);
+    place(s, 72, 156);
+    place(g, 74, 156);
     g.maxHp = g.hp = 5000;
     w.applyCommand({ type: 'cast', unitId: s.id, slot: 2, targetId: g.id });
     const fresh = 5000 - g.hp;
     k.maxHp = 5000;
     k.hp = 1000;
-    place(k, 48, 106);
+    place(k, 74, 158);
     run(w, 0.3); // cast time between spells
     s.hero!.abilities[2].cooldown = 0;
     s.mana = s.maxMana;
@@ -76,13 +76,13 @@ describe('Syl, Grom and Kaela', () => {
     const g = hero(0, 'grom');
     const [s, k] = [hero(1, 'syl'), hero(1, 'kaela')];
     learn(w, g, 0);
-    place(g, 46, 104);
-    place(s, 54, 104);
-    w.applyCommand({ type: 'cast', unitId: g.id, slot: 0, x: 54, y: 104 });
+    place(g, 72, 156);
+    place(s, 80, 156);
+    w.applyCommand({ type: 'cast', unitId: g.id, slot: 0, x: 80, y: 156 });
     run(w, 0.6);
     expect(s.stunTimer).toBeGreaterThan(0);
     learn(w, g, 2);
-    place(k, 50, 107);
+    place(k, 76, 159);
     s.stunTimer = 0;
     w.applyCommand({ type: 'cast', unitId: g.id, slot: 2 });
     run(w, 0.3);
@@ -106,19 +106,19 @@ describe('Syl, Grom and Kaela', () => {
     const k = hero(0, 'kaela');
     const g = hero(0, 'grom');
     const [s, b] = [hero(1, 'syl'), hero(1, 'brakk')];
-    place(k, 42, 105);
-    place(s, 49, 104);
-    place(b, 53, 104);
+    place(k, 68, 157);
+    place(s, 75, 156);
+    place(b, 79, 156);
     learn(w, k, 0);
     const speed = w.speedOf(s);
-    w.applyCommand({ type: 'cast', unitId: k.id, slot: 0, x: 60, y: 104 });
+    w.applyCommand({ type: 'cast', unitId: k.id, slot: 0, x: 86, y: 156 });
     run(w, 0.6);
     expect(s.hp).toBeLessThan(s.maxHp);
     expect(b.hp).toBeLessThan(b.maxHp);
     expect(w.speedOf(s)).toBeLessThan(speed);
     // Brine Veil on an ally.
     learn(w, k, 1);
-    place(g, 44, 105);
+    place(g, 70, 157);
     g.hp = 300;
     w.applyCommand({ type: 'cast', unitId: k.id, slot: 1, targetId: g.id });
     expect(g.hp).toBeGreaterThan(300);
@@ -126,7 +126,7 @@ describe('Syl, Grom and Kaela', () => {
     run(w, 0.3); // cast time between spells
     learn(w, k, 2);
     const hp = b.hp;
-    w.applyCommand({ type: 'cast', unitId: k.id, slot: 2, x: 53, y: 104 });
+    w.applyCommand({ type: 'cast', unitId: k.id, slot: 2, x: 79, y: 156 });
     run(w, 1);
     expect(b.hp).toBeLessThan(hp);
   });
