@@ -166,10 +166,10 @@ const BOSS_PIT: Vec2 = sc({ x: 150, y: 150 });
  */
 const HOUSE: House = (() => {
   const d = Math.SQRT1_2;
-  return { x: BOSS_PIT.x, y: BOSS_PIT.y, inner: 7, outer: 10, door: { x: -d, y: -d }, doorHalf: 3.2 };
+  return { x: BOSS_PIT.x, y: BOSS_PIT.y, inner: 5.5, outer: 8.5, door: { x: -d, y: -d }, doorHalf: 2.9 };
 })();
 /** Open ground around the house, so you can walk all the way round it. */
-const HOUSE_CLEARING = 13.5;
+const HOUSE_CLEARING = 12;
 
 const RIVER: [Vec2, Vec2] = [sc({ x: 20, y: 20 }), sc({ x: 180, y: 180 })];
 

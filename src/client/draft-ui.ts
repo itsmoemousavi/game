@@ -156,7 +156,7 @@ export class DraftUi {
     const verb = step?.kind === 'ban' ? 'BAN' : 'LOCK IN';
     det.innerHTML = `
       <div class="dinfo"><b style="color:${h.color}">${h.name}</b> <small>${h.title} · ${h.projectileSpeed ? 'ranged' : 'melee'}</small></div>
-      <div class="dab">${h.abilities.map((a) => `<span title="${a.summary}">${abilityIcon(a.id)}<small>${a.name}</small></span>`).join('')}</div>
+      <div class="dab">${h.abilities.map((a) => `<span>${abilityIcon(a.id)}<small>${a.name}${a.ultimate ? ' <em>ULT</em>' : ''}</small><p>${a.summary}</p></span>`).join('')}</div>
       <button id="draft-go" class="${step?.kind === 'ban' ? 'ban' : ''}" ${mine && d.allowed(show) ? '' : 'disabled'}>${verb} ${h.name.toUpperCase()}</button>`;
     det.querySelector('#draft-go')!.addEventListener('click', () => {
       if (this.draft?.humanTurn() && this.sel) this.draft.choose(this.sel);
