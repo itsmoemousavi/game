@@ -157,6 +157,11 @@ export class Renderer {
     return { x: this.camX + (sx - this.cssW / 2) / this.zoom, y: this.camY + (sy - this.cssH / 2) / this.zoom };
   }
 
+  /** Screen position (CSS pixels) of a world point `h` meters above the ground. */
+  screenOf(x: number, y: number, _h = 0) {
+    return { x: (x - this.camX) * this.zoom + this.cssW / 2, y: (y - this.camY) * this.zoom + this.cssH / 2 };
+  }
+
   minimapRect() {
     const size = Math.round(Math.min(170, this.cssH * 0.34));
     return { x: 8, y: 8, size };

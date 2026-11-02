@@ -90,6 +90,15 @@ function humanoid(o: BodyOpts): Body {
     add(h, mesh(sph(0.085 * b, 0), M(o.skin)), 0, 0, 0);
     return { g, h };
   });
+  // Named joints: the renderer animates these (walk, attack, cast, death).
+  root.name = 'rig';
+  torso.name = 'torso';
+  legs[0].name = 'legL';
+  legs[1].name = 'legR';
+  arms[0].g.name = 'armL';
+  arms[1].g.name = 'armR';
+  arms[0].h.name = 'handL';
+  arms[1].h.name = 'handR';
   return { root, torso, head, legL: legs[0], legR: legs[1], armL: arms[0].g, armR: arms[1].g, handL: arms[0].h, handR: arms[1].h };
 }
 

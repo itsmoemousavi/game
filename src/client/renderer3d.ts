@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { GameMap, HEROES, Team, Unit, World, isInvisible, isNight } from '../sim';
 import type { Aim } from './input';
 import { Renderer, TEAM_COLORS } from './renderer';
-import { TEAM_HEX, model } from './three/models';
+import { JOINTS, Joint, TEAM_HEX, model } from './three/models';
+import type { GameEvent } from '../sim';
 
 /** Ground level per map height (1 = normal, 2 = base plateau, 3 = ward hill), in meters. */
 const ELEVATION = [0, 0, 1.1, 2.2];
@@ -13,7 +14,8 @@ const FOV = 38;
 const FX_SPAN = 96;
 const FX_PX = 1024;
 /** Heroes are drawn a bit larger than life so they read well on a phone. */
-const HERO_SCALE = 1.55;
+const HERO_SCALE = 2.0;
+const CREEP_SCALE = 1.75;
 /** The 3D camera sits a little closer than the 2D view (perspective already shows more ground up top). */
 const CLOSER = 0.78;
 
@@ -42,7 +44,13 @@ export class Renderer3D extends Renderer {
   private fxY = 0;
   private overlay: CanvasRenderingContext2D;
   private trees: { crowns: THREE.InstancedMesh; cells: Int32Array; colors: THREE.Color[] } | null = null;
-  private objs = new Map<string, { o: THREE.Object3D; seen: number; key: string }>();
+  private objs = new Map<string, Obj>();
+  /** Per-unit animation clocks (walk cycle, attack swing, cast). */
+  private anims = new Map<number, Anim>();
+  /** Units that just died: they fall over and sink for a moment. */
+  private corpses: { o: THREE.Object3D; t: number; joints: Partial<Record<Joint, THREE.Object3D>> }[] = [];
+  private lastFrame = performance.now();
+  private dt = 1 / 60;
   private frameNo = 0;
   private raycaster = new THREE.Raycaster();
   private night = 0;
@@ -55,8 +63,9 @@ export class Renderer3D extends Renderer {
     super(overlay, map);
     this.flat = false;
     this.overlay = this.ctx;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    this.gl = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: dpr < 2, powerPreference: 'high-performance' });
+    // Phones have 3x screens; 1.5x keeps the 3D sharp enough while drawing far fewer pixels.
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    this.gl = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: true, powerPreference: 'high-performance' });
     this.gl.setPixelRatio(dpr);
     this.gl.shadowMap.enabled = true;
     this.gl.shadowMap.type = THREE.PCFShadowMap;
@@ -125,6 +134,39 @@ export class Renderer3D extends Renderer {
 
     this.buildTrees(map);
     this.resize();
+    this.prewarm();
+  }
+
+  /**
+   * Build every model and compile every shader before the match starts, so nothing
+   * stalls the first time a creep, spell or projectile shows up.
+   */
+  private prewarm() {
+    const keys = [
+      ...['brakk', 'vexa', 'orin', 'syl', 'grom', 'kaela'].map((h) => `hero:${h}`),
+      ...[0, 1].flatMap((t) => [`creep:melee:${t}`, `creep:ranged:${t}`]),
+      'brute', 'imp', 'warden', 'ward:observer', 'ward:sentry',
+      ...['haste', 'doubleDamage', 'regen', 'invisibility', 'bounty'].map((r) => `rune:${r}`),
+      'shot:fireball', 'shot:piercingArrow', 'shot:tidalWave', 'shot:spell', 'shot:shot0', 'shot:shot1',
+      'rubble:2.2', 'rubble:3', 'rubble:4.5',
+    ];
+    const tmp = new THREE.Group();
+    for (const k of keys) {
+      const o = model(k);
+      o.position.set(this.camX, -50, this.camY);
+      tmp.add(o);
+      // also the see-through copy used for invisible heroes
+      if (k.startsWith('hero:')) {
+        const f = model(k);
+        setOpacity(f, 0.45);
+        f.position.copy(o.position);
+        tmp.add(f);
+      }
+    }
+    this.scene.add(tmp);
+    this.placeCamera();
+    this.gl.compile(this.scene, this.camera);
+    this.scene.remove(tmp);
   }
 
   /** Free the GPU resources (when switching views or starting a new match). */
@@ -160,7 +202,6 @@ export class Renderer3D extends Renderer {
     crownGeo.translate(0, 2.9, 0);
     const trunks = new THREE.InstancedMesh(trunkGeo, new THREE.MeshLambertMaterial({ color: 0x4a3524 }), count);
     const crowns = new THREE.InstancedMesh(crownGeo, new THREE.MeshLambertMaterial({ flatShading: true }), count);
-    crowns.castShadow = true;
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
     const s = new THREE.Vector3();
@@ -205,11 +246,22 @@ export class Renderer3D extends Renderer {
     this.placeCamera();
     const ndc = new THREE.Vector2((sx / this.cssW) * 2 - 1, -(sy / this.cssH) * 2 + 1);
     this.raycaster.setFromCamera(ndc, this.camera);
-    const hit = this.raycaster.intersectObject(this.terrain3d, false)[0];
-    if (hit) return { x: hit.point.x, y: hit.point.z };
     const r = this.raycaster.ray;
-    const t = -r.origin.y / (r.direction.y || -1e-6);
-    return { x: r.origin.x + r.direction.x * t, y: r.origin.z + r.direction.z * t };
+    // Step along the ray until it dips below the ground (cheap; no triangle tests).
+    const d = r.direction;
+    const o = r.origin;
+    let prev = 0;
+    for (let t = 0; t < 400; t += 0.5) {
+      const x = o.x + d.x * t;
+      const z = o.z + d.z * t;
+      if (o.y + d.y * t <= this.elevationAt(x, z)) {
+        const tt = (prev + t) / 2;
+        return { x: o.x + d.x * tt, y: o.z + d.z * tt };
+      }
+      prev = t;
+    }
+    const t = -o.y / (d.y || -1e-6);
+    return { x: o.x + d.x * t, y: o.z + d.z * t };
   }
 
   private placeCamera() {
@@ -220,6 +272,10 @@ export class Renderer3D extends Renderer {
     this.camera.position.set(this.camX, gy + dist * Math.sin(PITCH), this.camY + dist * Math.cos(PITCH));
     this.camera.lookAt(this.camX, gy, this.camY);
     this.camera.updateMatrixWorld();
+  }
+
+  screenOf(x: number, y: number, h = 0) {
+    return this.toScreen(x, y, h);
   }
 
   /** Screen position (CSS pixels) of a point `h` meters above the ground. */
@@ -246,6 +302,9 @@ export class Renderer3D extends Renderer {
 
   render(w: World, alpha: number, focus: Unit | undefined, viewTeam: Team, aim: Aim | null = null) {
     this.frameNo++;
+    const now = performance.now();
+    this.dt = Math.min(0.1, (now - this.lastFrame) / 1000);
+    this.lastFrame = now;
     // 1. Ground effects via the 2D renderer (also moves the camera).
     this.ctx = this.fxCtx;
     super.render(w, alpha, focus, viewTeam, aim);
@@ -272,6 +331,7 @@ export class Renderer3D extends Renderer {
     this.sun.position.set(this.camX + 25, 60, this.camY + 18);
     this.sun.target.position.set(this.camX, 0, this.camY - 6);
     this.syncUnits(w, alpha, viewTeam);
+    this.updateCorpses();
     this.gl.render(this.scene, this.camera);
 
     // 4. Bars, names, numbers and the minimap on top.
@@ -317,18 +377,98 @@ export class Renderer3D extends Renderer {
   }
 
   private place(key: string, id: string, x: number, y: number, h = 0, rotY = 0, scale = 1): THREE.Object3D {
+    return this.placeObj(key, id, x, y, h, rotY, scale).o;
+  }
+
+  private placeObj(key: string, id: string, x: number, y: number, h = 0, rotY = 0, scale = 1): Obj {
     let e = this.objs.get(id);
     if (!e || e.key !== key) {
       if (e) this.scene.remove(e.o);
-      e = { o: model(key), seen: 0, key };
-      this.scene.add(e.o);
+      const o = model(key);
+      e = { o, seen: 0, key, joints: jointsOf(o) };
+      this.scene.add(o);
       this.objs.set(id, e);
     }
     e.seen = this.frameNo;
     e.o.position.set(x, this.elevationAt(x, y) + h, y);
     e.o.rotation.y = rotY;
     e.o.scale.setScalar(scale);
-    return e.o;
+    return e;
+  }
+
+  /** Model key for a unit (same model is used for its death animation). */
+  private keyOf(u: Unit): { key: string; scale: number } | null {
+    if (u.kind === 'hero') return { key: `hero:${u.hero!.defId}`, scale: HERO_SCALE };
+    if (u.creep) return { key: `creep:${u.creep.type}:${u.team === 1 ? 1 : 0}`, scale: u.creep.super ? CREEP_SCALE * 1.2 : CREEP_SCALE };
+    if (u.neutral) return { key: u.neutral.boss ? 'warden' : u.radius > 0.9 ? 'brute' : 'imp', scale: u.neutral.boss ? 1.8 : 1.6 };
+    return null;
+  }
+
+  pushEvents(w: World, events: GameEvent[], meId = -1) {
+    super.pushEvents(w, events, meId);
+    for (const e of events) {
+      if (e.type === 'attack') this.anim(e.sourceId).atk = 1;
+      else if (e.type === 'cast') this.anim(e.unitId).cast = 1;
+      else if (e.type === 'death') {
+        const u = w.unit(e.unitId);
+        const k = u && this.keyOf(u);
+        const live = this.objs.get('u' + e.unitId);
+        if (!u || !k || !live) continue;
+        // Reuse the live model as the corpse.
+        this.objs.delete('u' + e.unitId);
+        this.anims.delete(e.unitId);
+        this.corpses.push({ o: live.o, t: 0, joints: live.joints });
+      }
+    }
+  }
+
+  private anim(id: number): Anim {
+    let a = this.anims.get(id);
+    if (!a) this.anims.set(id, (a = { phase: 0, walk: 0, atk: 0, cast: 0 }));
+    return a;
+  }
+
+  /** Walk cycle, attack swing and casting pose, layered on the model's rest pose. */
+  private animate(e: Obj, u: Unit, time: number) {
+    const a = this.anim(u.id);
+    const dt = this.dt;
+    const speed = Math.hypot(u.x - u.px, u.y - u.py) * 30; // meters per second
+    const moving = speed > 0.5 && u.stunTimer <= 0;
+    a.walk += ((moving ? 1 : 0) - a.walk) * Math.min(1, dt * 10);
+    if (moving) a.phase += dt * (5 + speed * 0.9);
+    a.atk = Math.max(0, a.atk - dt / 0.38);
+    a.cast = Math.max(0, a.cast - dt / 0.55);
+    const swing = Math.sin(a.phase) * 0.75 * a.walk;
+    const hit = a.atk > 0 ? Math.sin((1 - a.atk) * Math.PI) : 0;
+    const cast = a.cast > 0 ? Math.sin((1 - a.cast) * Math.PI) : 0;
+    const breathe = Math.sin(time * 2.2 + u.id) * 0.03 * (1 - a.walk);
+    const j = e.joints;
+    pose(j.legL, swing, 0, 0);
+    pose(j.legR, -swing, 0, 0);
+    pose(j.armL, -swing * 0.6 - cast * 1.9 - hit * 0.5, 0, -cast * 0.4);
+    pose(j.armR, swing * 0.6 - cast * 1.9 - hit * 2.0, 0, cast * 0.4);
+    pose(j.torso, breathe + hit * 0.25 - cast * 0.15, hit * 0.35, 0);
+    if (j.rig) {
+      const rp = j.rig.userData.restPos as number[];
+      j.rig.position.set(rp[0], rp[1] + Math.abs(Math.sin(a.phase)) * 0.09 * a.walk, rp[2]);
+    }
+  }
+
+  private updateCorpses() {
+    this.corpses = this.corpses.filter((c) => {
+      c.t += this.dt;
+      const fall = Math.min(1, c.t / 0.45);
+      c.o.rotation.order = 'YXZ';
+      c.o.rotation.x = -fall * fall * (Math.PI / 2) * 0.95;
+      pose(c.joints.armL, -1.2 * fall, 0, -0.5 * fall);
+      pose(c.joints.armR, -1.2 * fall, 0, 0.5 * fall);
+      if (c.t > 1.1) c.o.position.y -= this.dt * 1.6;
+      if (c.t > 2) {
+        this.scene.remove(c.o);
+        return false;
+      }
+      return true;
+    });
   }
 
   private syncUnits(w: World, alpha: number, team: Team) {
@@ -352,17 +492,11 @@ export class Renderer3D extends Renderer {
         x += Math.cos(l.ang) * push;
         y += Math.sin(l.ang) * push;
       }
-      const moving = Math.hypot(u.x - u.px, u.y - u.py) > 0.01;
-      const bob = moving ? Math.abs(Math.sin(t * 9 + u.id)) * 0.12 : 0;
-      if (u.kind === 'hero') {
-        const o = this.place(`hero:${u.hero!.defId}`, id, x, y, bob, face(u.facing), HERO_SCALE);
-        setOpacity(o, isInvisible(u) ? 0.45 : 1);
-      } else if (u.creep) {
-        const side = u.team === 1 ? 1 : 0;
-        this.place(`creep:${u.creep.type}:${side}`, id, x, y, bob, face(u.facing), u.creep.super ? 1.6 : 1.3);
-      } else if (u.neutral) {
-        const key = u.neutral.boss ? 'warden' : u.radius > 0.9 ? 'brute' : 'imp';
-        this.place(key, id, x, y, bob * 0.5, face(u.facing), u.neutral.boss ? 1.5 : 1.3);
+      const k = this.keyOf(u);
+      if (k) {
+        const e = this.placeObj(k.key, id, x, y, 0, face(u.facing), k.scale);
+        this.animate(e, u, t);
+        if (u.kind === 'hero') setOpacity(e.o, isInvisible(u) ? 0.45 : 1);
       } else if (u.ward) {
         this.place(`ward:${u.ward.kind}`, id, u.x, u.y);
       }
@@ -431,7 +565,7 @@ export class Renderer3D extends Renderer {
         continue;
       }
       const boss = !!u.neutral?.boss;
-      const h = boss ? 5.2 : u.neutral ? 2.6 : 2.3;
+      const h = boss ? 6 : u.neutral ? 3 : 2.9;
       if (u.stunTimer > 0) {
         const p = this.toScreen(x, y, h + 0.4);
         this.stars(p.x, p.y - 8, w.time);
@@ -475,6 +609,34 @@ export class Renderer3D extends Renderer {
       ctx.fill();
     }
   }
+}
+
+interface Obj {
+  o: THREE.Object3D;
+  seen: number;
+  key: string;
+  joints: Partial<Record<Joint, THREE.Object3D>>;
+}
+interface Anim {
+  phase: number;
+  walk: number;
+  atk: number;
+  cast: number;
+}
+function jointsOf(o: THREE.Object3D): Partial<Record<Joint, THREE.Object3D>> {
+  const j: Partial<Record<Joint, THREE.Object3D>> = {};
+  for (const n of JOINTS) {
+    const x = o.getObjectByName(n);
+    if (x) j[n] = x;
+  }
+  return j;
+}
+const qa = new THREE.Quaternion();
+const ea = new THREE.Euler();
+/** Rest pose of a joint, then turned by (x, y, z) radians in its own frame. */
+function pose(o: THREE.Object3D | undefined, x: number, y: number, z: number) {
+  if (!o) return;
+  o.quaternion.fromArray(o.userData.rest as number[]).multiply(qa.setFromEuler(ea.set(x, y, z)));
 }
 
 function overlayMaterial(map: THREE.Texture, order: number) {

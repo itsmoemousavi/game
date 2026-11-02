@@ -278,7 +278,7 @@ export class Input {
       // Looking around with the minimap: the joystick is off and taps on the map are orders
       // (walk there / attack that). Letting go of the minimap brings the joystick back.
       if (this.peek !== null) {
-        this.commandAt(sx, sy);
+        this.commandAt(sx, sy, true);
         return;
       }
       const onJoySide = this.leftHanded ? sx > this.canvas.clientWidth * 0.5 : sx < this.canvas.clientWidth * 0.5;
@@ -290,7 +290,7 @@ export class Input {
       }
       return;
     }
-    if (e.button === 2 || e.button === 0) this.commandAt(sx, sy);
+    if (e.button === 2 || e.button === 0) this.commandAt(sx, sy, true);
   }
 
   private onAbilityDown(e: PointerEvent, slot: number) {
@@ -345,17 +345,29 @@ export class Input {
     return { x: me.x + Math.cos(me.facing) * range, y: me.y + Math.sin(me.facing) * range };
   }
 
-  /** Tap/click on an enemy = attack it; on ground = walk there. */
-  private commandAt(sx: number, sy: number) {
+  /**
+   * Tap/click on an enemy = attack it. Tapping the ground only walks there when that's
+   * clearly meant: while looking around with the minimap, or with a mouse (right/left click).
+   * On a touch screen the joystick moves the hero, so stray taps don't send it walking.
+   */
+  private commandAt(sx: number, sy: number, walk = false) {
     const w = this.world();
-    const p = this.renderer.screenToWorld(sx, sy);
     const me = w.unit(this.heroId());
     if (!me) return;
+    // Pick by what's under the finger on screen (3D models stand up off the ground).
+    const near = (u: Unit) => {
+      const s = this.renderer.screenOf(u.x, u.y, u.kind === 'structure' ? 2.5 : 1.2);
+      return Math.hypot(s.x - sx, s.y - sy);
+    };
+    const reach = (u: Unit) => Math.max(34, (u.radius + 0.8) * this.renderer.zoom);
     const enemy = w.units
-      .filter((u) => u.alive && w.canAttack(me, u) && Math.hypot(u.x - p.x, u.y - p.y) < u.radius + 1)
-      .sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
+      .filter((u) => u.alive && w.canAttack(me, u) && near(u) < reach(u))
+      .sort((a, b) => near(a) - near(b))[0];
     if (enemy) this.queue.push({ type: 'attack', unitId: me.id, targetId: enemy.id });
-    else this.queue.push({ type: 'moveTo', unitId: me.id, x: p.x, y: p.y });
+    else if (walk) {
+      const p = this.renderer.screenToWorld(sx, sy);
+      this.queue.push({ type: 'moveTo', unitId: me.id, x: p.x, y: p.y });
+    }
   }
 
   private onPointerMove(e: PointerEvent) {

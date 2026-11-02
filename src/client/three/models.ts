@@ -7,20 +7,50 @@ export const TEAM_HEX = [0x3d8bfd, 0xe5484d] as const;
 
 // ------------------------------------------------------------------ baking
 
+/** Joints that animate, in parent → child order. */
+export const JOINTS = ['rig', 'torso', 'legL', 'legR', 'armL', 'armR'] as const;
+export type Joint = (typeof JOINTS)[number];
+
 /**
- * Merge a model made of many small meshes into at most three meshes (lit, glowing,
- * see-through), with the part colors stored per vertex. Keeps draw calls low on phones.
+ * Merge a model made of many small meshes into a few meshes per joint (lit, glowing,
+ * see-through), with the part colors stored per vertex. Humanoids keep their joints
+ * (body, legs, arms) as separate pieces so they can be animated; everything else becomes
+ * one piece. Keeps draw calls low on phones.
  */
-export function bake(root: THREE.Object3D): THREE.Group {
-  root.updateMatrixWorld(true);
-  const parts: Record<'lit' | 'glow' | 'clear', THREE.BufferGeometry[]> = { lit: [], glow: [], clear: [] };
-  root.traverse((o) => {
+export function bake(top: THREE.Object3D): THREE.Group {
+  top.updateMatrixWorld(true);
+  const rig = top.getObjectByName('rig');
+  // Props held near a hand (weapons, shields, bows, orbs) move with that arm.
+  if (rig) {
+    const hands = (['handL', 'handR'] as const).map((n) => rig.getObjectByName(n)!);
+    const arms = (['armL', 'armR'] as const).map((n) => rig.getObjectByName(n)!);
+    const hp = hands.map((h) => h.getWorldPosition(new THREE.Vector3()));
+    for (const child of [...rig.children]) {
+      if (child.name) continue;
+      const p = child.getWorldPosition(new THREE.Vector3());
+      const d = hp.map((h) => h.distanceTo(p));
+      const i = d[0] < d[1] ? 0 : 1;
+      if (d[i] < 0.75) arms[i].attach(child);
+    }
+    top.updateMatrixWorld(true);
+  }
+  const jointOf = (o: THREE.Object3D): THREE.Object3D => {
+    for (let p: THREE.Object3D | null = o.parent; p && p !== top; p = p.parent) if ((JOINTS as readonly string[]).includes(p.name)) return p;
+    return top;
+  };
+  const pieces = new Map<THREE.Object3D, Record<'lit' | 'glow' | 'clear', THREE.BufferGeometry[]>>();
+  const inv = new THREE.Matrix4();
+  top.traverse((o) => {
     const m = o as THREE.Mesh;
-    if (!m.isMesh || !m.visible || !isShown(m)) return;
+    if (!m.isMesh || !isShown(m)) return;
+    const j = jointOf(m);
+    let parts = pieces.get(j);
+    if (!parts) pieces.set(j, (parts = { lit: [], glow: [], clear: [] }));
     const mat = m.material as THREE.MeshStandardMaterial;
     let g = m.geometry.clone();
     if (g.index) g = g.toNonIndexed();
-    g.applyMatrix4(m.matrixWorld);
+    inv.copy(j.matrixWorld).invert();
+    g.applyMatrix4(inv.multiply(m.matrixWorld));
     for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
     const glowing = mat.emissive && mat.emissiveIntensity > 0.5 && mat.emissive.getHex() !== 0;
     const c = (glowing ? mat.emissive : mat.color).clone();
@@ -31,18 +61,42 @@ export function bake(root: THREE.Object3D): THREE.Group {
     g.setAttribute('color', new THREE.BufferAttribute(col, 3));
     (mat.transparent && mat.opacity < 0.9 ? parts.clear : glowing ? parts.glow : parts.lit).push(g);
   });
+  // Rebuild the joint tree with the same rest pose; each joint holds its merged meshes.
   const out = new THREE.Group();
-  const make = (list: THREE.BufferGeometry[], material: THREE.Material, shadow: boolean) => {
-    if (!list.length) return;
-    const merged = mergeGeometries(list, false)!;
-    merged.computeBoundingSphere();
-    const me = new THREE.Mesh(merged, material);
-    me.castShadow = shadow;
-    out.add(me);
+  const made = new Map<THREE.Object3D, THREE.Object3D>([[top, out]]);
+  const nodeFor = (j: THREE.Object3D): THREE.Object3D => {
+    let node = made.get(j);
+    if (node) return node;
+    const parentJoint = jointOf(j);
+    const parentNode = nodeFor(parentJoint);
+    node = new THREE.Group();
+    node.name = j.name;
+    const local = new THREE.Matrix4().copy(parentJoint.matrixWorld).invert().multiply(j.matrixWorld);
+    local.decompose(node.position, node.quaternion, node.scale);
+    node.userData.rest = node.quaternion.toArray();
+    node.userData.restPos = node.position.toArray();
+    parentNode.add(node);
+    made.set(j, node);
+    return node;
   };
-  make(parts.lit, LIT, true);
-  make(parts.glow, GLOW, false);
-  make(parts.clear, CLEAR, false);
+  if (rig) for (const name of JOINTS) {
+    const j = rig.name === name ? rig : rig.getObjectByName(name);
+    if (j) nodeFor(j);
+  }
+  for (const [j, parts] of pieces) {
+    const node = nodeFor(j);
+    const make = (list: THREE.BufferGeometry[], material: THREE.Material, shadow: boolean) => {
+      if (!list.length) return;
+      const merged = mergeGeometries(list, false)!;
+      merged.computeBoundingSphere();
+      const me = new THREE.Mesh(merged, material);
+      me.castShadow = shadow;
+      node.add(me);
+    };
+    make(parts.lit, LIT, true);
+    make(parts.glow, GLOW, false);
+    make(parts.clear, CLEAR, false);
+  }
   return out;
 }
 function isShown(o: THREE.Object3D): boolean {
