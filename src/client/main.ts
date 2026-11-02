@@ -397,7 +397,12 @@ function announce(w: World, events: GameEvent[]) {
       continue;
     }
     if (e.type === 'bossKilled') {
-      hud.toast(e.team === 2 ? 'The Warden fell' : `${TEAM_NAMES[e.team]} slew the Warden — revive charm!`, '#c4b5fd');
+      hud.toast(`${e.team === 2 ? 'The Warden fell' : `${TEAM_NAMES[e.team]} slew the Warden`}. It dropped a revive charm: anyone can grab it!`, '#c4b5fd');
+    } else if (e.type === 'itemPickUp' && e.itemId === 'wardenCharm') {
+      const u = w.unit(e.unitId);
+      hud.toast(`${name(e.unitId)} took the Warden's charm`, u?.team === myTeam ? '#ffd23f' : '#ff7b7f');
+    } else if (e.type === 'itemExpire' && e.itemId === 'wardenCharm') {
+      if (e.unitId === myHeroId || w.unit(e.unitId)?.team === myTeam) hud.toast(`The Warden's charm crumbled`, '#c4b5fd');
     } else if (e.type === 'rune') {
       const u = w.unit(e.unitId);
       if (u?.team === myTeam) hud.toast(`${name(e.unitId)} picked up ${RUNE_INFO[e.kind as RuneKind].name}`, RUNE_INFO[e.kind as RuneKind].color);

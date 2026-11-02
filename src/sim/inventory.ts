@@ -1,4 +1,4 @@
-import { Team } from './constants';
+import { Side, Team } from './constants';
 import { BLINK_DAMAGE_LOCK, INVENTORY_SLOTS, ITEMS, ItemId, ItemStats, SALVE, SHOP_RADIUS, TELEPORT } from './data/items';
 import { dist } from './math';
 import { cellCenter, nearestWalkableCell } from './pathfinding';
@@ -12,6 +12,8 @@ export interface ItemSlot {
   cooldown?: number;
   /** Match time it was bought (sold within SELL_REFUND_WINDOW it refunds in full). */
   boughtAt?: number;
+  /** Match time the item crumbles (wherever it is: in a bag or on the ground). */
+  expiresAt?: number;
 }
 
 /** Changed your mind? Selling an item within this many seconds of buying it refunds the full price. */
@@ -76,7 +78,7 @@ export function priceFor(h: NonNullable<Unit['hero']>, id: ItemId): number {
 export function buyBlocker(w: World, u: Unit, id: ItemId): 'shop' | 'gold' | 'full' | null {
   const h = u.hero!;
   // While dead you're back at base (you respawn at the fountain), so the shop is open.
-  if (u.alive && !inShop(w, u)) return 'shop';
+  if ((u.alive && !inShop(w, u)) || ITEMS[id].noShop) return 'shop';
   if (h.gold < priceFor(h, id)) return 'gold';
   const def = ITEMS[id];
   const stack = def.consumable && h.items.some((s) => s?.id === id && s.count < def.consumable!.maxStack);
@@ -111,7 +113,7 @@ export function sellPrice(w: World, s: ItemSlot): number {
 export function sellItem(w: World, u: Unit, slot: number): boolean {
   const h = u.hero!;
   const s = h.items[slot];
-  if (!s || (u.alive && !inShop(w, u))) return false;
+  if (!s || (u.alive && !inShop(w, u)) || ITEMS[s.id].noShop) return false;
   h.gold += sellPrice(w, s);
   h.items[slot] = null;
   w.applyHeroStats(u);
@@ -248,9 +250,9 @@ export interface GroundItem {
   item: ItemSlot;
   x: number;
   y: number;
-  /** The hero who dropped it: only they can pick it up again (wards: any ally). */
+  /** The hero who dropped it: only they can pick it up again (wards: any ally; the Warden's charm: anyone). */
   ownerId: number;
-  team: Team;
+  team: Side;
   droppedAt: number;
 }
 
@@ -260,9 +262,12 @@ export const GROUND_ITEM_LIFETIME = 120;
 export const PICKUP_RANGE = 1.5;
 /** Items an ally may pick up (everything else stays with the hero who bought it). */
 const SHAREABLE: ItemId[] = ['observerWard', 'sentryWard'];
+/** Items anyone may pick up, enemies too. */
+const FREE_FOR_ALL: ItemId[] = ['wardenCharm'];
 
 export function canPickUp(u: Unit, g: GroundItem): boolean {
   if (!u.hero) return false;
+  if (FREE_FOR_ALL.includes(g.item.id)) return true;
   return g.ownerId === u.id || (g.team === u.team && SHAREABLE.includes(g.item.id));
 }
 
@@ -307,15 +312,34 @@ export function pickUpItem(w: World, u: Unit, groundId: number): 'picked' | 'app
   else h.items[h.items.indexOf(null)] = item;
   w.groundItems = w.groundItems.filter((x) => x !== g);
   w.applyHeroStats(u);
-  w.events.push({ type: 'itemPickUp', unitId: u.id });
+  w.events.push({ type: 'itemPickUp', unitId: u.id, itemId: item.id });
   return 'picked';
 }
 
-/** Remove dropped items that have been lying around too long. */
+/** When a ground item vanishes: its own crumble time if it has one, else GROUND_ITEM_LIFETIME after dropping. */
+export const groundItemExpiry = (g: GroundItem) => g.item.expiresAt ?? g.droppedAt + GROUND_ITEM_LIFETIME;
+
+/** Remove dropped items that have been lying around too long, and items that crumble in a bag. */
 export function expireGroundItems(w: World) {
-  if (w.groundItems.length && w.groundItems.some((g) => w.time - g.droppedAt >= GROUND_ITEM_LIFETIME)) {
-    w.groundItems = w.groundItems.filter((g) => w.time - g.droppedAt < GROUND_ITEM_LIFETIME);
+  if (w.groundItems.length && w.groundItems.some((g) => w.time >= groundItemExpiry(g))) {
+    w.groundItems = w.groundItems.filter((g) => w.time < groundItemExpiry(g));
+  }
+  if (w.tick % 15 !== 0) return;
+  for (const u of w.heroes) {
+    const h = u.hero!;
+    let changed = false;
+    h.items.forEach((s, i) => {
+      if (s?.expiresAt !== undefined && w.time >= s.expiresAt) {
+        h.items[i] = null;
+        changed = true;
+        w.events.push({ type: 'itemExpire', unitId: u.id, itemId: s.id });
+      }
+    });
+    if (changed) w.applyHeroStats(u);
   }
 }
+
+/** The hero's slot holding the Warden's charm, or -1. */
+export const charmSlot = (u: Unit) => u.hero?.items.findIndex((s) => s?.id === 'wardenCharm') ?? -1;
 
 export const emptyInventory = (): (ItemSlot | null)[] => Array<ItemSlot | null>(INVENTORY_SLOTS).fill(null);

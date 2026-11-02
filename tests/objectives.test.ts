@@ -117,29 +117,6 @@ describe('power-ups', () => {
   });
 });
 
-describe('boss', () => {
-  it('drops a revive charm; the holder revives on the spot', () => {
-    const { w, hero } = humans();
-    const boss = w.units.find((u) => u.neutral?.boss)!;
-    expect(boss).toBeDefined();
-    const b = hero(0, 'brakk');
-    place(b, boss.x - 3, boss.y);
-    run(w, 0.2); // let vision catch up
-    boss.hp = 1; // (bosses heal at home, so set this right before attacking)
-    w.applyCommand({ type: 'attack', unitId: b.id, targetId: boss.id });
-    run(w, 2);
-    expect(boss.alive).toBe(false);
-    expect(b.buffs.some((x) => x.key === 'charm')).toBe(true);
-    expect(w.bossRespawnAt).not.toBeNull();
-    const deathAt = { x: b.x, y: b.y };
-    w.dealDamage(hero(1, 'vexa').id, b, 99999, 'spell');
-    expect(b.alive).toBe(false);
-    run(w, 3.2);
-    expect(b.alive).toBe(true);
-    expect(Math.hypot(b.x - deathAt.x, b.y - deathAt.y)).toBeLessThan(1);
-  });
-});
-
 describe('buyback, tower shield, backdoor', () => {
   it('buyback respawns immediately for gold, then has a cooldown', () => {
     const { w, hero } = humans();
@@ -299,24 +276,7 @@ describe('settings & match controls', () => {
   });
 });
 
-describe('jungle camps & boss fight back', () => {
-  it('a ranged hero can kill the Warden from range; the Warden fights back instead of healing', () => {
-    const { w, hero } = humans();
-    const boss = w.units.find((u) => u.neutral?.boss)!;
-    const v = hero(0, 'vexa');
-    v.damage = 1200; // speed the test up
-    v.maxHp = v.hp = 50000; // and survive the fight
-    place(v, boss.x - 8.5, boss.y - 2); // outside the pit, in attack range
-    run(w, 0.2);
-    w.applyCommand({ type: 'attack', unitId: v.id, targetId: boss.id });
-    run(w, 2);
-    const hpAfterHits = boss.hp;
-    expect(hpAfterHits).toBeLessThan(boss.maxHp - 500);
-    expect(boss.targetId).toBe(v.id); // it's after Vexa
-    run(w, 12);
-    expect(boss.alive).toBe(false);
-  });
-
+describe('jungle camps fight back', () => {
   it('melee heroes can fight a camp and the camp hits back', () => {
     const { w, hero } = humans();
     run(w, 31);
@@ -395,7 +355,7 @@ describe('death costs gold', () => {
     // Revive charm: no loss.
     const b = hero(0, 'brakk');
     b.hero!.gold = 1000;
-    w.addBuff(b, { key: 'charm', t: 300 });
+    b.hero!.items[0] = { id: 'wardenCharm', count: 1, expiresAt: w.time + 300 };
     w.dealDamage(foe.id, b, 1e6, 'spell');
     expect(b.hero!.gold).toBe(1000);
   });

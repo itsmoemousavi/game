@@ -44,6 +44,12 @@ export const RUNE_INTERVAL = 120;
 export const BOSS_RESPAWN = 300;
 /** Revive charm from the boss lasts this long; reviving takes REVIVE_DELAY. */
 export const CHARM_DURATION = 300;
+/** The Warden chases attackers at most this far from the middle of its house. */
+export const WARDEN_LEASH = 17;
+/** Ground slam: every WARDEN_SLAM_INTERVAL s while fighting, after a short wind-up, it stuns everyone close by. */
+export const WARDEN_SLAM = { interval: 8, windup: 0.8, radius: 5, stun: 1.5, damage: 120 };
+/** Gold for the Warden: the hero who lands the killing blow gets it all, teammates get half. */
+export const WARDEN_GOLD = 300;
 export const REVIVE_DELAY = 3;
 
 export const BUYBACK_COOLDOWN = 300;

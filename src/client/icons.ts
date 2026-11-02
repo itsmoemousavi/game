@@ -76,6 +76,10 @@ const ICONS: Record<ItemId | 'tp' | 'shop', string> = {
     '<path d="M12 3c3 0 6 1.5 7 3l-2 14H7L5 6c1-1.5 4-3 7-3z" fill="#0ea5e9" stroke="#0c4a6e" stroke-width="1"/><path d="M12 8l3 1.3v2.4c0 2.3-1.4 3.9-3 4.6-1.6-.7-3-2.3-3-4.6V9.3z" fill="#e0f2fe" stroke="#0c4a6e" stroke-width="0.8"/>',
     '#082f49',
   ),
+  wardenCharm: svg(
+    '<circle cx="12" cy="7.5" r="3.5" fill="none" stroke="#fcd34d" stroke-width="2"/><path d="M12 11v10M7.5 14h9" stroke="#fcd34d" stroke-width="2" stroke-linecap="round"/>',
+    '#422006',
+  ),
   shadowStep: svg(
     '<path d="M4 18c2-1 3.5-1 5 0M8 13c2-1 3.5-1 5 0" stroke="#a5b4fc" stroke-width="1.4" stroke-linecap="round" fill="none" opacity="0.7"/><path d="M13 6h4l2 5-3 2v5h-3v-5l-2-2z" fill="#818cf8" stroke="#1e1b4b" stroke-width="1"/><circle cx="16" cy="4" r="1.6" fill="#c7d2fe"/>',
     '#1e1b4b',

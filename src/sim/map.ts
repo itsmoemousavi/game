@@ -44,6 +44,21 @@ export interface GameMap {
   runeSpots: [Vec2, Vec2];
   /** Where the boss lives (a pit beside the river). */
   bossPit: Vec2;
+  /** The Warden's walled house around the boss pit (one doorway facing the map centre). */
+  house: House;
+}
+
+export interface House {
+  x: number;
+  y: number;
+  /** Inside radius (open floor). */
+  inner: number;
+  /** Outer edge of the wall. */
+  outer: number;
+  /** Unit vector from the centre out through the doorway. */
+  door: Vec2;
+  /** Half the doorway's width. */
+  doorHalf: number;
 }
 
 /**
@@ -145,6 +160,17 @@ const RUNE_SPOT: Vec2 = sc({ x: 68, y: 68 });
 /** Boss pit on the river (the river line y = x is equally far from both bases). */
 const BOSS_PIT: Vec2 = sc({ x: 150, y: 150 });
 
+/**
+ * The Warden's house: a round walled room on the river between the bottom and middle lanes.
+ * Its only doorway faces the map centre along the river, so both teams reach it equally fast.
+ */
+const HOUSE: House = (() => {
+  const d = Math.SQRT1_2;
+  return { x: BOSS_PIT.x, y: BOSS_PIT.y, inner: 9, outer: 12, door: { x: -d, y: -d }, doorHalf: 3.6 };
+})();
+/** Open ground around the house, so you can walk all the way round it. */
+const HOUSE_CLEARING = 16;
+
 const RIVER: [Vec2, Vec2] = [sc({ x: 20, y: 20 }), sc({ x: 180, y: 180 })];
 
 /**
@@ -190,6 +216,15 @@ export function createMap(): GameMap {
   for (const [a, b] of JUNGLE_PATHS) carveSeg(a, b, JUNGLE_WIDTH);
   for (const path of FOREST_PATHS) for (let i = 1; i < path.length; i++) carveSeg(path[i - 1], path[i], FOREST_PATH_WIDTH);
   for (const h of HILLS) carveCircle(h, HILL_RADIUS);
+  // The Warden's house (only on this side of the river; the mirrored pit stays an open clearing).
+  for (let cy = 0; cy < GRID; cy++) {
+    for (let cx = 0; cx < GRID; cx++) {
+      const x = (cx + 0.5) * CELL;
+      const y = (cy + 0.5) * CELL;
+      const d = Math.hypot(x - HOUSE.x, y - HOUSE.y);
+      if (d <= HOUSE_CLEARING) walkable[cy * GRID + cx] = isHouseWallAt(HOUSE, x, y) ? 0 : 1;
+    }
+  }
 
   // Structures (team 0, then mirrored for team 1). Dota-style layout:
   //   lane: tier-1 tower out in the lane → tier-2 tower + barracks as a gate where the
@@ -318,6 +353,7 @@ export function createMap(): GameMap {
     camps: [...JUNGLE_ROOMS.map((r) => r.c), ...JUNGLE_ROOMS.map((r) => mirror(r.c))],
     runeSpots: [RUNE_SPOT, mirror(RUNE_SPOT)],
     bossPit: BOSS_PIT,
+    house: HOUSE,
   };
 }
 
@@ -366,4 +402,21 @@ export function heightAt(map: GameMap, x: number, y: number): number {
   const cy = Math.floor(y / map.cell);
   if (cx < 0 || cy < 0 || cx >= map.grid || cy >= map.grid) return 1;
   return map.height[cy * map.grid + cx];
+}
+
+/** True for a point inside the Warden's house (on its floor, not in the doorway or the wall). */
+export function inHouse(map: GameMap, x: number, y: number): boolean {
+  const h = map.house;
+  return Math.hypot(x - h.x, y - h.y) < h.inner;
+}
+
+/** True where the house wall stands (the ring between inner and outer, minus the doorway). */
+export function isHouseWallAt(h: House, x: number, y: number): boolean {
+  const dx = x - h.x;
+  const dy = y - h.y;
+  const d = Math.hypot(dx, dy);
+  if (d < h.inner || d > h.outer) return false;
+  const along = dx * h.door.x + dy * h.door.y;
+  const across = Math.abs(-dx * h.door.y + dy * h.door.x);
+  return !(along > 0 && across < h.doorHalf);
 }

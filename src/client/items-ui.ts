@@ -214,7 +214,7 @@ export class ItemsUi {
     const list = this.root.querySelector<HTMLElement>('#shop-items')!;
     const c = this.ctx();
     const build = c ? BUILDS[c.me.hero!.defId] : [];
-    const ids = this.tab === 'build' ? [...new Set(build)] : ITEM_IDS.filter((id) => categoryOf(id) === this.tab);
+    const ids = this.tab === 'build' ? [...new Set(build)] : ITEM_IDS.filter((id) => !ITEMS[id].noShop && categoryOf(id) === this.tab);
     this.root.querySelectorAll<HTMLElement>('#shop-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === this.tab));
     list.innerHTML = '';
     list.scrollTop = 0;
@@ -319,6 +319,14 @@ export class ItemsUi {
     if (this.sel.kind === 'own') {
       const s = h.items[this.sel.slot];
       if (!s) return;
+      this.root.querySelector<HTMLButtonElement>('#shop-drop')?.toggleAttribute('disabled', !me.alive);
+      if (ITEMS[s.id].noShop) {
+        btn.className = 'sell';
+        btn.innerHTML = 'SELL';
+        btn.disabled = true;
+        why.textContent = s.expiresAt !== undefined ? `Can't be sold. Crumbles in ${fmtTime(Math.max(0, s.expiresAt - w.time))}` : "Can't be sold";
+        return;
+      }
       const price = sellPrice(w, s);
       const left = Math.ceil(SELL_REFUND_WINDOW - (w.time - (s.boughtAt ?? -999)));
       btn.className = 'sell';
@@ -526,3 +534,5 @@ function onTap(el: Element, fn: () => void, cleanTapOnly = false) {
   });
   el.addEventListener('pointercancel', () => (start = null));
 }
+
+const fmtTime = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;

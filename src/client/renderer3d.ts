@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GameMap, HEROES, Team, Unit, World, isInvisible, isNight } from '../sim';
+import { GameMap, HEROES, Team, Unit, World, isHouseWallAt, isInvisible, isNight } from '../sim';
 import type { Aim } from './input';
 import { Renderer, TEAM_COLORS } from './renderer';
 import { JOINTS, Joint, TEAM_HEX, model } from './three/models';
@@ -135,6 +135,7 @@ export class Renderer3D extends Renderer {
     this.scene.add(fx);
 
     this.buildTrees(map);
+    this.buildHouse(map);
     this.resize();
     this.prewarm();
   }
@@ -193,10 +194,49 @@ export class Renderer3D extends Renderer {
     return a * (1 - ty) + b * ty;
   }
 
+  /** The Warden's house: a ring of low stone wall blocks with a doorway, and two gate pillars. */
+  private buildHouse(map: GameMap) {
+    const h = map.house;
+    const mid = (h.inner + h.outer) / 2;
+    const thick = h.outer - h.inner;
+    const doorAng = Math.atan2(h.door.y, h.door.x);
+    const gap = Math.asin(Math.min(1, (h.doorHalf + 0.3) / mid));
+    const span = Math.PI * 2 - gap * 2;
+    const count = Math.ceil((span * mid) / 2.4);
+    const step = span / count;
+    const height = 2.4;
+    const geo = new THREE.BoxGeometry(1, height, thick);
+    geo.translate(0, height / 2, 0);
+    const blocks = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ flatShading: true }), count + 2);
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0);
+    const shades = [0x8a857a, 0x7c776d, 0x938d80, 0x726d64];
+    const put = (k: number, a: number, r: number, len: number, hs: number, w = 1) => {
+      const x = h.x + Math.cos(a) * r;
+      const y = h.y + Math.sin(a) * r;
+      q.setFromAxisAngle(up, -a + Math.PI / 2);
+      m.compose(new THREE.Vector3(x, this.elevationAt(x, y) - 0.1, y), q, new THREE.Vector3(len, hs, w));
+      blocks.setMatrixAt(k, m);
+      blocks.setColorAt(k, new THREE.Color(shades[k % shades.length]));
+    };
+    for (let k = 0; k < count; k++) {
+      const a = doorAng + gap + step * (k + 0.5);
+      put(k, a, mid, step * mid + 0.15, 0.9 + ((k * 37) % 5) * 0.06);
+    }
+    // Gate pillars on both sides of the doorway.
+    put(count, doorAng + gap, mid, thick * 0.9, 1.45, 1.1);
+    put(count + 1, doorAng - gap, mid, thick * 0.9, 1.45, 1.1);
+    this.scene.add(blocks);
+  }
+
   private buildTrees(map: GameMap) {
     const n = map.grid;
     const cells: number[] = [];
-    for (let i = 0; i < n * n; i++) if (!map.walkable[i]) cells.push(i);
+    for (let i = 0; i < n * n; i++) {
+      if (map.walkable[i] || isHouseWallAt(map.house, ((i % n) + 0.5) * map.cell, (Math.floor(i / n) + 0.5) * map.cell)) continue;
+      cells.push(i);
+    }
     const count = cells.length;
     const trunkGeo = new THREE.CylinderGeometry(0.16, 0.24, 1.4, 5);
     trunkGeo.translate(0, 0.7, 0);

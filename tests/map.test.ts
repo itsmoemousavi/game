@@ -5,10 +5,25 @@ const map = createMap();
 
 describe('map', () => {
   it('is point-symmetric so both teams get the same map', () => {
+    const h = map.house;
+    const nearHouse = (cx: number, cy: number) => Math.hypot((cx + 0.5) * map.cell - h.x, (cy + 0.5) * map.cell - h.y) < 17;
     for (let cy = 0; cy < map.grid; cy++) {
       for (let cx = 0; cx < map.grid; cx++) {
         const m = (map.grid - 1 - cy) * map.grid + (map.grid - 1 - cx);
+        // The Warden's house stands on the river on one side only (checked below).
+        if (nearHouse(cx, cy) || nearHouse(map.grid - 1 - cx, map.grid - 1 - cy)) continue;
         expect(map.walkable[cy * map.grid + cx]).toBe(map.walkable[m]);
+      }
+    }
+  });
+
+  it("the Warden's house is mirror-symmetric across the river (fair to both teams)", () => {
+    const h = map.house;
+    expect(h.x).toBe(h.y); // on the river line y = x
+    for (let cy = 0; cy < map.grid; cy++) {
+      for (let cx = 0; cx < map.grid; cx++) {
+        if (Math.hypot((cx + 0.5) * map.cell - h.x, (cy + 0.5) * map.cell - h.y) > 15.5) continue;
+        expect(map.walkable[cy * map.grid + cx]).toBe(map.walkable[cx * map.grid + cy]);
       }
     }
   });

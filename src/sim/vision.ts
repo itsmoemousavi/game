@@ -1,4 +1,5 @@
 import { DAY_SECONDS, NIGHT_SECONDS, TRUE_SIGHT_RADIUS, Team } from './constants';
+import type { House } from './map';
 import type { Unit, World } from './world';
 
 /**
@@ -16,6 +17,10 @@ import type { Unit, World } from './world';
  *    at or above your level. So a ward on a hill (3) sees over normal forest (top 2)
  *    straight into the forest paths, but not over the trees around a base (top 3).
  */
+/**
+ * The Warden's house is always dark from outside (even through its doorway): a team sees
+ * its floor only while one of its units is inside, and then sees all of it.
+ */
 /** Wards are always invisible; heroes are while an invisibility buff is active. */
 export const isInvisible = (u: Unit) => !!u.ward || u.buffs.some((b) => b.invisible);
 
@@ -31,10 +36,23 @@ export class Vision {
     private cell: number,
     private walkable: Uint8Array,
     private height: Uint8Array,
+    house?: House,
   ) {
     this.grids = [new Uint8Array(grid * grid), new Uint8Array(grid * grid)];
     this.trueSight = [new Uint8Array(grid * grid), new Uint8Array(grid * grid)];
+    const inside: number[] = [];
+    if (house) {
+      this.house = house;
+      for (let cy = 0; cy < grid; cy++)
+        for (let cx = 0; cx < grid; cx++)
+          if (Math.hypot((cx + 0.5) * cell - house.x, (cy + 0.5) * cell - house.y) < house.inner + cell * 0.5) inside.push(cy * grid + cx);
+    }
+    this.houseCells = Int32Array.from(inside);
   }
+
+  private house: House | null = null;
+  /** Cells of the house floor (hidden unless your team is inside). */
+  private houseCells: Int32Array;
 
   update(w: World) {
     const night = isNight(w.time);
@@ -49,6 +67,11 @@ export class Vision {
         if (r > 0) this.reveal(g, u.x, u.y, r);
         if (u.ward?.kind === 'sentry') this.disc(ts, u.x, u.y, TRUE_SIGHT_RADIUS);
         if (u.structure?.tier === 'fountain') this.disc(ts, u.x, u.y, 16);
+      }
+      const hs = this.house;
+      if (hs) {
+        const inside = w.units.some((u) => u.alive && u.team === team && Math.hypot(u.x - hs.x, u.y - hs.y) < hs.inner);
+        for (const c of this.houseCells) g[c] = inside ? 1 : 0;
       }
     }
   }

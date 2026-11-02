@@ -96,6 +96,9 @@ export function statusEffects(w: World, u: Unit): Status[] {
     const id = BUFF_STATUS[b.key];
     if (id) add(id, b.t);
   }
+  // Carrying the Warden's charm.
+  const charm = u.hero?.items.find((s) => s?.id === 'wardenCharm');
+  if (charm) add('charm', charm.expiresAt !== undefined ? Math.max(0, charm.expiresAt - w.time) : undefined);
   if (slow !== undefined) add('slow', slow);
 
   // Passives worth tracking.

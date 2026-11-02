@@ -84,10 +84,11 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #clock { font-variant-numeric: tabular-nums; min-width: 44px; text-align: center; }
 
 /* Bottom group, just left of the ability buttons: status icons above the hero bar, items to its right. */
-#bottom-hud { position: absolute; right: calc(max(12px, env(safe-area-inset-right)) + 222px); bottom: max(4px, env(safe-area-inset-bottom)); display: flex; align-items: flex-end; gap: 8px; pointer-events: none; }
+#bottom-hud { position: absolute; right: calc(max(12px, env(safe-area-inset-right)) + 222px); bottom: max(4px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: flex-start; gap: 4px; pointer-events: none; }
+/* One glassy black panel holding the hero bar, items, TP and shop. */
+#hud-panel { display: flex; align-items: center; gap: 8px; padding: 5px 8px 5px 6px; border-radius: 12px; background: rgba(8,10,12,0.55); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 4px 18px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08); -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); pointer-events: none; }
 #app.lefty #bottom-hud { right: auto; left: calc(max(12px, env(safe-area-inset-left)) + 222px); }
-#hero-col { position: relative; display: flex; flex-direction: column; gap: 4px; }
-#herobar { position: relative; display: flex; gap: 8px; align-items: center; background: rgba(0,0,0,0.6); border-radius: 10px; padding: 6px 10px; width: clamp(190px, 31vw, 360px); box-sizing: border-box; pointer-events: none; }
+#herobar { position: relative; display: flex; gap: 8px; align-items: center; padding: 0 2px; width: clamp(180px, 29vw, 340px); box-sizing: border-box; pointer-events: none; }
 #portrait { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #111; }
 #herobar .bars { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .bar { position: relative; height: 13px; background: #222; border-radius: 3px; overflow: hidden; }

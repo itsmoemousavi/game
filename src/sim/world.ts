@@ -23,6 +23,9 @@ import {
   RUNE_FIRST,
   CAMP_RESPAWN,
   NEUTRAL_LEASH,
+  WARDEN_GOLD,
+  WARDEN_LEASH,
+  WARDEN_SLAM,
   Side,
   Team,
   VISION_HZ,
@@ -33,10 +36,10 @@ import {
 import { HEROES, HeroId, maxAbilityLevel } from './data/heroes';
 import { BARRACKS, CREEPS, CombatStats, HERO_VISION, NEUTRALS, STRUCTURES, SUPER_CREEP_MULT } from './data/units';
 import { ITEMS, ItemId, ItemStats, TELEPORT } from './data/items';
-import { GroundItem, ItemSlot, buyItem, buyTeleport, dropItem, emptyInventory, expireGroundItems, itemBonuses, pickUpItem, sellItem, startTeleport, updateChannel, useItem } from './inventory';
+import { GroundItem, ItemSlot, charmSlot, buyItem, buyTeleport, dropItem, emptyInventory, expireGroundItems, itemBonuses, pickUpItem, sellItem, startTeleport, updateChannel, useItem } from './inventory';
 import { Vision, isInvisible } from './vision';
 import { Rune, activateGlyph, buyback, placeWard, spawnBoss, updateObjectives } from './objectives';
-import { GameMap, LaneId, StructureTier, createMap, fits, heightAt, isWalkable, lineClear, teamLanePath } from './map';
+import { GameMap, LaneId, StructureTier, createMap, fits, heightAt, inHouse, isWalkable, lineClear, teamLanePath } from './map';
 import { Vec2, dist, distV } from './math';
 
 const distToSeg = (px: number, py: number, ax: number, ay: number, bx: number, by: number) => {
@@ -255,6 +258,10 @@ export interface NeutralState {
   boss?: boolean;
   /** Stays angry until this time (refreshed whenever it is hit). */
   aggroUntil: number;
+  /** Warden: when its next ground slam may start. */
+  nextSlam?: number;
+  /** Warden: while winding up a ground slam, the time it lands. */
+  slamLand?: number | null;
 }
 
 export interface WardState {
@@ -372,7 +379,10 @@ export type GameEvent =
   | { type: 'revive'; unitId: number }
   | { type: 'purchase'; unitId: number }
   | { type: 'itemDrop'; unitId: number }
-  | { type: 'itemPickUp'; unitId: number }
+  | { type: 'itemPickUp'; unitId: number; itemId?: ItemId }
+  | { type: 'itemExpire'; unitId: number; itemId: ItemId }
+  /** The Warden's ground slam: 'windup' when it raises its arms, 'hit' when it lands. */
+  | { type: 'wardenSlam'; unitId: number; phase: 'windup' | 'hit'; x: number; y: number; radius: number }
   | { type: 'goldLost'; unitId: number; amount: number }
   | { type: 'ping'; ping: Ping }
   | { type: 'blink'; unitId: number; fromX: number; fromY: number }
@@ -452,7 +462,7 @@ export class World {
     this.map = opts.map ?? createMap();
     this.nav = { ...this.map, walkable: new Uint8Array(this.map.walkable) };
     this.rng = new Rng(opts.seed);
-    this.vision = new Vision(this.map.grid, this.map.cell, this.map.walkable, this.map.height);
+    this.vision = new Vision(this.map.grid, this.map.cell, this.map.walkable, this.map.height, this.map.house);
     for (const s of this.map.structures) this.spawnStructure(s.team, s.tier, s.lane, s.pos, s.rax);
     this.refreshVulnerability();
     this.rebuildNav();
@@ -979,6 +989,7 @@ export class World {
         }
         this.updateHero(u);
       } else if (u.creep) this.updateCreep(u);
+      else if (u.neutral?.boss) this.updateWarden(u);
       else if (u.neutral) this.updateNeutral(u);
       else if (u.structure) this.updateStructure(u);
     }
@@ -1231,6 +1242,59 @@ export class World {
     else if (this.time > n.aggroUntil + 2) u.hp = Math.min(u.maxHp, u.hp + u.maxHp * 0.1 * DT); // heal at camp
   }
 
+  /**
+   * The Warden guards its house. When hurt it fights back against anyone (it hits from
+   * anywhere), chases up to WARDEN_LEASH from home and then gives up, and every few
+   * seconds slams the ground, stunning everyone close by after a short wind-up.
+   */
+  private updateWarden(u: Unit) {
+    const n = u.neutral!;
+    if (n.slamLand != null) {
+      if (this.time < n.slamLand) return; // arms raised: stands still
+      n.slamLand = null;
+      n.nextSlam = this.time + WARDEN_SLAM.interval;
+      for (const e of this.units) {
+        if (!e.alive || (e.kind !== 'hero' && e.kind !== 'creep')) continue;
+        if (dist(e.x, e.y, u.x, u.y) > WARDEN_SLAM.radius + e.radius) continue;
+        this.dealDamage(u.id, e, WARDEN_SLAM.damage, 'spell');
+        this.stun(e, WARDEN_SLAM.stun);
+      }
+      this.events.push({ type: 'wardenSlam', unitId: u.id, phase: 'hit', x: u.x, y: u.y, radius: WARDEN_SLAM.radius });
+      return;
+    }
+    const angry = this.time < n.aggroUntil;
+    if (!angry) n.nextSlam = this.time + 3; // the first slam comes a few seconds into a fight
+    let t = this.unit(u.targetId);
+    if (t && (!t.alive || !angry || t.team === 2)) t = undefined;
+    // Gave chase too far: give up and go home.
+    if (t && dist(t.x, t.y, n.homeX, n.homeY) > WARDEN_LEASH) {
+      t = undefined;
+      n.aggroUntil = 0;
+    }
+    // Still angry but its target is gone: anyone in the house will do.
+    if (!t && this.time < n.aggroUntil) {
+      t = this.units
+        .filter((e) => e.alive && (e.kind === 'hero' || e.kind === 'creep') && inHouse(this.map, e.x, e.y))
+        .sort((a, b) => dist(u.x, u.y, a.x, a.y) - dist(u.x, u.y, b.x, b.y))[0];
+    }
+    u.targetId = t?.id ?? null;
+    if (t) {
+      const near = this.units.some((e) => e.alive && e.team !== 2 && (e.kind === 'hero' || e.kind === 'creep') && dist(e.x, e.y, u.x, u.y) <= WARDEN_SLAM.radius + e.radius - 0.5);
+      if (near && this.time >= (n.nextSlam ?? 0)) {
+        n.slamLand = this.time + WARDEN_SLAM.windup;
+        u.path = null;
+        this.events.push({ type: 'wardenSlam', unitId: u.id, phase: 'windup', x: u.x, y: u.y, radius: WARDEN_SLAM.radius });
+        return;
+      }
+      if (this.tryAttack(u, t)) return;
+      this.steerTo(u, t.x, t.y);
+      return;
+    }
+    const home = dist(u.x, u.y, n.homeX, n.homeY);
+    if (home > 0.3) this.steerTo(u, n.homeX, n.homeY);
+    else if (this.time > n.aggroUntil + 2) u.hp = Math.min(u.maxHp, u.hp + u.maxHp * 0.05 * DT); // heals at home
+  }
+
   private updateProjectiles() {
     const keep: Projectile[] = [];
     for (const p of this.projectiles) {
@@ -1385,6 +1449,8 @@ export class World {
   // ---------------------------------------------------------------- combat
 
   inReach(a: Unit, b: Unit): boolean {
+    // The Warden can only be fought from inside its house.
+    if (b.neutral?.boss && !inHouse(this.map, a.x, a.y)) return false;
     return dist(a.x, a.y, b.x, b.y) <= a.attackRange + a.radius + b.radius;
   }
 
@@ -1435,6 +1501,8 @@ export class World {
     if (target.structure && (!target.structure.vulnerable || kind === 'spell' || target.structure.glyph > 0)) return;
     if (kind === 'spell' && this.isSpellImmune(target)) return;
     const src = this.unit(sourceId);
+    // Nothing from outside the Warden's house hurts it (spells and arrows included).
+    if (target.neutral?.boss && src && src !== target && !inHouse(this.map, src.x, src.y)) return;
     let amount = kind === 'attack' ? raw * armorMultiplier(this.armorOf(target)) : raw;
     if (kind === 'spell' && src?.hero) amount *= 1 + src.hero.bonus.spellAmpPct / 100;
     amount = damageAfterPassives(this, target, amount, kind);
@@ -1481,7 +1549,8 @@ export class World {
   }
 
   private kill(u: Unit, killer: Unit | undefined) {
-    const charm = u.hero && u.buffs.some((b) => b.key === 'charm');
+    const charmAt = u.hero ? charmSlot(u) : -1;
+    const charm = u.hero && (charmAt >= 0 || u.buffs.some((b) => b.key === 'charm'));
     u.hp = 0;
     u.alive = false;
     u.targetId = null;
@@ -1505,7 +1574,11 @@ export class World {
       h.order = { type: 'idle' };
       h.channel = null;
       if (charm) {
-        // Revive charm: get back up on the spot after a short delay.
+        // Revive charm: get back up on the spot after a short delay (the charm is used up).
+        if (charmAt >= 0) {
+          h.items[charmAt] = null;
+          this.applyHeroStats(u);
+        }
         h.respawnTimer = REVIVE_DELAY;
         h.reviveAt = { x: u.x, y: u.y };
       } else if (killer && killer.team !== u.team) {
@@ -1555,12 +1628,20 @@ export class World {
       this.bossRespawnAt = this.time + BOSS_RESPAWN;
       this.events.push({ type: 'bossKilled', killerId: killer?.id ?? null, team: team ?? 2 });
       if (team !== null) {
-        for (const ally of this.units) if (ally.hero && ally.team === team) this.giveGold(ally, 150);
+        // The killing blow takes the full reward, teammates get half.
+        for (const ally of this.units) if (ally.hero && ally.team === team) this.giveGold(ally, ally === killerHero ? WARDEN_GOLD : WARDEN_GOLD / 2);
         this.shareXp(u, u.bountyXp, team);
-        // The killer (or the team's most valuable living hero if a creep got it) carries the charm.
-        const holder = killerHero ?? this.units.find((a) => a.hero && a.alive && a.team === team);
-        if (holder) this.addBuff(holder, { key: 'charm', t: CHARM_DURATION });
       }
+      // The revive charm drops where the Warden fell: whoever grabs it first (either team) keeps it.
+      this.groundItems.push({
+        id: this.newId(),
+        item: { id: 'wardenCharm', count: 1, expiresAt: this.time + CHARM_DURATION },
+        x: u.x,
+        y: u.y,
+        ownerId: -1,
+        team: 2,
+        droppedAt: this.time,
+      });
     } else if (u.neutral) {
       if (killerHero) {
         killerHero.hero!.lastHits++;

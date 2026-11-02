@@ -122,19 +122,19 @@ export const NEUTRALS: Record<'brute' | 'imp', CombatStats> = {
   },
 };
 
-/** The river boss: tough, hits hard, drops a revive charm for the team that kills it. */
+/** The river boss (the Warden): very tough, hits hard, drops a revive charm anyone can grab. */
 export const BOSS: CombatStats = {
-  hp: 6500,
-  armor: 8,
-  damage: 80,
+  hp: 14000,
+  armor: 12,
+  damage: 110,
   attackInterval: 1.3,
   attackRange: 1.8,
   projectileSpeed: 0,
   moveSpeed: 5,
   radius: 2,
   acquireRange: 0,
-  bountyGold: 250,
-  bountyXp: 400,
+  bountyGold: 300,
+  bountyXp: 600,
 };
 
 export const WARDS: Record<'observer' | 'sentry', CombatStats> = {

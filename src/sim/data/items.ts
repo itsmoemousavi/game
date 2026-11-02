@@ -21,7 +21,8 @@ export type ItemId =
   | 'titanHeart'
   | 'archmageStaff'
   | 'wardedCloak'
-  | 'shadowStep';
+  | 'shadowStep'
+  | 'wardenCharm';
 
 export interface ItemStats {
   damage?: number;
@@ -61,6 +62,8 @@ export interface ItemDef {
   /** Item with a button. */
   active?: { kind: 'blink' | 'immunity'; cooldown: number; range?: number; duration?: number };
   summary: string;
+  /** Not sold in the shop and can't be sold back (the Warden's revive charm). */
+  noShop?: boolean;
 }
 
 export const ITEMS: Record<ItemId, ItemDef> = {
@@ -234,6 +237,17 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     icon: '#facc15',
     stats: { ultUpgrade: true, hp: 200, mana: 200 },
     summary: 'Upgrades your Ultimate: +25% effect, −30% cooldown. +200 health, +200 mana.',
+  },
+  wardenCharm: {
+    id: 'wardenCharm',
+    name: "Warden's Charm",
+    short: 'Charm',
+    cost: 0,
+    icon: '#fcd34d',
+    stats: {},
+    noShop: true,
+    summary:
+      'Dropped by the Warden; anyone can pick it up, enemies too. If you die while carrying it you come back to life on the spot 3 s later and lose no gold. It crumbles 5 minutes after the Warden falls.',
   },
 };
 

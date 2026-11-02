@@ -1,4 +1,4 @@
-import { GROUND_ITEM_LIFETIME, GameEvent, GameMap, HEROES, ITEMS, canPickUp, LANE_IDS, PING_DURATION, PingKind, RUNE_INFO, Side, Team, Unit, WARD_CAST_RANGE, World, isInvisible, isNight } from '../sim';
+import { GameEvent, groundItemExpiry, isHouseWallAt, GameMap, HEROES, ITEMS, canPickUp, LANE_IDS, PING_DURATION, PingKind, RUNE_INFO, Side, Team, Unit, WARD_CAST_RANGE, WARDEN_SLAM, World, isInvisible, isNight } from '../sim';
 import type { Aim } from './input';
 import { itemImage } from './icons';
 
@@ -130,6 +130,8 @@ export class Renderer {
         const color = '#ffffff';
         this.swings.push({ x: src.x, y: src.y, ang, reach: src.radius + src.attackRange + tgt.radius * 0.5, t: 0.2, color });
         this.lunges.set(src.id, { ang, t: 0.16 });
+      } else if (e.type === 'wardenSlam' && e.phase === 'hit') {
+        this.blasts.push({ x: e.x, y: e.y, r: e.radius * 1.4, t: 0.45, color: '196,181,253' });
       } else if (e.type === 'explosion') {
         this.blasts.push({ x: e.x, y: e.y, r: e.radius, t: 0.35, color: '255,140,40' });
       } else if (e.type === 'teleport') {
@@ -212,6 +214,7 @@ export class Renderer {
     this.drawAreas(w, seesPoint);
     this.drawRunes(w, viewTeam);
     this.drawGroundItems(w, viewTeam, focus);
+    this.drawWardenSlam(w, sees);
     for (const u of w.units) if (u.ward && u.alive && sees(u)) this.drawWard(u, viewTeam);
     if (this.wardMode !== null && focus?.alive) {
       const p = lerp(focus);
@@ -558,7 +561,7 @@ export class Renderer {
     for (const g of w.groundItems) {
       if (g.team !== team && !w.vision.seesPoint(team, g.x, g.y)) continue;
       const mine = !!me && canPickUp(me, g);
-      const left = 1 - (w.time - g.droppedAt) / GROUND_ITEM_LIFETIME;
+      const left = (groundItemExpiry(g) - w.time) / (groundItemExpiry(g) - g.droppedAt);
       const r = 1.25;
       ctx.fillStyle = 'rgba(0,0,0,0.45)';
       ctx.beginPath();
@@ -577,6 +580,25 @@ export class Renderer {
         ctx.textAlign = 'center';
         ctx.fillText(String(g.item.count), g.x + r * 0.55, g.y + r * 0.8);
       }
+    }
+  }
+
+  /** The Warden winding up its ground slam: a red circle that fills until it lands. */
+  protected drawWardenSlam(w: World, sees: (u: Unit) => boolean) {
+    const ctx = this.ctx;
+    for (const u of w.units) {
+      const n = u.neutral;
+      if (!n?.boss || !u.alive || n.slamLand == null || !sees(u)) continue;
+      const k = Math.max(0, Math.min(1, 1 - (n.slamLand - w.time) / WARDEN_SLAM.windup));
+      ctx.fillStyle = `rgba(239,68,68,${0.12 + 0.2 * k})`;
+      ctx.beginPath();
+      ctx.arc(u.x, u.y, WARDEN_SLAM.radius * k, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(248,113,113,0.9)';
+      ctx.lineWidth = 0.22;
+      ctx.beginPath();
+      ctx.arc(u.x, u.y, WARDEN_SLAM.radius, 0, Math.PI * 2);
+      ctx.stroke();
     }
   }
 
@@ -1093,6 +1115,7 @@ function bakeMap(map: GameMap): HTMLCanvasElement {
   for (let cy = 0; cy < map.grid; cy++) {
     for (let cx = 0; cx < map.grid; cx++) {
       if (map.walkable[cy * map.grid + cx]) continue;
+      if (isHouseWallAt(map.house, (cx + 0.5) * map.cell, (cy + 0.5) * map.cell)) continue; // drawn as stone below
       g.fillStyle = '#0f1a10';
       g.fillRect(cx * cs, cy * cs, cs + 0.5, cs + 0.5);
       const hsh = ((cx * 73856093) ^ (cy * 19349663)) >>> 0;
@@ -1103,6 +1126,45 @@ function bakeMap(map: GameMap): HTMLCanvasElement {
         g.fill();
       }
     }
+  }
+  // The Warden's house: a flagstone floor inside a round stone wall with one doorway.
+  {
+    const h = map.house;
+    const mid = (h.inner + h.outer) / 2;
+    const doorAng = Math.atan2(h.door.y, h.door.x);
+    const gap = Math.asin(Math.min(1, h.doorHalf / mid));
+    g.fillStyle = '#3b3a37';
+    g.beginPath();
+    g.arc(h.x * px, h.y * px, mid * px, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = 'rgba(0,0,0,0.25)';
+    g.lineWidth = 0.12 * px;
+    for (let r = 2.2; r < h.inner; r += 2.2) {
+      g.beginPath();
+      g.arc(h.x * px, h.y * px, r * px, 0, Math.PI * 2);
+      g.stroke();
+    }
+    for (let a = 0; a < 12; a++) {
+      const t = (a / 12) * Math.PI * 2;
+      g.beginPath();
+      g.moveTo((h.x + Math.cos(t) * 2.2) * px, (h.y + Math.sin(t) * 2.2) * px);
+      g.lineTo((h.x + Math.cos(t) * h.inner) * px, (h.y + Math.sin(t) * h.inner) * px);
+      g.stroke();
+    }
+    g.lineCap = 'butt';
+    g.strokeStyle = '#77736b';
+    g.lineWidth = (h.outer - h.inner) * px;
+    g.beginPath();
+    g.arc(h.x * px, h.y * px, mid * px, doorAng + gap, doorAng - gap + Math.PI * 2);
+    g.stroke();
+    g.strokeStyle = '#a19c91';
+    g.lineWidth = 0.35 * px;
+    for (const r of [h.inner + 0.2, h.outer - 0.2]) {
+      g.beginPath();
+      g.arc(h.x * px, h.y * px, r * px, doorAng + Math.asin(Math.min(1, h.doorHalf / r)), doorAng - Math.asin(Math.min(1, h.doorHalf / r)) + Math.PI * 2);
+      g.stroke();
+    }
+    g.lineCap = 'round';
   }
   // Forest paths: faint trails so the escape routes read on the map.
   g.strokeStyle = 'rgba(120,100,70,0.35)';

@@ -108,6 +108,11 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
       case 'purchase':
         if (e.unitId === meId) sfx.play('purchase');
         break;
+      case 'wardenSlam': {
+        const b = w.unit(e.unitId);
+        if (b && w.canSee(team, b)) sfx.play(e.phase === 'hit' ? 'slam' : 'roar', near(b) * (e.phase === 'hit' ? 1 : 0.35));
+        break;
+      }
       case 'itemDrop':
         if (e.unitId === meId) sfx.play('itemDrop');
         break;
