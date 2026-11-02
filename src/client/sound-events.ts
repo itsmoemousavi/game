@@ -108,6 +108,12 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
       case 'purchase':
         if (e.unitId === meId) sfx.play('purchase');
         break;
+      case 'itemDrop':
+        if (e.unitId === meId) sfx.play('itemDrop');
+        break;
+      case 'itemPickUp':
+        if (e.unitId === meId) sfx.play('itemPickUp');
+        break;
       case 'gameOver':
         sfx.play(e.winner === team ? 'victory' : 'defeat');
         break;

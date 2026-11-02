@@ -37,6 +37,8 @@ export type SoundName =
   | 'roar'
   | 'revive'
   | 'purchase'
+  | 'itemDrop'
+  | 'itemPickUp'
   | 'click'
   | 'ping'
   | 'victory'
@@ -82,6 +84,14 @@ const RECIPES: Record<SoundName, Recipe> = {
   stun: (s, v) => {
     s.tone('square', 1200, 1200, 0.08, 0.08 * v);
     s.tone('square', 1800, 1800, 0.08, 0.06 * v, 0.06);
+  },
+  itemDrop: (s, v) => {
+    s.noise(0.08, 0.2 * v, 'lowpass', 900, 300);
+    s.tone('triangle', 330, 180, 0.12, 0.16 * v);
+  },
+  itemPickUp: (s, v) => {
+    s.tone('triangle', 520, 880, 0.1, 0.18 * v);
+    s.noise(0.05, 0.08 * v, 'highpass', 3000);
   },
   coin: (s, v) => {
     s.tone('sine', 1320, 1320, 0.07, 0.18 * v);

@@ -240,4 +240,82 @@ export function updateChannel(w: World, u: Unit, dt: number): boolean {
   return false;
 }
 
+// ------------------------------------------------------------------ dropping items
+
+/** An item lying on the ground (dropped by a hero). */
+export interface GroundItem {
+  id: number;
+  item: ItemSlot;
+  x: number;
+  y: number;
+  /** The hero who dropped it: only they can pick it up again (wards: any ally). */
+  ownerId: number;
+  team: Team;
+  droppedAt: number;
+}
+
+/** Dropped items vanish after this many seconds. */
+export const GROUND_ITEM_LIFETIME = 120;
+/** How close (beyond the hero's own radius) a hero must be to pick an item up. */
+export const PICKUP_RANGE = 1.5;
+/** Items an ally may pick up (everything else stays with the hero who bought it). */
+const SHAREABLE: ItemId[] = ['observerWard', 'sentryWard'];
+
+export function canPickUp(u: Unit, g: GroundItem): boolean {
+  if (!u.hero) return false;
+  return g.ownerId === u.id || (g.team === u.team && SHAREABLE.includes(g.item.id));
+}
+
+/** Drop the item in `slot` at the hero's feet. */
+export function dropItem(w: World, u: Unit, slot: number): boolean {
+  const h = u.hero!;
+  const s = h.items[slot];
+  if (!s || !u.alive) return false;
+  // A step in front of the hero, on walkable ground.
+  const fx = u.x + Math.cos(u.facing) * (u.radius + 0.6);
+  const fy = u.y + Math.sin(u.facing) * (u.radius + 0.6);
+  const cell = nearestWalkableCell(w.nav, fx, fy);
+  const p = cell >= 0 && dist(cellCenter(w.nav, cell).x, cellCenter(w.nav, cell).y, fx, fy) > 1.2 ? { x: u.x, y: u.y } : { x: fx, y: fy };
+  h.items[slot] = null;
+  w.groundItems.push({ id: w.newId(), item: s, x: p.x, y: p.y, ownerId: u.id, team: u.team as Team, droppedAt: w.time });
+  w.applyHeroStats(u);
+  w.events.push({ type: 'itemDrop', unitId: u.id });
+  return true;
+}
+
+/** Why `u` can't pick up ground item `g` right now (other than distance), or null. */
+export function pickUpBlocker(u: Unit, g: GroundItem): 'notYours' | 'full' | null {
+  if (!canPickUp(u, g)) return 'notYours';
+  const h = u.hero!;
+  const max = ITEMS[g.item.id].consumable?.maxStack ?? 1;
+  const stack = max > 1 && h.items.some((s) => s?.id === g.item.id && s.count + g.item.count <= max);
+  if (!stack && !h.items.includes(null)) return 'full';
+  return null;
+}
+
+/** Pick up ground item `groundId` (walk there first if it's out of reach). */
+export function pickUpItem(w: World, u: Unit, groundId: number): 'picked' | 'approach' | 'fail' {
+  const g = w.groundItems.find((x) => x.id === groundId);
+  if (!g || !u.alive || pickUpBlocker(u, g)) return 'fail';
+  if (dist(u.x, u.y, g.x, g.y) > u.radius + PICKUP_RANGE) return 'approach';
+  const h = u.hero!;
+  const max = ITEMS[g.item.id].consumable?.maxStack ?? 1;
+  const stack = max > 1 ? h.items.find((s) => s?.id === g.item.id && s.count + g.item.count <= max) : undefined;
+  // An ally's ward is a gift: it can't be sold back for the full price.
+  const item: ItemSlot = g.ownerId === u.id ? g.item : { ...g.item, boughtAt: undefined };
+  if (stack) stack.count += item.count;
+  else h.items[h.items.indexOf(null)] = item;
+  w.groundItems = w.groundItems.filter((x) => x !== g);
+  w.applyHeroStats(u);
+  w.events.push({ type: 'itemPickUp', unitId: u.id });
+  return 'picked';
+}
+
+/** Remove dropped items that have been lying around too long. */
+export function expireGroundItems(w: World) {
+  if (w.groundItems.length && w.groundItems.some((g) => w.time - g.droppedAt >= GROUND_ITEM_LIFETIME)) {
+    w.groundItems = w.groundItems.filter((g) => w.time - g.droppedAt < GROUND_ITEM_LIFETIME);
+  }
+}
+
 export const emptyInventory = (): (ItemSlot | null)[] => Array<ItemSlot | null>(INVENTORY_SLOTS).fill(null);

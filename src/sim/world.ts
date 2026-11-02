@@ -33,7 +33,7 @@ import {
 import { HEROES, HeroId, maxAbilityLevel } from './data/heroes';
 import { BARRACKS, CREEPS, CombatStats, HERO_VISION, NEUTRALS, STRUCTURES, SUPER_CREEP_MULT } from './data/units';
 import { ITEMS, ItemId, ItemStats, TELEPORT } from './data/items';
-import { ItemSlot, buyItem, buyTeleport, emptyInventory, itemBonuses, sellItem, startTeleport, updateChannel, useItem } from './inventory';
+import { GroundItem, ItemSlot, buyItem, buyTeleport, dropItem, emptyInventory, expireGroundItems, itemBonuses, pickUpItem, sellItem, startTeleport, updateChannel, useItem } from './inventory';
 import { Vision, isInvisible } from './vision';
 import { Rune, activateGlyph, buyback, placeWard, spawnBoss, updateObjectives } from './objectives';
 import { GameMap, LaneId, StructureTier, createMap, fits, heightAt, isWalkable, lineClear, teamLanePath } from './map';
@@ -60,7 +60,8 @@ export type Order =
   | { type: 'move'; x: number; y: number }
   | { type: 'attack'; targetId: number }
   | { type: 'cast'; slot: number; targetId?: number; x?: number; y?: number }
-  | { type: 'ward'; slot: number; x: number; y: number };
+  | { type: 'ward'; slot: number; x: number; y: number }
+  | { type: 'pickUp'; groundId: number };
 
 /** Every way a player (human or bot, local or remote) can influence the game. */
 export type Command =
@@ -98,6 +99,10 @@ export type Command =
   | { type: 'placeWard'; unitId: number; slot: number; x: number; y: number }
   /** Pay gold to respawn immediately (while dead). */
   | { type: 'buyback'; unitId: number }
+  /** Drop the item in `slot` on the ground in front of the hero. */
+  | { type: 'dropItem'; unitId: number; slot: number }
+  /** Pick up a dropped item (walks there first). Only your own items, or an ally's wards. */
+  | { type: 'pickUp'; unitId: number; groundId: number }
   /** Team tower shield: every allied building invulnerable for a few seconds. */
   | { type: 'glyph'; unitId: number };
 
@@ -366,6 +371,8 @@ export type GameEvent =
   | { type: 'bossKilled'; killerId: number | null; team: Side }
   | { type: 'revive'; unitId: number }
   | { type: 'purchase'; unitId: number }
+  | { type: 'itemDrop'; unitId: number }
+  | { type: 'itemPickUp'; unitId: number }
   | { type: 'goldLost'; unitId: number; amount: number }
   | { type: 'ping'; ping: Ping }
   | { type: 'blink'; unitId: number; fromX: number; fromY: number }
@@ -432,6 +439,8 @@ export class World {
   surrendered: Team | null = null;
   private nextCampSpawn = CAMP_FIRST_SPAWN;
   runes: Rune[] = [];
+  /** Items heroes dropped on the ground. */
+  groundItems: GroundItem[] = [];
   nextRune = RUNE_FIRST;
   bossRespawnAt: number | null = null;
   glyphCooldown: [number, number] = [0, 0];
@@ -630,6 +639,15 @@ export class World {
         break;
       case 'buyback':
         buyback(this, u);
+        break;
+      case 'dropItem':
+        dropItem(this, u, cmd.slot);
+        break;
+      case 'pickUp':
+        if (pickUpItem(this, u, cmd.groundId) === 'approach') {
+          h.order = { type: 'pickUp', groundId: cmd.groundId };
+          u.path = null;
+        }
         break;
       case 'glyph':
         activateGlyph(this, u.team as Team);
@@ -933,6 +951,7 @@ export class World {
       this.nextCampSpawn += CAMP_RESPAWN;
     }
     updateObjectives(this);
+    expireGroundItems(this);
 
     for (const u of this.units) {
       if (u.attackTimer > 0) u.attackTimer -= DT;
@@ -1108,6 +1127,13 @@ export class World {
       case 'ward': {
         const r = placeWard(this, u, o.slot, o.x, o.y);
         if (r === 'approach') this.navigate(u, o.x, o.y, 0);
+        else h.order = { type: 'idle' };
+        break;
+      }
+      case 'pickUp': {
+        const r = pickUpItem(this, u, o.groundId);
+        const g = this.groundItems.find((x) => x.id === o.groundId);
+        if (r === 'approach' && g) this.navigate(u, g.x, g.y, 0);
         else h.order = { type: 'idle' };
         break;
       }

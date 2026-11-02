@@ -138,7 +138,13 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 .ability .mana { font-size: 8px; color: #8cc4ff; line-height: 1; }
 
 /* ---------- item bar ---------- */
-#itembar { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(max(4px, env(safe-area-inset-bottom)) + 58px); display: flex; gap: 4px; align-items: center; }
+#itembar { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(max(4px, env(safe-area-inset-bottom)) + 58px); display: grid; grid-template-columns: repeat(3, 34px) auto auto; grid-template-rows: 34px 34px; grid-auto-flow: row; gap: 4px; align-items: center; }
+#itembar .tp, #btn-shop { grid-row: 1 / span 2; }
+#itembar .tp { grid-column: 4; }
+#btn-shop { grid-column: 5; }
+/* long-press an item: Drop button above it */
+#item-drop { position: absolute !important; width: auto !important; height: 26px !important; padding: 0 10px !important; transform: translate(-50%, calc(-100% - 6px)); background: #7f1d1d !important; border-color: #fca5a5 !important; color: #fff; font-size: 12px; font-weight: 900; letter-spacing: 0.08em; z-index: 3; box-shadow: 0 3px 10px rgba(0,0,0,0.5); }
+#item-drop.hidden { display: none !important; }
 #itembar button { position: relative; width: 34px; height: 34px; border-radius: 7px; border: 2px solid rgba(255,255,255,0.3); background: rgba(20,30,24,0.8); padding: 0; display: grid; place-items: center; touch-action: none; }
 #itembar .item .lbl { font-size: 8px; font-weight: 800; color: #111; text-shadow: 0 0 2px rgba(255,255,255,0.6); }
 #itembar .item.empty { background: rgba(0,0,0,0.45); border-style: dashed; }
@@ -173,7 +179,8 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 .shop-mid { min-height: 0; display: flex; flex-direction: column; gap: 6px; }
 #shop-own { flex: none; display: flex; align-items: center; gap: 5px; padding: 5px 6px; border-radius: 9px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08); }
 #shop-own small { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.6; margin-right: 4px; }
-#shop-own button { width: 34px; height: 34px; padding: 0; border-radius: 7px; border: 2px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.4); overflow: hidden; position: relative; }
+#shop-own .own-grid { display: grid; grid-template-columns: repeat(3, 30px); grid-template-rows: 30px 30px; gap: 4px; }
+#shop-own button { width: 30px; height: 30px; padding: 0; border-radius: 7px; border: 2px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.4); overflow: hidden; position: relative; }
 #shop-own button.empty { border-style: dashed; opacity: 0.5; }
 #shop-own button.picked { border-color: #7dd3fc; }
 #shop-items { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 6px; align-content: start; padding: 2px; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
@@ -193,11 +200,14 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 .d-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .d-row small { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.6; margin-right: 2px; }
 .d-row .part { width: 28px; height: 28px; border-radius: 5px; overflow: hidden; display: inline-block; position: relative; border: 1px solid rgba(255,255,255,0.2); }
-#shop-act { margin-top: auto; padding: 9px 0; border-radius: 10px; border: 0; font-size: 16px; font-weight: 900; letter-spacing: 0.08em; }
+#shop-detail .d-acts { margin-top: auto; display: flex; gap: 6px; }
+#shop-act { flex: 1; padding: 9px 0; border-radius: 10px; border: 0; font-size: 16px; font-weight: 900; letter-spacing: 0.08em; }
 #shop-act.buy { background: linear-gradient(180deg, #ffd84d, #d18f0c); color: #2a1a00; box-shadow: 0 3px 0 #6b4700; }
 #shop-act.sell { background: linear-gradient(180deg, #7dd3fc, #2563eb); color: #06142e; box-shadow: 0 3px 0 #1e3a8a; }
 #shop-act b { margin-left: 4px; }
 #shop-act:disabled { filter: grayscale(0.8); opacity: 0.55; }
+#shop-drop { padding: 9px 12px; border-radius: 10px; border: 0; font-size: 14px; font-weight: 900; letter-spacing: 0.06em; background: linear-gradient(180deg, #f87171, #991b1b); color: #fff; box-shadow: 0 3px 0 #450a0a; }
+#shop-drop:disabled { filter: grayscale(0.8); opacity: 0.55; }
 #shop-why { min-height: 14px; font-size: 11px; text-align: center; opacity: 0.75; }
 
 /* ---------- teleport picker ---------- */

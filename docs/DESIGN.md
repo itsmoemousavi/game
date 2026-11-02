@@ -125,11 +125,12 @@ Ability levels: basic abilities max level 4 (and at most ⌈hero level / 2⌉), 
 ## 6. Items (implemented, milestone 4)
 
 **Inventory and shop:**
-- **6 inventory slots, plus a separate Teleport slot.** The TP slot shows how many scrolls you carry, 0 if none. You can buy as many as you like.
+- **6 inventory slots in 2 rows of 3, plus a separate Teleport slot.** The TP slot shows how many scrolls you carry, 0 if none. You can buy as many as you like.
 - **The 🛒 shop** opens anywhere, but buying and selling only work near your fountain. Selling refunds 50%.
 - **Recommended items** for your hero are marked ★ and listed first.
 - **Healing Salves** stack up to 3 in one slot; tap the slot to use one.
 - **While the shop is open,** tapping one of your items sells it.
+- **Dropping items:** press and hold an item (or use DROP in the shop) to put it on the ground in front of you. It shows as its icon on the ground with a ring that empties over its **2 minutes**, then it's gone. Tap it to walk over and pick it up. **Only the hero who dropped an item can pick it up again**, so nobody can buy items for a teammate or feed an enemy. Exception: **Observer and Sentry wards can be handed to allies** (never to enemies); a gifted ward sells for half price. The ring is gold on items you can take, grey otherwise.
 
 **Teleport:**
 - 50 gold each.

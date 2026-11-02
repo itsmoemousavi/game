@@ -24,8 +24,10 @@ import { itemIcon } from './icons';
 /**
  * Item bar (6 slots + teleport slot), shop panel and teleport destination picker.
  *
- * Item slot tap: use a consumable (salve). While the shop is open, tapping an item picks it
- * in the shop (to sell it there with the Sell button).
+ * Item slot (2 rows × 3): tap = use the item (salve, ward, blink…); press and hold = a
+ * "Drop" button appears above it. While the shop is open, tapping an item picks it in the
+ * shop (to sell or drop it with the buttons there). Dropped items are picked up again by
+ * tapping them on the ground.
  *
  * Shop: category tabs, a grid of items and a detail panel. Tapping an item only selects it;
  * buying and selling happen with the big button in the detail panel, so scrolling the list
@@ -45,6 +47,9 @@ export class ItemsUi {
   private tab: ShopTab = 'build';
   /** Selected item in the shop: a shop item, or one of your own slots (to sell). */
   private sel: { kind: 'shop'; id: ItemId } | { kind: 'own'; slot: number } | null = null;
+  private dropBtn: HTMLButtonElement;
+  /** Slot whose "Drop" button is showing (after a long press), if any. */
+  private dropSlot: number | null = null;
   /** Slot of the ward being placed, if any. */
   placingSlot: number | null = null;
 
@@ -70,21 +75,67 @@ export class ItemsUi {
         fn(e as PointerEvent);
       });
 
-    this.slots.forEach((el, i) =>
-      tap(el, () => {
+    // Item slots: a quick tap uses the item; press and hold shows a "Drop" button above it.
+    this.dropBtn = document.createElement('button');
+    this.dropBtn.id = 'item-drop';
+    this.dropBtn.className = 'hidden';
+    this.dropBtn.textContent = 'DROP';
+    root.querySelector('#itembar')!.appendChild(this.dropBtn);
+    tap(this.dropBtn, () => {
+      const c = this.ctx();
+      if (c && this.dropSlot !== null && c.me.hero!.items[this.dropSlot]) this.send({ type: 'dropItem', unitId: c.me.id, slot: this.dropSlot });
+      this.hideDrop();
+    });
+    this.slots.forEach((el, i) => {
+      let hold: ReturnType<typeof setTimeout> | null = null;
+      let pointer: number | null = null;
+      el.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         const c = this.ctx();
         if (!c) return;
         const item = c.me.hero!.items[i];
+        this.hideDrop();
         if (this.shopOpen) {
           if (item) this.select({ kind: 'own', slot: i });
+          return;
         }
-        else if (item?.id === 'observerWard' || item?.id === 'sentryWard' || ITEMS[item?.id ?? 'healingSalve'].active?.kind === 'blink') {
+        if (!item) return;
+        pointer = e.pointerId;
+        try {
+          el.setPointerCapture(e.pointerId);
+        } catch {
+          /* not supported */
+        }
+        hold = setTimeout(() => {
+          hold = null;
+          pointer = null;
+          if (this.ctx()?.me.alive) this.showDrop(i);
+        }, 450);
+      });
+      const release = (e: PointerEvent, cancelled: boolean) => {
+        if (pointer !== e.pointerId) return;
+        pointer = null;
+        if (!hold) return; // long press: the Drop button is showing
+        clearTimeout(hold);
+        hold = null;
+        if (cancelled) return;
+        const c = this.ctx();
+        const item = c?.me.hero!.items[i];
+        if (!c || !item) return;
+        if (item.id === 'observerWard' || item.id === 'sentryWard' || ITEMS[item.id].active?.kind === 'blink') {
           this.placingSlot = this.placingSlot === i ? null : i;
           this.onWard(this.placingSlot);
           this.lastKey = '';
         } else this.send({ type: 'useItem', unitId: c.me.id, slot: i });
-      }),
-    );
+      };
+      el.addEventListener('pointerup', (e) => release(e as PointerEvent, false));
+      el.addEventListener('pointercancel', (e) => release(e as PointerEvent, true));
+    });
+    // Any other tap hides the Drop button.
+    window.addEventListener('pointerdown', (e) => {
+      if (e.target !== this.dropBtn) this.hideDrop();
+    });
     tap(this.tpSlot, () => {
       const c = this.ctx();
       if (!c) return;
@@ -106,6 +157,19 @@ export class ItemsUi {
     this.buildShop();
   }
 
+  private showDrop(slot: number) {
+    this.dropSlot = slot;
+    const el = this.slots[slot];
+    this.dropBtn.style.left = `${el.offsetLeft + el.offsetWidth / 2}px`;
+    this.dropBtn.style.top = `${el.offsetTop}px`;
+    this.dropBtn.classList.remove('hidden');
+  }
+
+  private hideDrop() {
+    this.dropSlot = null;
+    this.dropBtn.classList.add('hidden');
+  }
+
   get shopOpen() {
     return !this.shop.classList.contains('hidden');
   }
@@ -122,6 +186,7 @@ export class ItemsUi {
   }
 
   reset() {
+    this.hideDrop();
     this.toggleShop(false);
     this.closePicker();
     this.lastKey = '';
@@ -180,7 +245,7 @@ export class ItemsUi {
     const c = this.ctx();
     const sel = this.sel;
     if (!c || !sel) {
-      box.innerHTML = '<p class="empty">Tap an item to see what it does.<br><br>Tap one of your items (bottom bar) to sell it.</p>';
+      box.innerHTML = '<p class="empty">Tap an item to see what it does.<br><br>Tap one of your items to sell or drop it.</p>';
       return;
     }
     const h = c.me.hero!;
@@ -199,7 +264,7 @@ export class ItemsUi {
       <p class="d-sum">${d.summary}</p>
       ${parts ? `<div class="d-row"><small>Made from</small>${parts}</div>` : ''}
       ${usedIn.length ? `<div class="d-row"><small>Part of</small>${usedIn.map((x) => `<span class="part" title="${ITEMS[x].name}">${itemIcon(x)}</span>`).join('')}</div>` : ''}
-      <button id="shop-act"></button>
+      <div class="d-acts"><button id="shop-act"></button>${sel.kind === 'own' ? '<button id="shop-drop">DROP</button>' : ''}</div>
       <small id="shop-why"></small>`;
     onTap(box.querySelector('#shop-act')!, () => {
       const c2 = this.ctx();
@@ -212,6 +277,16 @@ export class ItemsUi {
       } else this.send({ type: 'buy', unitId: c2.me.id, itemId: this.sel.id });
       this.shopKey = '';
     });
+    const drop = box.querySelector('#shop-drop');
+    if (drop)
+      onTap(drop, () => {
+        const c2 = this.ctx();
+        if (!c2 || this.sel?.kind !== 'own' || !c2.me.alive) return;
+        this.send({ type: 'dropItem', unitId: c2.me.id, slot: this.sel.slot });
+        this.sel = null;
+        this.lastKey = '';
+        setTimeout(() => this.renderDetail(), 50);
+      });
     box.querySelectorAll<HTMLElement>('.part').forEach((el, i) => {
       const all = [...(d.recipe ?? []), ...usedIn];
       onTap(el, () => this.select({ kind: 'shop', id: all[i] }));
@@ -222,14 +297,15 @@ export class ItemsUi {
   /** Your items, inside the shop (tap one to sell it). */
   private renderOwn(items: (ItemSlot | null)[]) {
     const row = this.root.querySelector<HTMLElement>('#shop-own')!;
-    row.innerHTML = '<small>Your items</small>';
+    row.innerHTML = '<small>Your items</small><div class="own-grid"></div>';
+    const grid = row.querySelector('.own-grid')!;
     items.forEach((s, i) => {
       const b = document.createElement('button');
       b.className = s ? '' : 'empty';
       b.classList.toggle('picked', this.sel?.kind === 'own' && this.sel.slot === i);
       b.innerHTML = s ? itemIcon(s.id) : '';
       if (s) onTap(b, () => this.select({ kind: 'own', slot: i }), true);
-      row.appendChild(b);
+      grid.appendChild(b);
     });
   }
 
@@ -248,7 +324,8 @@ export class ItemsUi {
       btn.className = 'sell';
       btn.innerHTML = `SELL <b>+${price}</b>`;
       btn.disabled = !atShop;
-      why.textContent = !atShop ? 'Go back to your base to sell' : left > 0 ? `Full refund for ${left} more s` : 'Sells for half price';
+      this.root.querySelector<HTMLButtonElement>('#shop-drop')?.toggleAttribute('disabled', !me.alive);
+      why.textContent = !atShop ? 'Go back to your base to sell (or drop it here)' : left > 0 ? `Full refund for ${left} more s` : 'Sells for half price';
       return;
     }
     const id = this.sel.id;
@@ -267,6 +344,7 @@ export class ItemsUi {
     const { w, me } = c;
     const h = me.hero!;
     const atShop = inShop(w, me) || !me.alive;
+    if (this.dropSlot !== null && (!h.items[this.dropSlot] || !me.alive)) this.hideDrop();
     const placing = this.placingSlot !== null ? h.items[this.placingSlot] : null;
     if (this.placingSlot !== null && (!placing || (!placing.id.endsWith('Ward') && !ITEMS[placing.id].active))) {
       this.placingSlot = null; // used up / sold
@@ -286,7 +364,7 @@ export class ItemsUi {
         el.classList.toggle('placing', this.placingSlot === i);
         el.querySelector('.lbl')!.innerHTML = d ? itemIcon(d.id) : '';
         el.querySelector('.cnt')!.textContent = s && s.count > 1 ? String(s.count) : '';
-        el.title = d ? `${d.name}: ${d.summary}${this.shopOpen ? ' (tap to pick it, then Sell)' : ''}` : 'Empty slot';
+        el.title = d ? `${d.name}: ${d.summary}${this.shopOpen ? ' (tap to pick it, then Sell or Drop)' : ' (hold to drop it)'}` : 'Empty slot';
       });
       this.tpSlot.querySelector('.cnt')!.textContent = String(h.tpCount);
       const cd = Math.ceil(h.tpCooldown);

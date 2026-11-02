@@ -34,6 +34,7 @@ npx vite-node scripts/simulate.ts [seed] [minutes]   # headless all-bot match lo
 | Info | Tap the **top bar** for the scoreboard · tap your **portrait (ⓘ)** for hero stats · **long-press** an ability for its details | same (click / hold) |
 | Menu | **⏸** pause (resume / surrender) · **⚙** settings: graphics (3D / 2D), auto attack, sound, auto-learn, left-handed, vibration, joystick size, camera zoom | same (click) |
 | Shopping | 🛒 opens the shop (at base, or anywhere while dead): pick a tab, tap an item, then **BUY**. To sell, tap one of your items, then **SELL** (full refund within 10 s of buying, half price after) | same (click) |
+| Items | 6 slots in 2 rows of 3. Tap an item to use it. **Press and hold** an item → **DROP** puts it on the ground (also a DROP button in the shop). Tap a dropped item to walk over and pick it up. Only you can pick up your items; wards and sentries can be handed to allies. Dropped items vanish after 2 minutes | same (click) |
 | Learn ability | Tap the yellow **+** next to the button | Ctrl + Q / W / R |
 | Camera | Hold/drag the minimap to look (while looking, the joystick is off and taps on the map are orders); release to return · while dead, drag anywhere to look around | Hold minimap to look, right-click minimap to walk there, wheel to zoom |
 

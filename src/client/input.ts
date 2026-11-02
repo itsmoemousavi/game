@@ -1,4 +1,4 @@
-import { Command, HEROES, ITEMS, PingKind, Unit, World, abilityDef, castBlocker } from '../sim';
+import { Command, HEROES, ITEMS, PingKind, Unit, World, abilityDef, canPickUp, castBlocker } from '../sim';
 import type { Renderer } from './renderer';
 import { toLocal } from './screen';
 
@@ -282,6 +282,12 @@ export class Input {
         return;
       }
       const onJoySide = this.leftHanded ? sx > this.canvas.clientWidth * 0.5 : sx < this.canvas.clientWidth * 0.5;
+      // A tap right on a dropped item picks it up, even on the joystick side.
+      const item = me ? this.groundItemAt(this.world(), me, sx, sy, Math.max(26, 1.1 * this.renderer.zoom)) : undefined;
+      if (item && me) {
+        this.queue.push({ type: 'pickUp', unitId: me.id, groundId: item.id });
+        return;
+      }
       if (onJoySide && !this.joy) {
         this.joy = { id: e.pointerId, ox: sx, oy: sy, dx: 0, dy: 0, at: performance.now(), moved: false };
         this.showJoystick(sx, sy, 0, 0);
@@ -350,6 +356,15 @@ export class Input {
    * clearly meant: while looking around with the minimap, or with a mouse (right/left click).
    * On a touch screen the joystick moves the hero, so stray taps don't send it walking.
    */
+  /** A dropped item you may take (yours, or an ally's ward) under the finger. */
+  private groundItemAt(w: World, me: Unit, sx: number, sy: number, reach: number) {
+    const tapDist = (g: { x: number; y: number }) => {
+      const s = this.renderer.screenOf(g.x, g.y, 0);
+      return Math.hypot(s.x - sx, s.y - sy);
+    };
+    return w.groundItems.filter((g) => canPickUp(me, g) && tapDist(g) < reach).sort((a, b) => tapDist(a) - tapDist(b))[0];
+  }
+
   private commandAt(sx: number, sy: number, walk = false) {
     const w = this.world();
     const me = w.unit(this.heroId());
@@ -363,7 +378,9 @@ export class Input {
     const enemy = w.units
       .filter((u) => u.alive && w.canAttack(me, u) && near(u) < reach(u))
       .sort((a, b) => near(a) - near(b))[0];
+    const item = this.groundItemAt(w, me, sx, sy, Math.max(34, 1.3 * this.renderer.zoom));
     if (enemy) this.queue.push({ type: 'attack', unitId: me.id, targetId: enemy.id });
+    else if (item) this.queue.push({ type: 'pickUp', unitId: me.id, groundId: item.id });
     else if (walk) {
       const p = this.renderer.screenToWorld(sx, sy);
       this.queue.push({ type: 'moveTo', unitId: me.id, x: p.x, y: p.y });

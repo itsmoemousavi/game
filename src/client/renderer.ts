@@ -1,5 +1,6 @@
-import { GameEvent, GameMap, HEROES, ITEMS, LANE_IDS, PING_DURATION, PingKind, RUNE_INFO, Side, Team, Unit, WARD_CAST_RANGE, World, isInvisible, isNight } from '../sim';
+import { GROUND_ITEM_LIFETIME, GameEvent, GameMap, HEROES, ITEMS, canPickUp, LANE_IDS, PING_DURATION, PingKind, RUNE_INFO, Side, Team, Unit, WARD_CAST_RANGE, World, isInvisible, isNight } from '../sim';
 import type { Aim } from './input';
+import { itemImage } from './icons';
 
 /**
  * 2D top-down renderer. It only READS the simulation; swapping it for a 3D renderer
@@ -210,6 +211,7 @@ export class Renderer {
     if (this.flat) for (const s of structures) this.drawStructure(s, w.time);
     this.drawAreas(w, seesPoint);
     this.drawRunes(w, viewTeam);
+    this.drawGroundItems(w, viewTeam, focus);
     for (const u of w.units) if (u.ward && u.alive && sees(u)) this.drawWard(u, viewTeam);
     if (this.wardMode !== null && focus?.alive) {
       const p = lerp(focus);
@@ -544,6 +546,37 @@ export class Renderer {
       }
       ctx.globalAlpha = 1;
       ctx.lineCap = 'butt';
+    }
+  }
+
+  /**
+   * Dropped items: the item's icon flat on the ground. A gold ring marks items you can
+   * pick up (yours, or an ally's ward); the ring empties as the item's 2 minutes run out.
+   */
+  protected drawGroundItems(w: World, team: Team, me: Unit | undefined) {
+    const ctx = this.ctx;
+    for (const g of w.groundItems) {
+      if (g.team !== team && !w.vision.seesPoint(team, g.x, g.y)) continue;
+      const mine = !!me && canPickUp(me, g);
+      const left = 1 - (w.time - g.droppedAt) / GROUND_ITEM_LIFETIME;
+      const r = 1.25;
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.beginPath();
+      ctx.arc(g.x, g.y, r + 0.25, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = mine ? '#facc15' : 'rgba(200,200,200,0.6)';
+      ctx.lineWidth = 0.16;
+      ctx.beginPath();
+      ctx.arc(g.x, g.y, r + 0.12, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * left);
+      ctx.stroke();
+      const img = itemImage(g.item.id);
+      if (img.complete) ctx.drawImage(img, g.x - r * 0.8, g.y - r * 0.8, r * 1.6, r * 1.6);
+      if (g.item.count > 1) {
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 0.6px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(String(g.item.count), g.x + r * 0.55, g.y + r * 0.8);
+      }
     }
   }
 

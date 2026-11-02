@@ -91,3 +91,15 @@ const ICONS: Record<ItemId | 'tp' | 'shop', string> = {
 };
 
 export const itemIcon = (id: ItemId | 'tp' | 'shop') => ICONS[id];
+
+const images = new Map<string, HTMLImageElement>();
+/** The item icon as an image (for drawing on a canvas, e.g. items lying on the ground). */
+export function itemImage(id: ItemId): HTMLImageElement {
+  let img = images.get(id);
+  if (!img) {
+    img = new Image();
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(ICONS[id].replace('<svg ', '<svg width="64" height="64" '));
+    images.set(id, img);
+  }
+  return img;
+}
