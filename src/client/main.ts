@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 import './style.css';
-import { BotDifficulty, DT, HEROES, HERO_IDS, HeroId, LANE_IDS, LaneId, PlayerSlot, Team, World, XP_TABLE } from '../sim';
+import { BotDifficulty, DRAFT_TIME, DT, Draft, DraftStep, HeroId, LANE_IDS, LaneId, PlayerSlot, Team, WARMUP_SECONDS, World, XP_TABLE } from '../sim';
+import { DraftUi } from './draft-ui';
 import { Hud, heroPortraits } from './hud';
 import { Input } from './input';
 import { ItemsUi } from './items-ui';
@@ -27,9 +28,9 @@ let renderer: Renderer | null = null;
 let input: Input | null = null;
 let myHeroId = 0;
 const myTeam: Team = 0;
-let pickedHero: HeroId = 'brakk';
+let devPick: HeroId | null = null;
 // Local dev server only (never in the published game): lets test scripts look at the match.
-if (import.meta.env.DEV) Object.assign(window, { dbg: { world: () => world, me: () => world?.unit(myHeroId), pick: (h: HeroId) => (pickedHero = h) } });
+if (import.meta.env.DEV) Object.assign(window, { dbg: { world: () => world, me: () => world?.unit(myHeroId), pick: (h: HeroId) => (devPick = h) } });
 let pickedLane: LaneId = 'mid';
 let pickedDifficulty: BotDifficulty = 'normal';
 try {
@@ -38,49 +39,33 @@ try {
   /* storage unavailable */
 }
 
-// ------------------------------------------------------------- hero select
+// ------------------------------------------------------------- menu & draft
 
-const cards = $<HTMLElement>('#hero-cards');
-const info = $<HTMLElement>('#hero-info');
-let showcase: MenuShowcase | null = null;
+// The 3D hero models are rendered once into round headshots (HUD and draft screen).
 try {
-  showcase = new MenuShowcase($<HTMLCanvasElement>('#menu3d'));
+  const showcase = new MenuShowcase($<HTMLCanvasElement>('#menu3d'));
+  Object.assign(heroPortraits, showcase.portraits());
+  showcase.dispose();
 } catch (err) {
-  console.warn('3D hero preview unavailable', err);
+  console.warn('Hero headshots unavailable', err);
 }
-function pickHero(id: HeroId) {
-  pickedHero = id;
-  const d = HEROES[id];
-  select.style.setProperty('--hc', d.color);
-  cards.querySelectorAll<HTMLElement>('.hero-card').forEach((c) => c.classList.toggle('picked', c.dataset.hero === id));
-  info.innerHTML = `
-    <div class="role">${d.role}</div>
-    <h2>${d.name}</h2>
-    <div class="title">${d.title} · ${d.projectileSpeed ? 'ranged' : 'melee'}</div>
-    <div class="abil">${d.abilities
-      .map((a) => `<div><b>${a.slot}</b><span><em>${a.name}${a.ultimate ? '<span class="ult">ULT</span>' : ''}</em><i>${a.summary}</i></span></div>`)
-      .join('')}</div>`;
-  showcase?.show(id);
+const draftUi = new DraftUi($<HTMLElement>('#draft'));
+
+/** Play → the draft (bans, then picks) → the match. Practice and the tutorial only pick your hero. */
+function startDraft(m: Mode) {
+  select.classList.add('hidden');
+  const seat = m === 'bots' ? Math.floor(Math.random() * 3) : 0;
+  const order: DraftStep[] | undefined = m === 'bots' ? undefined : [{ kind: 'pick', team: myTeam }];
+  const d = new Draft({ team: myTeam, seat }, order);
+  if (devPick) {
+    // Test scripts: finish the draft at once with the requested hero.
+    while (!d.done) {
+      if (d.humanTurn()) d.choose(d.current!.kind === 'ban' ? null : devPick);
+      else d.update(DRAFT_TIME.bot + 0.01);
+    }
+  }
+  draftUi.start(d, (done) => startMatch(m, done));
 }
-for (const id of HERO_IDS) {
-  const d = HEROES[id];
-  const card = document.createElement('button');
-  card.className = 'hero-card';
-  card.dataset.hero = id;
-  card.style.setProperty('--c', d.color);
-  card.innerHTML = `<div class="portrait">${d.name[0]}</div><span>${d.name}</span>`;
-  card.addEventListener('click', () => pickHero(id));
-  cards.appendChild(card);
-}
-if (showcase) {
-  const pics = showcase.portraits();
-  Object.assign(heroPortraits, pics);
-  cards.querySelectorAll<HTMLElement>('.hero-card').forEach((c) => {
-    c.querySelector('.portrait')!.innerHTML = `<img alt="" src="${pics[c.dataset.hero as HeroId]}">`;
-  });
-  showcase.start();
-}
-pickHero(pickedHero);
 
 const lanes = $<HTMLElement>('#lane-pick');
 for (const l of LANE_IDS) {
@@ -111,27 +96,26 @@ for (const d of ['easy', 'normal', 'hard'] as BotDifficulty[]) {
   diffs.appendChild(b);
 }
 
-$<HTMLButtonElement>('#btn-play').addEventListener('click', () => startMatch('bots'));
-$<HTMLButtonElement>('#btn-practice').addEventListener('click', () => startMatch('practice'));
-$<HTMLButtonElement>('#btn-tutorial').addEventListener('click', () => startMatch('tutorial'));
+$<HTMLButtonElement>('#btn-play').addEventListener('click', () => startDraft('bots'));
+$<HTMLButtonElement>('#btn-practice').addEventListener('click', () => startDraft('practice'));
+$<HTMLButtonElement>('#btn-tutorial').addEventListener('click', () => startDraft('tutorial'));
 
 // ------------------------------------------------------------- match setup
 
-/** Fill a 3v3: the human takes one slot, bots take every empty one. */
-function buildSlots(): PlayerSlot[] {
+/** Turn the draft into the 3v3: the human's seat gets their lane, bots take the other lanes. */
+function buildSlots(d: Draft): PlayerSlot[] {
   const slots: PlayerSlot[] = [];
   for (const team of [0, 1] as Team[]) {
-    // Bots get random heroes (no duplicates within a team).
-    const heroes = [...HERO_IDS].sort(() => Math.random() - 0.5);
-    const lanePool = [...LANE_IDS];
-    if (team === myTeam) {
-      heroes.splice(heroes.indexOf(pickedHero), 1);
-      lanePool.splice(lanePool.indexOf(pickedLane), 1);
-      slots.push({ team, heroId: pickedHero, controller: 'human', lane: pickedLane });
-    }
-    while (slots.filter((s) => s.team === team).length < 3) {
-      slots.push({ team, heroId: heroes.shift()!, controller: 'bot', lane: lanePool.shift()!, difficulty: pickedDifficulty });
-    }
+    const lanePool = [...LANE_IDS].sort(() => Math.random() - 0.5);
+    if (team === myTeam) lanePool.splice(lanePool.indexOf(pickedLane), 1);
+    d.picks[team].forEach((heroId, seat) => {
+      const human = d.human?.team === team && d.human.seat === seat;
+      slots.push(
+        human
+          ? { team, heroId, controller: 'human', lane: pickedLane }
+          : { team, heroId, controller: 'bot', lane: lanePool.shift()!, difficulty: pickedDifficulty },
+      );
+    });
   }
   return slots;
 }
@@ -140,7 +124,6 @@ const hud = new Hud(app, () => {
   app.classList.add('hidden');
   select.classList.remove('hidden');
   world = null;
-  showcase?.start();
 });
 
 const sfx = new Sfx();
@@ -457,12 +440,13 @@ practicePanel.querySelectorAll<HTMLElement>('[data-cheat]').forEach((b) =>
   }),
 );
 
-function startMatch(m: Mode) {
+function startMatch(m: Mode, d: Draft) {
   select.classList.add('hidden');
-  showcase?.stop();
   app.classList.remove('hidden');
-  const slots = m === 'bots' ? buildSlots() : [{ team: myTeam, heroId: pickedHero, controller: 'human' as const, lane: pickedLane }];
-  world = new World({ seed: (Date.now() & 0xffff) + 1, slots });
+  const slots = m === 'bots' ? buildSlots(d) : [{ team: myTeam, heroId: d.picks[myTeam][0], controller: 'human' as const, lane: pickedLane }];
+  // Vs bots: a 30 s warm-up (the clock counts up from -0:30) to shop and walk to lane before creeps come.
+  world = new World({ seed: (Date.now() & 0xffff) + 1, slots, warmup: m === 'bots' ? WARMUP_SECONDS : 0 });
+  if (m === 'bots') hud.toast(`Creeps arrive in ${WARMUP_SECONDS} s: buy items and head to your lane`, '#ffd23f');
   practicePanel.classList.toggle('hidden', m !== 'practice');
   tutorial?.hide();
   tutorial = m === 'tutorial' ? new Tutorial($<HTMLElement>('#tutorial'), () => (tutorial = null)) : null;
@@ -492,7 +476,6 @@ function startMatch(m: Mode) {
 
 setupLandscape($<HTMLElement>('#root'), () => {
   renderer?.resize();
-  showcase?.resize();
   if (renderer) {
     const mm = renderer.minimapRect();
     $<HTMLElement>('#btn-glyph').style.top = `${mm.y + mm.size + 10}px`;
@@ -512,7 +495,9 @@ function frame(now: number) {
   if (world && renderer && input) {
     while (acc >= DT) {
       input.flush(world);
+      const before = world.time;
       world.step();
+      if (before < 0 && world.time >= 0) hud.toast('The battle begins: creeps are on their way!', '#ffd23f');
       renderer.pushEvents(world, world.events, myHeroId);
       tutorial?.update(world, world.unit(myHeroId)!);
       playEvents(sfx, world, world.events, myHeroId, myTeam, { x: renderer.camX, y: renderer.camY });

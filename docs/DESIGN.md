@@ -112,6 +112,17 @@ Ability levels: basic abilities max level 4 (and at most ⌈hero level / 2⌉), 
 - Stunned units can't move, attack or cast.
 - Unit-target spells walk into range automatically; ground-target spells are capped at max range.
 
+### Draft (implemented)
+
+The start menu no longer shows heroes: you choose lane and bot difficulty, then **Play** opens the draft.
+- **Bans:** your team bans one hero (20 s; no ban if time runs out), then the enemy bans one. Banned heroes can't be played by anyone this match.
+- **Picks** alternate 1-2-2-1 (Azure, Crimson, Crimson, Azure, Azure, Crimson). Which of your team's three picks is yours is random each match; bots pick the other seats. 30 s per pick (a random hero if time runs out).
+- With 6 heroes, the same hero can be on both teams, but only once per team.
+- Tapping a hero shows its abilities; the big button bans or locks it in (no accidental picks).
+- After the draft: a **30 s warm-up**. The clock counts up from -0:30; no creeps and no passive gold before 0:00 (shop and walk to lane).
+- Practice and the tutorial only ask you to pick your hero (no bans, no warm-up).
+- Code: `src/sim/draft.ts` (rules, bot choices), `src/client/draft-ui.ts` (screen).
+
 ### Mobile ability controls (implemented)
 - **Hold the button:** an arrow appears immediately, pointing where a quick-cast would go.
 - **Drag in any direction, including behind you,** to aim. The arrow follows. Release to cast; you can miss.

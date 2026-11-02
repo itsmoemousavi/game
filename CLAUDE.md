@@ -70,6 +70,8 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
   **not** walk (only while holding the minimap, or with a mouse); tap an enemy to attack it.
 - Shop: tabs + grid + detail panel with BUY/SELL; taps only select (no accidental buys when scrolling);
   sell = full refund within 10 s, then half; dead heroes can shop; **no quick-buy**.
+- Match start: menu has no heroes; **draft inside the match** (1 ban per team, picks 1-2-2-1, then 30 s warm-up).
+- Warden: walled house on the river (bot/mid side), seen and fought only from inside, slam stun, charm anyone can grab.
 - Dying costs gold; buyback exists. Android build: not now. App stores: later.
 
 ## Open items / next steps

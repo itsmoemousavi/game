@@ -141,4 +141,12 @@ export class MenuShowcase {
   stop() {
     this.running = false;
   }
+
+  /** Free the WebGL context (once the headshots are made, the menu doesn't need it). */
+  dispose() {
+    this.running = false;
+    this.gl.dispose();
+    this.gl.forceContextLoss();
+    this.canvas.remove();
+  }
 }

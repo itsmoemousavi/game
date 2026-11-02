@@ -422,6 +422,8 @@ export interface WorldOptions {
   seed: number;
   slots: PlayerSlot[];
   map?: GameMap;
+  /** Seconds of warm-up before the clock reaches 0:00 (the match starts at -warmup; no creeps or passive gold before 0:00). */
+  warmup?: number;
 }
 
 const armorMultiplier = (armor: number) => 1 - (0.06 * armor) / (1 + 0.06 * Math.abs(armor));
@@ -462,6 +464,7 @@ export class World {
     this.map = opts.map ?? createMap();
     this.nav = { ...this.map, walkable: new Uint8Array(this.map.walkable) };
     this.rng = new Rng(opts.seed);
+    this.time = -(opts.warmup ?? 0);
     this.vision = new Vision(this.map.grid, this.map.cell, this.map.walkable, this.map.height, this.map.house);
     for (const s of this.map.structures) this.spawnStructure(s.team, s.tier, s.lane, s.pos, s.rax);
     this.refreshVulnerability();
@@ -1011,8 +1014,10 @@ export class World {
 
   private updateHeroUpkeep(u: Unit) {
     const h = u.hero!;
-    h.gold += PASSIVE_GOLD_PER_SEC * DT;
-    h.goldEarned += PASSIVE_GOLD_PER_SEC * DT;
+    if (this.time >= 0) {
+      h.gold += PASSIVE_GOLD_PER_SEC * DT;
+      h.goldEarned += PASSIVE_GOLD_PER_SEC * DT;
+    }
     for (const a of h.abilities) if (a.cooldown > 0) a.cooldown = Math.max(0, a.cooldown - DT);
     if (h.tpCooldown > 0) h.tpCooldown = Math.max(0, h.tpCooldown - DT);
     for (const it of h.items) if (it?.cooldown) it.cooldown = Math.max(0, it.cooldown - DT);

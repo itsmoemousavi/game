@@ -23,7 +23,11 @@ import {
 
 import { abilityIcon, itemIcon, statusIcon } from './icons';
 
-const fmtTime = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+const fmtTime = (t: number) => {
+  // Warm-up counts up from -0:30.
+  const a = t < 0 ? Math.ceil(-t) : Math.floor(t);
+  return `${t < 0 ? '-' : ''}${Math.floor(a / 60)}:${String(a % 60).padStart(2, '0')}`;
+};
 
 /** Hero headshots (image URLs), filled in by main.ts once the 3D portraits are rendered. */
 export const heroPortraits: Partial<Record<HeroId, string>> = {};

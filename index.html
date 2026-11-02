@@ -16,8 +16,6 @@
         <div class="menu-tag">3v3 · Break the towers · Destroy the enemy Shrine</div>
       </header>
       <div class="menu-main">
-        <div class="menu-info" id="hero-info"></div>
-        <div class="menu-stage"><canvas id="menu3d"></canvas><div class="stage-hint">Drag to turn</div></div>
         <div class="menu-side">
           <div class="opt"><span>Lane</span><div id="lane-pick" class="seg"></div></div>
           <div class="opt"><span>Bots</span><div id="diff-pick" class="seg"></div></div>
@@ -28,8 +26,10 @@
           </div>
         </div>
       </div>
-      <div id="hero-cards"></div>
+      <canvas id="menu3d"></canvas>
     </section>
+
+    <section id="draft" class="hidden"></section>
 
     <div id="app" class="hidden">
       <canvas id="game3d"></canvas>

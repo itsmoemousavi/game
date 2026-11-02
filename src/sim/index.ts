@@ -20,5 +20,7 @@ export { buybackBlocker } from './objectives';
 export { isInvisible } from './vision';
 export type { BotDifficulty } from './ai/bots';
 export { Rng } from './rng';
+export { DRAFT_ORDER, DRAFT_TIME, Draft, WARMUP_SECONDS } from './draft';
+export type { DraftStep } from './draft';
 export { STATUS_INFO, statusEffects } from './status';
 export type { Status, StatusId } from './status';

@@ -53,7 +53,7 @@ export const WARDEN_GOLD = 300;
 export const REVIVE_DELAY = 3;
 
 export const BUYBACK_COOLDOWN = 300;
-export const buybackCost = (level: number, minutes: number) => Math.round(150 + level * 30 + minutes * 8);
+export const buybackCost = (level: number, minutes: number) => Math.round(150 + level * 30 + Math.max(0, minutes) * 8);
 
 /** Team tower shield ("glyph"): all your buildings invulnerable for a few seconds. */
 export const GLYPH_COOLDOWN = 300;
