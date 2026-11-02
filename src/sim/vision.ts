@@ -54,7 +54,11 @@ export class Vision {
   /** Cells of the house floor (hidden unless your team is inside). */
   private houseCells: Int32Array;
 
+  /** Goes up every time the grids are recomputed (lets the 3D view skip rebuilding its fog texture). */
+  version = 0;
+
   update(w: World) {
+    this.version++;
     const night = isNight(w.time);
     for (const team of [0, 1] as Team[]) {
       const g = this.grids[team];

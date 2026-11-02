@@ -11,7 +11,7 @@ import { playEvents } from './sound-events';
 import { GameEvent, HEROES as HERO_DEFS, PingKind, RUNE_INFO, RuneKind, TEAM_NAMES } from '../sim';
 import { PING_STYLE } from './renderer';
 import { Renderer } from './renderer';
-import { Renderer3D } from './renderer3d';
+import { QUALITY, Quality, Renderer3D } from './renderer3d';
 import { MenuShowcase } from './menu3d';
 import { enterImmersive, setupLandscape } from './screen';
 
@@ -181,8 +181,9 @@ interface Settings {
   joystick: 'S' | 'M' | 'L';
   zoom: number;
   graphics: '3d' | '2d';
+  quality: Quality;
 }
-const settings: Settings = { autoAttack: true, sound: true, autoLearn: false, leftHanded: false, vibrate: true, joystick: 'M', zoom: 1, graphics: '3d' };
+const settings: Settings = { autoAttack: true, sound: true, autoLearn: false, leftHanded: false, vibrate: true, joystick: 'M', zoom: 1, graphics: '3d', quality: 'medium' };
 const JOY_RADIUS = { S: 42, M: 55, L: 72 };
 try {
   Object.assign(settings, JSON.parse(localStorage.getItem('shrinefall-settings') ?? '{}'));
@@ -231,6 +232,7 @@ function applySettings() {
   world?.enqueue({ type: 'setAutoLearn', unitId: myHeroId, enabled: settings.autoLearn });
   document.querySelectorAll<HTMLElement>('#set-joy button').forEach((b) => b.classList.toggle('on', b.dataset.v === settings.joystick));
   document.querySelectorAll<HTMLElement>('#set-gfx button').forEach((b) => b.classList.toggle('on', b.dataset.v === settings.graphics));
+  document.querySelectorAll<HTMLElement>('#set-quality button').forEach((b) => b.classList.toggle('on', b.dataset.v === settings.quality));
 }
 
 /** 3D view, or the lighter top-down 2D view. Falls back to 2D if WebGL isn't available. */
@@ -240,8 +242,8 @@ function makeRenderer(map: World['map']): Renderer {
   if (settings.graphics === '3d') {
     try {
       canvas3d.classList.remove('hidden');
-      const r = new Renderer3D(canvas, canvas3d, map);
-      showGfx('3D');
+      const r = new Renderer3D(canvas, canvas3d, map, settings.quality);
+      showGfx(`3D ${settings.quality}`);
       return r;
     } catch (err) {
       gfx3dFailed(err);
@@ -262,18 +264,32 @@ function gfx3dFailed(err: unknown) {
   showGfx('2D');
   hud.toast(`3D view could not start, showing 2D. ${gfxNote}`, '#ffb4b4');
 }
+let forceDraw = false;
+/** Rebuild the view (after changing 3D/2D or the quality), keeping the camera where it was. */
+function rebuildView() {
+  if (!world || !renderer) return;
+  const prev = renderer;
+  renderer = makeRenderer(world.map);
+  renderer.setZoomFactor(settings.zoom);
+  renderer.camX = prev.camX;
+  renderer.camY = prev.camY;
+  if (input) input.renderer = renderer;
+  forceDraw = true; // show the new view even while paused
+}
+document.querySelectorAll<HTMLElement>('#set-quality button').forEach((b) =>
+  b.addEventListener('click', () => {
+    if (settings.quality === b.dataset.v) return;
+    settings.quality = b.dataset.v as Quality;
+    saveSettings();
+    if (settings.graphics === '3d') rebuildView();
+    applySettings();
+  }),
+);
 document.querySelectorAll<HTMLElement>('#set-gfx button').forEach((b) =>
   b.addEventListener('click', () => {
     settings.graphics = b.dataset.v as Settings['graphics'];
     saveSettings();
-    if (world && renderer) {
-      const prev = renderer;
-      renderer = makeRenderer(world.map);
-      renderer.setZoomFactor(settings.zoom);
-      renderer.camX = prev.camX;
-      renderer.camY = prev.camY;
-      if (input) input.renderer = renderer;
-    }
+    rebuildView();
     applySettings();
   }),
 );
@@ -488,10 +504,21 @@ setupLandscape($<HTMLElement>('#root'), () => {
 
 let acc = 0;
 let last = performance.now();
+let lastDraw = 0;
 function frame(now: number) {
   acc += Math.min(0.25, (now - last) / 1000);
   last = now;
   if (paused) acc = 0;
+  // Battery: never draw faster than the quality's frame rate (phones can refresh at 120 Hz),
+  // and don't redraw a paused game.
+  const fps = settings.graphics === '3d' ? QUALITY[settings.quality].fps : 60;
+  const draw = forceDraw || (!paused && now - lastDraw >= 1000 / fps - 4);
+  forceDraw = false;
+  if (world && renderer && input && !draw) {
+    requestAnimationFrame(frame);
+    return;
+  }
+  if (draw) lastDraw = now;
   if (world && renderer && input) {
     while (acc >= DT) {
       input.flush(world);

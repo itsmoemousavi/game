@@ -88,4 +88,5 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
 - Don't `pkill -f <pattern>` where the pattern matches your own shell command (it kills the shell).
 - Headless screenshots: Playwright Chromium with `--use-gl=angle --use-angle=swiftshader` renders WebGL
   (slowly; fps numbers there mean nothing).
+- Headless screenshots that hang: kill leftover browsers first (`pkill -f chrome-headless-shell`).
 - iPhone Safari keeps old builds: have the owner reopen the tab and check the build id in Settings.

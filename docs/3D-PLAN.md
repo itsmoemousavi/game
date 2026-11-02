@@ -45,3 +45,17 @@ So everything we build and test in 2D (rules, balance, bots, UI) carries over to
 2. All features, fixes and tuning continue in 2D on the working branch through a pull request. Every push redeploys the test build to https://itsmoemousavi.github.io/game/ for phone testing. When a batch is good, it is merged into `main`.
 3. Once gameplay is settled, a separate `3d` branch replaces only the renderer. The 2D renderer can stay as a "low graphics" option for weak phones.
 4. Ship the Capacitor app with the 3D renderer.
+
+## Graphics quality and battery (Settings → Graphics quality)
+
+| | Low | Medium (default) | High |
+|---|---|---|---|
+| Pixel density | 1× | up to 1.25× | up to 2× |
+| Edge smoothing | off | on | on |
+| Shadows | off | 1024 | 2048, soft |
+| Ground-effects image | 512 px | 768 px | 1024 px |
+| Frame rate cap | 30 | 60 | 60 |
+
+Always on (all levels): never draw faster than 60 fps (iPhones can refresh at 120 Hz); nothing is redrawn while
+paused; the fog texture and tree shading are rebuilt only when vision changes (10× a second), not every frame.
+The 2D view is a separate "View" option and stays the lightest.

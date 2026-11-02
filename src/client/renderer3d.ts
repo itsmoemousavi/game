@@ -12,7 +12,16 @@ const PITCH = (56 * Math.PI) / 180;
 const FOV = 38;
 /** The ground-effects texture covers this many meters around the camera. */
 const FX_SPAN = 96;
-const FX_PX = 1024;
+/**
+ * Graphics quality. Low/Medium save battery: fewer pixels, no or smaller shadows, a smaller
+ * ground-effects image and (Low) 30 frames per second.
+ */
+export type Quality = 'low' | 'medium' | 'high';
+export const QUALITY: Record<Quality, { dpr: number; antialias: boolean; shadows: number; fxPx: number; fps: number }> = {
+  low: { dpr: 1, antialias: false, shadows: 0, fxPx: 512, fps: 30 },
+  medium: { dpr: 1.25, antialias: true, shadows: 1024, fxPx: 768, fps: 60 },
+  high: { dpr: 2, antialias: true, shadows: 2048, fxPx: 1024, fps: 60 },
+};
 /** Heroes are drawn a bit larger than life so they read well on a phone. */
 const HERO_SCALE = 2.0;
 const CREEP_SCALE = 1.75;
@@ -42,6 +51,10 @@ export class Renderer3D extends Renderer {
   private fxCtx: CanvasRenderingContext2D;
   private fxTex: THREE.CanvasTexture;
   private fxX = 0;
+  private fxPx: number;
+  /** Vision grid version the fog texture was last built from (rebuilt only when vision changes). */
+  private fogKey = '';
+  private lastTreeShade = 0;
   private fxY = 0;
   private overlay: CanvasRenderingContext2D;
   private trees: { crowns: THREE.InstancedMesh; cells: Int32Array; colors: THREE.Color[] } | null = null;
@@ -60,16 +73,19 @@ export class Renderer3D extends Renderer {
     overlay: HTMLCanvasElement,
     glCanvas: HTMLCanvasElement,
     map: GameMap,
+    readonly quality: Quality = 'medium',
   ) {
     super(overlay, map);
+    const q = QUALITY[quality];
+    this.fxPx = q.fxPx;
     this.flat = false;
     this.overlay = this.ctx;
-    // Phones have 3x screens; 1.5x keeps the 3D sharp enough while drawing far fewer pixels.
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-    this.gl = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: true, powerPreference: 'high-performance' });
+    // Phones have 3x screens; drawing fewer pixels is the biggest battery saver.
+    const dpr = Math.min(window.devicePixelRatio || 1, q.dpr);
+    this.gl = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: q.antialias, powerPreference: quality === 'high' ? 'high-performance' : 'low-power' });
     this.gl.setPixelRatio(dpr);
-    this.gl.shadowMap.enabled = true;
-    this.gl.shadowMap.type = THREE.PCFShadowMap;
+    this.gl.shadowMap.enabled = q.shadows > 0;
+    this.gl.shadowMap.type = quality === 'high' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
     this.gl.toneMapping = THREE.ACESFilmicToneMapping;
     this.gl.toneMappingExposure = 1.05;
     this.scene.background = new THREE.Color(0x0d150f);
@@ -77,8 +93,8 @@ export class Renderer3D extends Renderer {
     this.sky = new THREE.HemisphereLight(0xdfeeff, 0x3a4a30, 1.5);
     this.scene.add(this.sky);
     this.sun = new THREE.DirectionalLight(0xfff1dd, 2.4);
-    this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(1024, 1024);
+    this.sun.castShadow = q.shadows > 0;
+    this.sun.shadow.mapSize.set(Math.max(512, q.shadows), Math.max(512, q.shadows));
     Object.assign(this.sun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 120 });
     this.sun.shadow.bias = -0.0008;
     this.scene.add(this.sun, this.sun.target);
@@ -125,7 +141,7 @@ export class Renderer3D extends Renderer {
 
     // Ground effects (aim, spell areas, rings, pings): the 2D renderer draws them into a
     // canvas covering the area around the camera.
-    this.fxCanvas.width = this.fxCanvas.height = FX_PX;
+    this.fxCanvas.width = this.fxCanvas.height = this.fxPx;
     this.fxCtx = this.fxCanvas.getContext('2d')!;
     this.fxTex = new THREE.CanvasTexture(this.fxCanvas);
     this.fxTex.colorSpace = THREE.SRGBColorSpace;
@@ -335,9 +351,9 @@ export class Renderer3D extends Renderer {
     this.fxX = this.camX - FX_SPAN / 2;
     this.fxY = this.camY - 6 - FX_SPAN / 2;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, FX_PX, FX_PX);
+    ctx.clearRect(0, 0, this.fxPx, this.fxPx);
     ctx.save();
-    const k = FX_PX / FX_SPAN;
+    const k = this.fxPx / FX_SPAN;
     ctx.scale(k, k);
     ctx.translate(-this.fxX, -this.fxY);
   }
@@ -353,10 +369,10 @@ export class Renderer3D extends Renderer {
     this.ctx = this.overlay;
     const c = this.fxCtx;
     c.setTransform(1, 0, 0, 1, 0, 0);
-    c.clearRect(0, 0, FX_PX, 2);
-    c.clearRect(0, FX_PX - 2, FX_PX, 2);
-    c.clearRect(0, 0, 2, FX_PX);
-    c.clearRect(FX_PX - 2, 0, 2, FX_PX);
+    c.clearRect(0, 0, this.fxPx, 2);
+    c.clearRect(0, this.fxPx - 2, this.fxPx, 2);
+    c.clearRect(0, 0, 2, this.fxPx);
+    c.clearRect(this.fxPx - 2, 0, 2, this.fxPx);
     this.fxTex.offset.set(-this.fxX / FX_SPAN, 1 - this.mapSize / FX_SPAN + this.fxY / FX_SPAN);
     this.fxTex.needsUpdate = true;
 
@@ -381,6 +397,10 @@ export class Renderer3D extends Renderer {
   }
 
   private updateFog(w: World, team: Team) {
+    // Vision only changes a few times a second: rebuild the fog texture only then.
+    const key = `${w.vision.version}|${team}|${isNight(w.time)}`;
+    if (key === this.fogKey) return;
+    this.fogKey = key;
     const g = w.vision.grids[team];
     const n = this.grid;
     const d = this.fogTex.image.data as Uint8Array;
@@ -397,7 +417,9 @@ export class Renderer3D extends Renderer {
     }
     this.fogTex.needsUpdate = true;
     // Trees outside vision get darker (a few times per second is enough).
-    if (this.trees && this.frameNo % 8 === 0) {
+    const now = performance.now();
+    if (this.trees && now - this.lastTreeShade > 250) {
+      this.lastTreeShade = now;
       const { crowns, cells, colors } = this.trees;
       const tmp = new THREE.Color();
       for (let k = 0; k < cells.length; k++) {
