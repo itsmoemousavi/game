@@ -63,13 +63,16 @@ describe('simulation', () => {
     expect(w.heroes.some((h) => h.hero!.level > 1)).toBe(true);
   });
 
-  it('an all-bot match is won by destroying a shrine, bots use abilities and never get stuck', () => {
+  it('an all-bot match is won by destroying a shrine, bots use abilities and never get stuck', async () => {
     const w = newWorld();
     // Stuck detector: a living hero that has had a move order for 10 s straight must have moved.
     const streak = new Map<number, { x: number; y: number; t: number }>();
     let casts = 0;
+    let n = 0;
     while (w.winner === null && w.time < 75 * 60) {
       w.step();
+      // Let the test runner breathe now and then (long synchronous runs time out its heartbeat).
+      if (++n % 3000 === 0) await new Promise((r) => setTimeout(r, 0));
       casts += w.events.filter((e) => e.type === 'cast').length;
       for (const h of w.heroes) {
         const moving = h.alive && h.hero!.order.type === 'move' && h.stunTimer <= 0;

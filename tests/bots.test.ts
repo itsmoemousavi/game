@@ -25,13 +25,16 @@ describe('smarter bots', () => {
     expect(helpers.length).toBeGreaterThanOrEqual(2);
   }, 30_000);
 
-  it('hard bots beat easy bots', () => {
+  it('hard bots beat easy bots', async () => {
     const slots: PlayerSlot[] = [];
     const diff: BotDifficulty[] = ['hard', 'easy'];
     for (const team of [0, 1] as Team[])
       HERO_IDS.slice(0, 3).forEach((heroId, i) => slots.push({ team, heroId, controller: 'bot', lane: LANE_IDS[i], difficulty: diff[team] }));
     const w = new World({ seed: 7, slots });
-    run(w, 50 * 60);
+    for (let m = 0; m < 50; m++) {
+      run(w, 60);
+      await new Promise((r) => setTimeout(r, 0)); // keep the test runner's heartbeat alive
+    }
     expect(w.winner).toBe(0);
     expect(w.teamKills[0]).toBeGreaterThan(w.teamKills[1]);
   }, 120_000);
