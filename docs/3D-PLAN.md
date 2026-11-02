@@ -1,6 +1,14 @@
 # Going 3D: plan
 
-> **Status: on hold.** 3D work starts only after the 2D game is finished and signed off. Until then all work (features, fixes, balance, bots) happens in 2D. This page is kept as the reference for later.
+> **Status: first playable 3D view is in** (`src/client/renderer3d.ts`, models in `src/client/three/`). It is the default view; Settings → Graphics switches back to the lighter 2D view. Next: test on phones (frame rate, battery), then animations and real art.
+
+### What the first 3D version does
+
+- Terrain with real height (base plateaus, ward hills) and the forest as instanced 3D trees that darken in fog of war.
+- Low-poly placeholder models for all 6 heroes (same as the concept viewer), lane creeps, jungle monsters, the Warden, every building, wards, power-ups and projectiles. Each model is merged into 1-3 meshes to keep draw calls low.
+- Ground effects (aim arrows, spell areas, rings, pings) come from the 2D renderer, drawn into a texture laid on the terrain; fog of war is a second texture over the whole map.
+- Health bars, names, damage numbers and the minimap are drawn on top in screen space. Taps are turned into ground points with a ray against the terrain.
+- Day/night dims the light. If WebGL is unavailable the game falls back to 2D.
 
 ![3D concept: mid-lane fight](concept/shrinefall-3d-lane.png)
 ![3D concept: Azure base](concept/shrinefall-3d-base.png)

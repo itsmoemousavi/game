@@ -62,7 +62,7 @@ export class Input {
 
   constructor(
     private canvas: HTMLCanvasElement,
-    private renderer: Renderer,
+    public renderer: Renderer,
     private world: () => World,
     private heroId: () => number,
     root: HTMLElement,

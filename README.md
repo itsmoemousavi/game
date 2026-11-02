@@ -32,7 +32,7 @@ npx vite-node scripts/simulate.ts [seed] [minutes]   # headless all-bot match lo
 | Deny | Tap one of your own creeps below half health (or your own tower below 10%) | Click it |
 | Team | 🛡 under the minimap: tower shield · 📍 ping (pick one, then tap the map/minimap) · **Buy back** in the respawn banner | same (click) |
 | Info | Tap the **top bar** for the scoreboard · tap your **portrait (ⓘ)** for hero stats · **long-press** an ability for its details | same (click / hold) |
-| Menu | **⏸** pause (resume / surrender) · **⚙** settings: auto attack, sound, auto-learn, left-handed, vibration, joystick size, camera zoom | same (click) |
+| Menu | **⏸** pause (resume / surrender) · **⚙** settings: graphics (3D / 2D), auto attack, sound, auto-learn, left-handed, vibration, joystick size, camera zoom | same (click) |
 | Shopping | The button next to 🛒 quick-buys the next recommended item (at base) | same (click) |
 | Learn ability | Tap the yellow **+** next to the button | Ctrl + Q / W / R |
 | Camera | Hold/drag the minimap to look (while looking, the joystick is off and taps on the map are orders); release to return · while dead, drag anywhere to look around | Hold minimap to look, right-click minimap to walk there, wheel to zoom |
@@ -53,6 +53,6 @@ src/sim/        deterministic game simulation (no rendering), reusable on a futu
   ai/bots.ts    bot heroes
   map.ts        map, lanes, maze, structure placement
   world.ts      units, combat, creep waves, protection rules, win condition
-src/client/     2D renderer, touch/keyboard input, HUD, sound effects (audio.ts), landscape lock (renderer to be replaced by 3D later)
+src/client/     3D renderer (renderer3d.ts + three/ models), 2D renderer, touch/keyboard input, HUD, sound effects (audio.ts), landscape lock (renderer to be replaced by 3D later)
 tests/          vitest suites
 ```

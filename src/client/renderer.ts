@@ -18,30 +18,32 @@ export const PING_STYLE: Record<PingKind, { color: string; icon: string; label: 
 };
 
 export class Renderer {
-  readonly ctx: CanvasRenderingContext2D;
-  private mapImage: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  /** true: draw everything top-down (2D). false: draw only the ground layer (the 3D view adds the rest). */
+  protected flat = true;
+  protected mapImage: HTMLCanvasElement;
   camX = 100;
   camY = 100;
   /** CSS pixels per world meter. */
   zoom = 10;
   zoomFactor = 1;
-  private dpr = 1;
-  private cssW = 0;
-  private cssH = 0;
+  protected dpr = 1;
+  protected cssW = 0;
+  protected cssH = 0;
   /** Melee swing arcs (attacker position, direction, reach). */
-  private swings: { x: number; y: number; ang: number; reach: number; t: number; color: string }[] = [];
-  private lunges = new Map<number, { ang: number; t: number }>();
-  private blasts: { x: number; y: number; r: number; t: number; color: string }[] = [];
+  protected swings: { x: number; y: number; ang: number; reach: number; t: number; color: string }[] = [];
+  protected lunges = new Map<number, { ang: number; t: number }>();
+  protected blasts: { x: number; y: number; r: number; t: number; color: string }[] = [];
   /** Floating text: "Denied!", "+38" gold... */
-  private floaters: { x: number; y: number; t: number; text: string; color: string; big?: boolean }[] = [];
+  protected floaters: { x: number; y: number; t: number; text: string; color: string; big?: boolean }[] = [];
   /** Inventory slot of a ward being placed (shows the placement range). */
   wardMode: number | null = null;
   /** Tutorial highlight on the map. */
   marker: { x: number; y: number } | null = null;
   /** Free camera: set while dead, or while the player holds the minimap. */
-  private lookTarget: { x: number; y: number } | null = null;
-  private fogCanvas: HTMLCanvasElement;
-  private fogData: ImageData;
+  protected lookTarget: { x: number; y: number } | null = null;
+  protected fogCanvas: HTMLCanvasElement;
+  protected fogData: ImageData;
 
   constructor(
     readonly canvas: HTMLCanvasElement,
@@ -175,16 +177,7 @@ export class Renderer {
     const sees = (u: Unit) => w.canSee(viewTeam, u);
     const seesPoint = (team: Side, x: number, y: number) => team === viewTeam || w.vision.seesPoint(viewTeam, x, y);
 
-    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    ctx.fillStyle = '#0d150f';
-    ctx.fillRect(0, 0, this.cssW, this.cssH);
-
-    ctx.save();
-    ctx.translate(this.cssW / 2, this.cssH / 2);
-    ctx.scale(this.zoom, this.zoom);
-    ctx.translate(-this.camX, -this.camY);
-    ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(this.mapImage, 0, 0, w.map.size, w.map.size);
+    this.beginWorld(w);
 
     if (focus && focus.alive) {
       const p = lerp(focus);
@@ -209,7 +202,7 @@ export class Renderer {
       return p;
     };
 
-    for (const s of structures) this.drawStructure(s, w.time);
+    if (this.flat) for (const s of structures) this.drawStructure(s, w.time);
     this.drawAreas(w, seesPoint);
     this.drawRunes(w, viewTeam);
     for (const u of w.units) if (u.ward && u.alive && sees(u)) this.drawWard(u, viewTeam);
@@ -226,7 +219,7 @@ export class Renderer {
       ctx.setLineDash([]);
     }
     this.drawTeleports(w, viewTeam);
-    for (const c of creeps) {
+    for (const c of this.flat ? creeps : []) {
       const p = at(c);
       if (c.neutral) {
         this.drawNeutral(c, p);
@@ -276,6 +269,23 @@ export class Renderer {
         ctx.arc(p.x, p.y, h.radius + 0.75 + Math.sin(w.time * 4) * 0.08, 0, Math.PI * 2);
         ctx.stroke();
       }
+      if (!this.flat) {
+        // 3D view: only the rings on the ground (team ring, and yours in yellow).
+        ctx.strokeStyle = TEAM_COLORS[h.team];
+        ctx.lineWidth = 0.22;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, h.radius + 0.15, 0, Math.PI * 2);
+        ctx.stroke();
+        if (isMe) {
+          ctx.strokeStyle = '#ffe066';
+          ctx.lineWidth = 0.15;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, h.radius + 0.5, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        continue;
+      }
       ctx.fillStyle = 'rgba(0,0,0,0.35)';
       ctx.beginPath();
       ctx.ellipse(p.x, p.y + 0.35, h.radius * 1.1, h.radius * 0.6, 0, 0, Math.PI * 2);
@@ -324,7 +334,7 @@ export class Renderer {
       ctx.setLineDash([]);
     }
 
-    for (const pr of w.projectiles) {
+    for (const pr of this.flat ? w.projectiles : []) {
       const p = lerp(pr);
       if (!seesPoint(pr.team, p.x, p.y)) continue;
       if (pr.spell) {
@@ -389,7 +399,7 @@ export class Renderer {
 
     this.floaters = this.floaters.filter((f) => (f.t -= 1 / 60) > 0);
     ctx.textAlign = 'center';
-    for (const f of this.floaters) {
+    for (const f of this.flat ? this.floaters : []) {
       ctx.globalAlpha = Math.min(1, f.t * 2);
       ctx.fillStyle = f.color;
       ctx.font = `bold ${f.big ? 1.5 : 1.05}px system-ui, sans-serif`;
@@ -400,7 +410,7 @@ export class Renderer {
     }
     ctx.globalAlpha = 1;
 
-    this.drawFog(w, viewTeam);
+    if (this.flat) this.drawFog(w, viewTeam);
     this.drawPings(w, viewTeam);
     if (this.marker) {
       const pulse = (w.time * 1.2) % 1;
@@ -421,6 +431,7 @@ export class Renderer {
     }
     if (aim && focus && focus.alive) this.drawAim(w, focus, lerp(focus), aim);
     ctx.restore();
+    if (!this.flat) return;
     if (isNight(w.time)) {
       ctx.fillStyle = 'rgba(10,20,60,0.22)';
       ctx.fillRect(0, 0, this.cssW, this.cssH);
@@ -429,7 +440,21 @@ export class Renderer {
     this.drawMinimap(w, focus, viewTeam);
   }
 
-  private oneHitKills(w: World, me: Unit, c: Unit): boolean {
+  /** Clear the screen and set the world → screen transform (the 3D renderer overrides this). */
+  protected beginWorld(w: World) {
+    const ctx = this.ctx;
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.fillStyle = '#0d150f';
+    ctx.fillRect(0, 0, this.cssW, this.cssH);
+    ctx.save();
+    ctx.translate(this.cssW / 2, this.cssH / 2);
+    ctx.scale(this.zoom, this.zoom);
+    ctx.translate(-this.camX, -this.camY);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(this.mapImage, 0, 0, w.map.size, w.map.size);
+  }
+
+  protected oneHitKills(w: World, me: Unit, c: Unit): boolean {
     if (c.team === me.team && !w.canDeny(me, c)) return false;
     let dmg = me.damage;
     for (const b of me.buffs) if (b.damageMult) dmg *= b.damageMult;
@@ -440,7 +465,7 @@ export class Renderer {
   }
 
   /** Darken everything outside the team's vision (smoothly upscaled from the vision grid). */
-  private drawFog(w: World, team: Team) {
+  protected drawFog(w: World, team: Team) {
     const g = w.vision.grids[team];
     const d = this.fogData.data;
     const a = isNight(w.time) ? 175 : 140;
@@ -456,7 +481,7 @@ export class Renderer {
     ctx.drawImage(this.fogCanvas, 0, 0, w.map.size, w.map.size);
   }
 
-  private drawPings(w: World, team: Team) {
+  protected drawPings(w: World, team: Team) {
     const ctx = this.ctx;
     for (const p of w.pings) {
       if (p.team !== team) continue;
@@ -480,7 +505,7 @@ export class Renderer {
     }
   }
 
-  private drawSwings() {
+  protected drawSwings() {
     const ctx = this.ctx;
     this.swings = this.swings.filter((s) => (s.t -= 1 / 60) > 0);
     for (const [id, l] of this.lunges) if ((l.t -= 1 / 60) <= 0) this.lunges.delete(id);
@@ -517,7 +542,7 @@ export class Renderer {
     }
   }
 
-  private drawRunes(w: World, team: Team) {
+  protected drawRunes(w: World, team: Team) {
     const ctx = this.ctx;
     for (const r of w.runes) {
       if (!w.vision.seesPoint(team, r.x, r.y)) continue;
@@ -542,7 +567,7 @@ export class Renderer {
     }
   }
 
-  private drawWard(u: Unit, viewTeam: Team) {
+  protected drawWard(u: Unit, viewTeam: Team) {
     const ctx = this.ctx;
     const sentry = u.ward!.kind === 'sentry';
     const own = u.team === viewTeam;
@@ -563,7 +588,7 @@ export class Renderer {
     ctx.globalAlpha = 1;
   }
 
-  private drawNeutral(c: Unit, p: { x: number; y: number }) {
+  protected drawNeutral(c: Unit, p: { x: number; y: number }) {
     const ctx = this.ctx;
     if (c.neutral?.boss) {
       // The river boss: big, purple, crowned.
@@ -611,7 +636,7 @@ export class Renderer {
   }
 
   /** Channelling teleports: ring around the hero and a marker on the destination. */
-  private drawTeleports(w: World, viewTeam: Team) {
+  protected drawTeleports(w: World, viewTeam: Team) {
     const ctx = this.ctx;
     for (const h of w.units) {
       const c = h.hero?.channel;
@@ -635,7 +660,7 @@ export class Renderer {
     }
   }
 
-  private drawAreas(w: World, seesPoint: (team: Side, x: number, y: number) => boolean) {
+  protected drawAreas(w: World, seesPoint: (team: Side, x: number, y: number) => boolean) {
     const ctx = this.ctx;
     for (const z of w.zones) {
       if (!seesPoint(z.team, z.x, z.y)) continue;
@@ -683,9 +708,9 @@ export class Renderer {
     }
   }
 
-  private drawStatus(u: Unit, p: { x: number; y: number }, time: number) {
+  protected drawStatus(u: Unit, p: { x: number; y: number }, time: number) {
     const ctx = this.ctx;
-    if (u.stunTimer > 0) {
+    if (u.stunTimer > 0 && this.flat) {
       ctx.fillStyle = '#ffe066';
       for (let i = 0; i < 3; i++) {
         const a = time * 5 + (i * Math.PI * 2) / 3;
@@ -739,7 +764,7 @@ export class Renderer {
    * hero toward the aim (works in any direction, including backwards), and the
    * ability's footprint (line width, area, or the ally that will be targeted).
    */
-  private drawAim(w: World, me: Unit, p: { x: number; y: number }, aim: Aim) {
+  protected drawAim(w: World, me: Unit, p: { x: number; y: number }, aim: Aim) {
     const ctx = this.ctx;
     const def = HEROES[me.hero!.defId].abilities[aim.slot];
     const rgb = aim.cancel ? '255,80,80' : '120,200,255';
@@ -811,7 +836,7 @@ export class Renderer {
     }
   }
 
-  private arrow(x0: number, y0: number, x1: number, y1: number, rgb: string) {
+  protected arrow(x0: number, y0: number, x1: number, y1: number, rgb: string) {
     const ctx = this.ctx;
     const dx = x1 - x0;
     const dy = y1 - y0;
@@ -838,7 +863,7 @@ export class Renderer {
     ctx.lineCap = 'butt';
   }
 
-  private drawStructure(s: Unit, time: number) {
+  protected drawStructure(s: Unit, time: number) {
     const ctx = this.ctx;
     const st = s.structure!;
     const r = s.radius;
@@ -929,7 +954,7 @@ export class Renderer {
     this.hpBar(s.x, s.y - r - 1, r * 2.2, 0.5, s.hp / s.maxHp, color);
   }
 
-  private hpBar(x: number, y: number, w: number, h: number, ratio: number, color: string) {
+  protected hpBar(x: number, y: number, w: number, h: number, ratio: number, color: string) {
     const ctx = this.ctx;
     ctx.fillStyle = 'rgba(0,0,0,0.7)';
     ctx.fillRect(x - w / 2 - 0.05, y - h / 2 - 0.05, w + 0.1, h + 0.1);
@@ -937,7 +962,7 @@ export class Renderer {
     ctx.fillRect(x - w / 2, y - h / 2, w * Math.max(0, ratio), h);
   }
 
-  private drawMinimap(w: World, focus: Unit | undefined, viewTeam: Team) {
+  protected drawMinimap(w: World, focus: Unit | undefined, viewTeam: Team) {
     const ctx = this.ctx;
     const { x, y, size } = this.minimapRect();
     const k = size / w.map.size;

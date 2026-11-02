@@ -9,11 +9,13 @@ import { playEvents } from './sound-events';
 import { GameEvent, HEROES as HERO_DEFS, PingKind, RUNE_INFO, RuneKind, TEAM_NAMES } from '../sim';
 import { PING_STYLE } from './renderer';
 import { Renderer } from './renderer';
+import { Renderer3D } from './renderer3d';
 import { enterImmersive, setupLandscape } from './screen';
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 
 const canvas = $<HTMLCanvasElement>('#game');
+const canvas3d = $<HTMLCanvasElement>('#game3d');
 const app = $<HTMLElement>('#app');
 const select = $<HTMLElement>('#select');
 
@@ -170,8 +172,9 @@ interface Settings {
   vibrate: boolean;
   joystick: 'S' | 'M' | 'L';
   zoom: number;
+  graphics: '3d' | '2d';
 }
-const settings: Settings = { autoAttack: true, sound: true, autoLearn: false, leftHanded: false, vibrate: true, joystick: 'M', zoom: 1 };
+const settings: Settings = { autoAttack: true, sound: true, autoLearn: false, leftHanded: false, vibrate: true, joystick: 'M', zoom: 1, graphics: '3d' };
 const JOY_RADIUS = { S: 42, M: 55, L: 72 };
 try {
   Object.assign(settings, JSON.parse(localStorage.getItem('shrinefall-settings') ?? '{}'));
@@ -219,7 +222,38 @@ function applySettings() {
   renderer?.setZoomFactor(settings.zoom);
   world?.enqueue({ type: 'setAutoLearn', unitId: myHeroId, enabled: settings.autoLearn });
   document.querySelectorAll<HTMLElement>('#set-joy button').forEach((b) => b.classList.toggle('on', b.dataset.v === settings.joystick));
+  document.querySelectorAll<HTMLElement>('#set-gfx button').forEach((b) => b.classList.toggle('on', b.dataset.v === settings.graphics));
 }
+
+/** 3D view, or the lighter top-down 2D view. Falls back to 2D if WebGL isn't available. */
+function makeRenderer(map: World['map']): Renderer {
+  (renderer as Renderer3D | null)?.destroy?.();
+  if (settings.graphics === '3d') {
+    try {
+      canvas3d.classList.remove('hidden');
+      return new Renderer3D(canvas, canvas3d, map);
+    } catch (err) {
+      console.warn('3D view unavailable, using 2D', err);
+    }
+  }
+  canvas3d.classList.add('hidden');
+  return new Renderer(canvas, map);
+}
+document.querySelectorAll<HTMLElement>('#set-gfx button').forEach((b) =>
+  b.addEventListener('click', () => {
+    settings.graphics = b.dataset.v as Settings['graphics'];
+    saveSettings();
+    if (world && renderer) {
+      const prev = renderer;
+      renderer = makeRenderer(world.map);
+      renderer.setZoomFactor(settings.zoom);
+      renderer.camX = prev.camX;
+      renderer.camY = prev.camY;
+      if (input) input.renderer = renderer;
+    }
+    applySettings();
+  }),
+);
 bindToggle('#set-autolearn', 'autoLearn', applySettings);
 bindToggle('#set-lefty', 'leftHanded', applySettings);
 bindToggle('#set-vibrate', 'vibrate', () => {});
@@ -387,7 +421,7 @@ function startMatch(m: Mode) {
   tutorial?.hide();
   tutorial = m === 'tutorial' ? new Tutorial($<HTMLElement>('#tutorial'), () => (tutorial = null)) : null;
   myHeroId = world.heroes.find((h) => h.hero!.controller === 'human')!.id;
-  renderer = new Renderer(canvas, world.map);
+  renderer = makeRenderer(world.map);
   input?.destroy();
   input = new Input(canvas, renderer, () => world!, () => myHeroId, app);
   input.onWardPlaced = () => {

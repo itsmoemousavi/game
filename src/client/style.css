@@ -29,6 +29,8 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 /* ---------- in game ---------- */
 #app { position: absolute; inset: 0; }
 #game { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+#game3d { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+#game3d.hidden { display: none; }
 #topbar { position: absolute; top: max(6px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; background: rgba(0,0,0,0.55); border-radius: 8px; padding: 4px 12px; font-weight: 700; cursor: pointer; touch-action: none; }
 #topbar .t0 { color: #6fb0ff; } #topbar .t1 { color: #ff7b7f; }
 #clock { font-variant-numeric: tabular-nums; min-width: 44px; text-align: center; }
