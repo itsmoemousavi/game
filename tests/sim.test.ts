@@ -10,10 +10,10 @@ const snapshot = (w: World) =>
   JSON.stringify(w.units.map((u) => [u.id, u.x.toFixed(3), u.y.toFixed(3), u.hp.toFixed(2), u.alive]));
 
 describe('simulation', () => {
-  it('spawns 6 heroes and 26 structures', () => {
+  it('spawns 6 heroes and 32 structures', () => {
     const w = newWorld();
     expect(w.heroes.length).toBe(6);
-    expect(w.structures.length).toBe(26);
+    expect(w.structures.length).toBe(32);
   });
 
   it('spawns creep waves in all 3 lanes for both teams', () => {

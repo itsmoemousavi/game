@@ -4,7 +4,7 @@ import { Vec2, distToSegment, distV, pointAlong, polylineLength, projectOnPolyli
 export type LaneId = 'top' | 'mid' | 'bot';
 export const LANE_IDS: LaneId[] = ['top', 'mid', 'bot'];
 
-export type StructureTier = 'tower1' | 'tower2' | 'barracks' | 'shrineTower' | 'shrine' | 'fountain';
+export type StructureTier = 'tower1' | 'tower2' | 'tower3' | 'barracks' | 'shrineTower' | 'shrine' | 'fountain';
 
 export interface StructureSpawn {
   team: Team;
@@ -146,13 +146,15 @@ const BOSS_PIT: Vec2 = sc({ x: 150, y: 150 });
 const RIVER: [Vec2, Vec2] = [sc({ x: 20, y: 20 }), sc({ x: 180, y: 180 })];
 
 /**
- * Tier-1 towers stand this far along the way from the base gate to the river
+ * Tier-1 towers stand this far along the way from the base gate to the river (close to it)
  * (as a fraction), so every lane's outer tower is equally "half-way out".
  */
-const T1_FRACTION = 0.55;
+const T1_FRACTION = 0.86;
+/** Tier-2 towers stand a bit further back toward the base. */
+const T2_FRACTION = 0.45;
 /** Towers stand beside the lane, not in the middle of it. */
 const TOWER_SIDE_OFFSET = 4.5;
-/** Tier-2 tower + barracks form a gate this far from where the lane leaves the base. */
+/** Tier-3 tower + barracks form a gate this far from where the lane leaves the base. */
 const GATE_DISTANCE = 5 * S;
 
 export function teamLanePath(map: GameMap, team: Team, lane: LaneId): Vec2[] {
@@ -217,14 +219,17 @@ export function createMap(): GameMap {
       }
     }
     const t1 = sideOf(path, river * T1_FRACTION);
+    const t2 = sideOf(path, river * T2_FRACTION);
     const gate = sideOf(path, GATE_DISTANCE);
     const t1Pos = { x: t1.at.x + t1.px * TOWER_SIDE_OFFSET, y: t1.at.y + t1.py * TOWER_SIDE_OFFSET };
-    const t2Pos = { x: gate.at.x + gate.px * TOWER_SIDE_OFFSET, y: gate.at.y + gate.py * TOWER_SIDE_OFFSET };
+    const t2Pos = { x: t2.at.x + t2.px * TOWER_SIDE_OFFSET, y: t2.at.y + t2.py * TOWER_SIDE_OFFSET };
+    const t3Pos = { x: gate.at.x + gate.px * TOWER_SIDE_OFFSET, y: gate.at.y + gate.py * TOWER_SIDE_OFFSET };
     const raxPos = { x: gate.at.x - gate.px * (TOWER_SIDE_OFFSET + 1), y: gate.at.y - gate.py * (TOWER_SIDE_OFFSET + 1) };
     structures.push({ team: 0, tier: 'tower1', lane, pos: t1Pos });
     structures.push({ team: 0, tier: 'tower2', lane, pos: t2Pos });
+    structures.push({ team: 0, tier: 'tower3', lane, pos: t3Pos });
     structures.push({ team: 0, tier: 'barracks', lane, pos: raxPos });
-    for (const p of [t1Pos, t2Pos]) carveCircle(p, 3.5);
+    for (const p of [t1Pos, t2Pos, t3Pos]) carveCircle(p, 3.5);
     carveCircle(raxPos, 4.5);
   }
   // Shrine towers flank the Shrine on the side facing the lanes.

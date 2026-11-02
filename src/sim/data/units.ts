@@ -69,7 +69,8 @@ const tower = (hp: number, damage: number): CombatStats => ({
 
 export const STRUCTURES: Record<StructureTier, CombatStats & { teamGold: number }> = {
   tower1: { ...tower(1400, 100), teamGold: 140 },
-  tower2: { ...tower(1700, 120), teamGold: 180 },
+  tower2: { ...tower(1550, 110), teamGold: 160 },
+  tower3: { ...tower(1750, 125), teamGold: 190 },
   shrineTower: { ...tower(1700, 140), teamGold: 220 },
   barracks: { ...tower(1500, 0), attackInterval: 0, attackRange: 0, acquireRange: 0, armor: 10, radius: 3, teamGold: 200 },
   shrine: { ...tower(3000, 0), attackInterval: 0, attackRange: 0, acquireRange: 0, armor: 13, radius: 4.5, teamGold: 0 },

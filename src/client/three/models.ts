@@ -222,8 +222,8 @@ function structure(tier: StructureTier, team: 0 | 1): THREE.Object3D {
   const trim = M(tc);
   const crystal = glow(team === 0 ? 0x7cc0ff : 0xff8a8a, 2.4);
   const g = grp();
-  if (tier === 'tower1' || tier === 'tower2' || tier === 'shrineTower') {
-    const h = tier === 'tower1' ? 5.2 : tier === 'tower2' ? 5.8 : 6.4;
+  if (tier === 'tower1' || tier === 'tower2' || tier === 'tower3' || tier === 'shrineTower') {
+    const h = tier === 'tower1' ? 5 : tier === 'tower2' ? 5.5 : tier === 'tower3' ? 6 : 6.4;
     add(g, mesh(cyl(1.9, 2.2, 0.8, 8), stone2), 0, 0.4, 0);
     add(g, mesh(cyl(1.15, 1.55, h, 8), stone), 0, 0.8 + h / 2, 0);
     for (let i = 0; i < 3; i++) add(g, mesh(cyl(1.6 - i * 0.05, 1.6 - i * 0.05, 0.18, 8), trim), 0, 1.6 + i * (h / 3), 0);

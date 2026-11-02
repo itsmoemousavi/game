@@ -183,17 +183,20 @@ describe('buyback, tower shield, backdoor', () => {
 });
 
 describe('walk + attack (multi-touch)', () => {
-  it('holding attack while steering hits enemies in range, and keeps walking when none are', () => {
+  it('holding attack while steering hits enemies in range on the move, and keeps walking', () => {
     const { w, hero } = humans();
-    const b = hero(0, 'brakk');
-    const foe = hero(1, 'vexa');
+    const b = hero(1, 'brakk');
+    const foe = hero(0, 'vexa');
     place(b, 40, 40);
-    place(foe, 42, 40);
+    place(foe, 40, 43);
+    foe.maxHp = foe.hp = 1e5;
     run(w, 0.2);
-    w.applyCommand({ type: 'moveDir', unitId: b.id, dx: 0, dy: 1 }); // steering away
+    const y = b.y;
+    w.applyCommand({ type: 'moveDir', unitId: b.id, dx: 0, dy: 1 }); // walking past the enemy
     w.applyCommand({ type: 'attackHold', unitId: b.id, held: true });
-    run(w, 2);
-    expect(foe.hp).toBeLessThan(foe.maxHp);
+    run(w, 0.6);
+    expect(foe.hp).toBeLessThan(foe.maxHp); // hit on the way...
+    expect(b.y).toBeGreaterThan(y + 1); // ...without stopping
     expect(b.hero!.order.type).toBe('dir'); // still steering
     place(foe, 140, 60); // enemy gone: keep walking
     const y0 = b.y;

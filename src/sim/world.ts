@@ -496,7 +496,7 @@ export class World {
     if (b.creep) return b.hp < b.maxHp * DENY_CREEP;
     if (b.structure) {
       const t = b.structure.tier;
-      return (t === 'tower1' || t === 'tower2' || t === 'shrineTower') && b.structure.vulnerable && b.hp < b.maxHp * DENY_TOWER;
+      return (t === 'tower1' || t === 'tower2' || t === 'tower3' || t === 'shrineTower') && b.structure.vulnerable && b.hp < b.maxHp * DENY_TOWER;
     }
     return false;
   }
@@ -1022,6 +1022,14 @@ export class World {
           .filter((e) => this.inReach(u, e))
           .sort((a, b) => Number(!!b.hero) - Number(!!a.hero) || dist(u.x, u.y, a.x, a.y) - dist(u.x, u.y, b.x, b.y))[0];
       }
+      if (o.type === 'dir') {
+        // Steering with the joystick: keep walking and shoot on the move whenever the
+        // attack is ready and something is in reach (the hero doesn't stop to fight).
+        if (t && this.inReach(u, t) && u.attackTimer <= 0) this.tryAttack(u, t);
+        u.targetId = t?.id ?? null;
+        this.stepMove(u, o.dx, o.dy, this.speedOf(u) * DT);
+        return;
+      }
       if (t && this.tryAttack(u, t)) {
         u.targetId = t.id;
         return;
@@ -1541,7 +1549,8 @@ export class World {
   /**
    * Structure protection rules (Dota-style):
    *  - Tier 1 towers: always attackable.
-   *  - Tier 2 tower + barracks of a lane: after that lane's tier 1 falls.
+   *  - Tier 2 tower of a lane: after that lane's tier 1 falls.
+   *  - Tier 3 tower + barracks of a lane: after that lane's tier 2 falls.
    *  - The two shrine towers: after any barracks of that team falls.
    *  - Shrine: after both shrine towers fall.
    *  - Fountain: never.
@@ -1555,8 +1564,11 @@ export class World {
           st.vulnerable = true;
           break;
         case 'tower2':
-        case 'barracks':
           st.vulnerable = this.findStructure(s.team, 'tower1', st.lane).every((t) => !t.alive);
+          break;
+        case 'tower3':
+        case 'barracks':
+          st.vulnerable = this.findStructure(s.team, 'tower2', st.lane).every((t) => !t.alive);
           break;
         case 'shrineTower':
           st.vulnerable = this.findStructure(s.team, 'barracks').some((r) => !r.alive);

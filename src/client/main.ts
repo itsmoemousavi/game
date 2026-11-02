@@ -407,7 +407,7 @@ function announce(w: World, events: GameEvent[]) {
     } else if (e.type === 'death') {
       const u = w.unit(e.unitId);
       if (u?.structure && u.structure.tier !== 'fountain') {
-        const tier = { tower1: 'tier-1 tower', tower2: 'tier-2 tower', barracks: 'barracks', shrineTower: 'shrine tower', shrine: 'Shrine' }[u.structure.tier as string];
+        const tier = { tower1: 'tier-1 tower', tower2: 'tier-2 tower', tower3: 'tier-3 tower', barracks: 'barracks', shrineTower: 'shrine tower', shrine: 'Shrine' }[u.structure.tier as string];
         hud.toast(`${TEAM_NAMES[u.team as Team]} ${u.structure.lane ?? ''} ${tier} destroyed`, u.team === myTeam ? '#ff7b7f' : '#6fb0ff');
       } else if (u?.hero) {
         hud.killFeed(w, u, w.unit(e.killerId), myHeroId);

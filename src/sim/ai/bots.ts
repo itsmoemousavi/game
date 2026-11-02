@@ -59,6 +59,12 @@ function teamPlan(w: World, team: Team): TeamPlan {
   const cur = cache[team];
   if (cur && w.time < cur.until) return cur;
   const until = w.time + 2;
+  // Keep defending while enemies are still at that building (don't turn back halfway).
+  if (cur?.mode === 'defend') {
+    const s = w.unit(cur.structureId);
+    const still = s?.alive && w.units.some((e) => e.alive && e.team !== team && e.team !== 2 && !e.structure && dist(e.x, e.y, s.x, s.y) < 18);
+    if (still) return (cache[team] = { ...cur, until });
+  }
   // Defend a building that enemies are hitting (heroes, or several creeps on an inner building).
   let defend: { s: Unit; threat: number } | null = null;
   for (const s of w.units) {

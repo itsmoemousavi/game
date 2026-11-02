@@ -26,18 +26,23 @@ describe('structure protection rules', () => {
     expect(t2.hp).toBe(t2.maxHp);
   });
 
-  it('opens tier-2 and barracks of a lane only when that lane tier-1 falls', () => {
+  it('opens a lane tower by tower: tier-2 after tier-1, then tier-3 and barracks after tier-2', () => {
     const w = newWorld();
     destroy(w, get(w, 1, 'tower1', 'top')[0]);
     expect(get(w, 1, 'tower2', 'top')[0].structure!.vulnerable).toBe(true);
-    expect(get(w, 1, 'barracks', 'top')[0].structure!.vulnerable).toBe(true);
+    expect(get(w, 1, 'tower3', 'top')[0].structure!.vulnerable).toBe(false);
+    expect(get(w, 1, 'barracks', 'top')[0].structure!.vulnerable).toBe(false);
     expect(get(w, 1, 'tower2', 'mid')[0].structure!.vulnerable).toBe(false);
+    destroy(w, get(w, 1, 'tower2', 'top')[0]);
+    expect(get(w, 1, 'tower3', 'top')[0].structure!.vulnerable).toBe(true);
+    expect(get(w, 1, 'barracks', 'top')[0].structure!.vulnerable).toBe(true);
     expect(get(w, 1, 'shrineTower')[0].structure!.vulnerable).toBe(false);
   });
 
   it('opens shrine towers after any barracks, and the shrine after both shrine towers', () => {
     const w = newWorld();
     destroy(w, get(w, 1, 'tower1', 'bot')[0]);
+    destroy(w, get(w, 1, 'tower2', 'bot')[0]);
     destroy(w, get(w, 1, 'barracks', 'bot')[0]);
     const [a, b] = get(w, 1, 'shrineTower');
     expect(a.structure!.vulnerable && b.structure!.vulnerable).toBe(true);

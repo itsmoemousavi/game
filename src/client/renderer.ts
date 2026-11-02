@@ -927,7 +927,7 @@ export class Renderer {
         ctx.font = 'bold 1.1px system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(st.tier === 'tower1' ? '1' : st.tier === 'tower2' ? '2' : 'S', s.x, s.y + 0.05);
+        ctx.fillText(st.tier === 'tower1' ? '1' : st.tier === 'tower2' ? '2' : st.tier === 'tower3' ? '3' : 'S', s.x, s.y + 0.05);
         ctx.textBaseline = 'alphabetic';
       }
     }
