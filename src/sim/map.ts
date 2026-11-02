@@ -86,7 +86,7 @@ const BASE_PLATEAU = 26;
 const JUNGLE_ROOMS: { c: Vec2; r: number }[] = [
   { c: { x: 52, y: 104 }, r: 7 },
   { c: { x: 100, y: 148 }, r: 7 },
-  { c: { x: 64, y: 140 }, r: 6 },
+  { c: { x: 42, y: 136 }, r: 6 },
 ];
 /**
  * Narrow paths through the forest ("juke paths") for hiding, ganking and escaping.
@@ -118,9 +118,9 @@ const JUNGLE_PATHS: [Vec2, Vec2][] = [
   [{ x: 100, y: 148 }, { x: 102, y: 182 }],
   [{ x: 100, y: 148 }, { x: 132, y: 132 }],
   [{ x: 100, y: 148 }, { x: 78, y: 122 }],
-  [{ x: 64, y: 140 }, { x: 100, y: 148 }],
-  [{ x: 64, y: 140 }, { x: 40, y: 158 }],
-  [{ x: 64, y: 140 }, { x: 52, y: 104 }],
+  [{ x: 42, y: 136 }, { x: 22, y: 132 }],
+  [{ x: 42, y: 136 }, { x: 40, y: 156 }],
+  [{ x: 42, y: 136 }, { x: 52, y: 104 }],
 ];
 /** Power-up spots: river junctions where jungle paths meet (mirror images of each other). */
 const RUNE_SPOT: Vec2 = { x: 68, y: 68 };
