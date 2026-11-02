@@ -131,14 +131,17 @@ describe('Syl, Grom and Kaela', () => {
     expect(b.hp).toBeLessThan(hp);
   });
 
-  it('a bots-only match with the new heroes plays out', () => {
+  it('a bots-only match with the new heroes plays out', async () => {
     const slots: PlayerSlot[] = [];
     (['syl', 'grom', 'kaela'] as HeroId[]).forEach((heroId, i) => slots.push({ team: 0, heroId, controller: 'bot', lane: LANE_IDS[i] }));
     (['brakk', 'vexa', 'orin'] as HeroId[]).forEach((heroId, i) => slots.push({ team: 1, heroId, controller: 'bot', lane: LANE_IDS[i] }));
     const w = new World({ seed: 8, slots });
     let casts = 0;
+    let n = 0;
     while (w.winner === null && w.time < 45 * 60) {
       w.step();
+      // Let the test runner breathe now and then (long synchronous runs time out its heartbeat on CI).
+      if (++n % 3000 === 0) await new Promise((r) => setTimeout(r, 0));
       for (const e of w.events) if (e.type === 'cast' && w.unit(e.unitId)?.team === 0) casts++;
     }
     expect(w.winner).not.toBeNull();
