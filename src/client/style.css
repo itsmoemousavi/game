@@ -158,7 +158,7 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 .ability .cd { z-index: 2; text-shadow: 0 1px 3px #000; }
 
 /* ---------- item bar ---------- */
-#itembar { position: relative; pointer-events: auto; display: grid; grid-template-columns: repeat(3, var(--slot)) auto auto; grid-template-rows: var(--slot) var(--slot); column-gap: 4px; grid-auto-flow: row; gap: 4px; align-items: center; }
+#itembar { position: relative; pointer-events: auto; display: grid; grid-template-columns: repeat(3, var(--slot)) auto auto auto; grid-template-rows: var(--slot) var(--slot); column-gap: 4px; grid-auto-flow: row; gap: 4px; align-items: center; }
 #itembar .tp { grid-row: 1; align-self: center; }
 #itembar .tp { grid-column: 4; }
 
@@ -202,6 +202,9 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #shop-own { flex: none; display: flex; align-items: center; gap: 5px; padding: 5px 6px; border-radius: 9px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08); }
 #shop-own small { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.6; margin-right: 4px; }
 #shop-own .own-grid { display: grid; grid-template-columns: repeat(3, 30px); grid-template-rows: 30px 30px; gap: 4px; }
+#shop-own .own-grid.courier { grid-template-columns: repeat(3, 30px); grid-template-rows: 30px; }
+#shop-own .own-grid.courier button { border-color: rgba(196,181,253,0.45); }
+#shop-own small:nth-of-type(2) { margin-left: 8px; color: #c4b5fd; }
 #shop-own button { width: 30px; height: 30px; padding: 0; border-radius: 7px; border: 2px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.4); overflow: hidden; position: relative; }
 #shop-own button.empty { border-style: dashed; opacity: 0.5; }
 #shop-own button.picked { border-color: #7dd3fc; }
@@ -469,9 +472,29 @@ svg.icon { display: block; width: 100%; height: 100%; }
 #draft-detail .dab small em { font-style: normal; color: #ffd23f; font-size: 8px; }
 #draft-detail .dab p { margin: 0; font-size: 9.5px; line-height: 1.25; opacity: 0.7; text-align: center; height: 3.75em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
 
-/* Courier (placeholder: no action yet), right of the TP scroll. */
+/* Courier button (right of the TP scroll) and its 3 slots at the right end of the bar. */
 #btn-courier { grid-column: 5; grid-row: 1; align-self: center; margin-left: 4px; background: #3b2a4a !important; border-color: #c4b5fd !important; padding: 1px !important; }
 #btn-courier .lbl { position: absolute; inset: 1px; display: block; }
+#btn-courier.empty { opacity: 0.55; }
+#btn-courier.ready { border-color: #ffd23f !important; animation: pulse 0.9s infinite alternate; }
+#btn-courier.out { border-color: #4ade80 !important; }
+#btn-courier .state { position: absolute; left: 50%; bottom: -1px; transform: translateX(-50%); font-size: 8px; font-weight: 900; letter-spacing: 0.04em; color: #fff; text-shadow: 0 1px 2px #000; white-space: nowrap; z-index: 1; }
+#courier-slots { --cs: calc((var(--slot) * 2 + 4px - 6px) / 3); grid-column: 6; grid-row: 1 / span 2; display: flex; flex-direction: column; gap: 3px; margin-left: 2px; padding: 0 3px; border-left: 1px solid rgba(196,181,253,0.35); }
+#itembar #courier-slots .cslot { width: var(--cs); height: var(--cs); border-radius: 5px; border-color: rgba(196,181,253,0.55); background: rgba(40,28,52,0.85); }
+#itembar #courier-slots .cslot.empty { background: rgba(0,0,0,0.4); border-style: dashed; border-color: rgba(196,181,253,0.3); }
+#itembar #courier-slots .cslot.waiting .lbl { opacity: 0.45; }
+#itembar #courier-slots .cslot.waiting { border-style: dotted; }
+#itembar #courier-slots .cslot .lbl { position: absolute; inset: 1px; display: block; }
+#itembar #courier-slots .cslot .cnt { position: absolute; right: 1px; bottom: 0; font-size: 9px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000; z-index: 1; }
+#itembar #courier-slots .cslot.picked, #itembar .item.picked { border-color: #ffd23f; }
+/* Re-ordering by dragging: the slot under the finger lights up. */
+#itembar .drop-target { border-color: #ffd23f !important; box-shadow: 0 0 0 2px rgba(255,210,63,0.5); }
+#itembar .dragging { opacity: 0.4; }
+#drag-ghost { position: absolute; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 7px; border: 2px solid #ffd23f; background: rgba(20,30,24,0.9); pointer-events: none; z-index: 50; }
+#drag-ghost svg { width: 100%; height: 100%; }
+/* A part promised to a combined item still on the courier. */
+#itembar .item.reserved .lbl { filter: grayscale(0.6) brightness(0.7); }
+#itembar .item.reserved::after { content: '⛓'; position: absolute; left: 1px; top: -2px; font-size: 10px; color: #c4b5fd; text-shadow: 0 1px 2px #000; z-index: 2; }
 /* Blink item locked after taking hero damage: grey, with the seconds left. */
 #itembar .item.locked .lbl { filter: grayscale(1) brightness(0.75); }
 #itembar .item.locked .cd { background: transparent; text-shadow: 0 1px 3px #000, 0 0 2px #000; }

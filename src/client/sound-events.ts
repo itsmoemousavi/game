@@ -152,6 +152,12 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
       case 'purchase':
         if (e.unitId === meId) sfx.play('purchase');
         break;
+      case 'courierSend':
+        if (e.unitId === meId) sfx.play('click');
+        break;
+      case 'courierDeliver':
+        if (e.unitId === meId) sfx.play('itemPickUp');
+        break;
       case 'wardenSlam': {
         const b = w.unit(e.unitId);
         if (b && w.canSee(team, b)) sfx.play(e.phase === 'hit' ? 'earthsplitter' : 'roar', near(b) * (e.phase === 'hit' ? 0.85 : 0.6));

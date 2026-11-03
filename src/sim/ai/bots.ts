@@ -4,7 +4,8 @@ import { dist, pointAlong, polylineLength, projectOnPolyline } from '../math';
 import type { Unit, World } from '../world';
 import { abilityDef, botLearn, castBlocker } from '../abilities';
 import { BUILDS, ITEMS, TELEPORT } from '../data/items';
-import { buyBlocker, inShop, itemBlocker, teleportTargets, tpBlocker } from '../inventory';
+import { buyBlocker, buyDestination, inShop, itemBlocker, recipeSources, teleportTargets, tpBlocker } from '../inventory';
+import { courierBlocker } from '../courier';
 
 /**
  * Bot heroes. Bots issue the exact same Commands a human does, so later on a bot
@@ -112,7 +113,7 @@ export function botThink(w: World, me: Unit) {
   const hpRatio = me.hp / me.maxHp;
   if (h.skillPoints > 0) botLearn(w, me);
   if (h.channel) return; // teleporting
-  if (inShop(w, me)) shop(w, me);
+  shop(w, me);
   if (hpRatio < 0.45) useSalve(w, me);
   maybeGlyph(w, me);
   if (supportAllies(w, me)) return;
@@ -381,19 +382,32 @@ function useAbilities(w: World, me: Unit, target: Unit): boolean {
   return false;
 }
 
-/** Buy along the hero's build; keep one teleport scroll. */
+/**
+ * Buy along the hero's build; keep one teleport scroll. Away from the shop the purchases go on
+ * the courier, which the bot sends out right away (bots only walk home to heal).
+ */
 function shop(w: World, me: Unit) {
   const h = me.hero!;
-  if (h.tpCount === 0 && h.gold >= TELEPORT.cost) w.applyCommand({ type: 'buyTp', unitId: me.id });
+  const atShop = inShop(w, me);
+  const tpOnCourier = h.courier.bag.some((s) => s?.id === 'tp');
+  if (h.tpCount === 0 && !tpOnCourier && h.gold >= TELEPORT.cost) w.applyCommand({ type: 'buyTp', unitId: me.id });
   // Supports keep an observer ward on them.
-  if (h.defId === 'orin' && h.gold > 400 && !h.items.some((s) => s?.id === 'observerWard')) {
+  if (h.defId === 'orin' && h.gold > 400 && !h.items.some((s) => s?.id === 'observerWard') && !h.courier.bag.some((s) => s?.id === 'observerWard')) {
     w.applyCommand({ type: 'buy', unitId: me.id, itemId: 'observerWard' });
   }
   const build = BUILDS[h.defId];
   for (let guard = 0; guard < 3 && h.bot.buildIndex < build.length; guard++) {
     const next = build[h.bot.buildIndex];
     const blocked = buyBlocker(w, me, next);
-    if (blocked === 'gold') return;
+    if (blocked === 'gold' || blocked === 'courierFull') break;
+    // Away from base, only buy what will fit in the bag on delivery (otherwise wait for the shop).
+    if (!atShop && buyDestination(w, me, next) === 'courier') {
+      const def = ITEMS[next];
+      const pending = h.courier.bag.filter((x) => x && x.id !== 'tp' && !x.parts?.length).length;
+      const free = h.items.filter((x) => !x).length - pending;
+      const stack = def.consumable && h.items.some((x) => x?.id === next && x.count < def.consumable!.maxStack);
+      if (!stack && recipeSources(h, next).inv.length === 0 && free <= 0) break;
+    }
     if (blocked === 'full') {
       // Make room by selling the cheapest item (never the Crown).
       let cheapest = -1;
@@ -409,6 +423,8 @@ function shop(w: World, me: Unit) {
     w.applyCommand({ type: 'buy', unitId: me.id, itemId: next });
     h.bot.buildIndex++;
   }
+  // Courier: send it whenever something is waiting for us.
+  if (!atShop && !courierBlocker(me)) w.applyCommand({ type: 'courier', unitId: me.id });
 }
 
 function useSalve(w: World, me: Unit) {

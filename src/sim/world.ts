@@ -36,7 +36,8 @@ import {
 import { HEROES, HeroId, maxAbilityLevel } from './data/heroes';
 import { BARRACKS, CREEPS, CombatStats, HERO_VISION, NEUTRALS, STRUCTURES, SUPER_CREEP_MULT } from './data/units';
 import { ITEMS, ItemId, ItemStats, TELEPORT } from './data/items';
-import { GroundItem, ItemSlot, charmSlot, updateItemAuras, buyItem, buyTeleport, dropItem, emptyInventory, expireGroundItems, itemBonuses, pickUpItem, sellItem, startTeleport, updateChannel, useItem } from './inventory';
+import { GroundItem, ItemSlot, charmSlot, updateItemAuras, buyItem, buyTeleport, dropItem, emptyInventory, expireGroundItems, itemBonuses, pickUpItem, sellCourierItem, sellItem, startTeleport, swapItems, updateChannel, useItem } from './inventory';
+import { CourierState, courierGround, dropCourierItem, newCourier, sendCourier, updateCouriers } from './courier';
 import { Vision, isInvisible } from './vision';
 import { Rune, activateGlyph, buyback, placeWard, spawnBoss, updateObjectives } from './objectives';
 import { GameMap, LaneId, StructureTier, createMap, fits, heightAt, inHouse, isWalkable, lineClear, teamLanePath } from './map';
@@ -94,6 +95,13 @@ export type Command =
   | { type: 'buy'; unitId: number; itemId: ItemId }
   | { type: 'sell'; unitId: number; slot: number }
   | { type: 'buyTp'; unitId: number }
+  /** Send your courier with its items (it fetches anything waiting at the base first). */
+  | { type: 'courier'; unitId: number }
+  /** Sell / drop an item from a courier slot. */
+  | { type: 'sellCourier'; unitId: number; slot: number }
+  | { type: 'dropCourier'; unitId: number; slot: number }
+  /** Re-order: swap two inventory slots, or two courier slots. */
+  | { type: 'swapItems'; unitId: number; courier: boolean; a: number; b: number }
   /** Use the item in inventory slot `slot` (consumables, items with a button; blink takes x/y). */
   | { type: 'useItem'; unitId: number; slot: number; x?: number; y?: number }
   /** Channel a teleport to an allied building. Moving or being stunned cancels it. */
@@ -238,6 +246,8 @@ export interface HeroState {
   items: (ItemSlot | null)[];
   /** Teleport scrolls carried (separate slot, unlimited). */
   tpCount: number;
+  /** This hero's courier and its 3 slots. */
+  courier: CourierState;
   tpCooldown: number;
   channel: { kind: 'tp'; t: number; total: number; targetId: number } | null;
   /** Item bonuses currently applied (cooldown reduction, spell amp, lifesteal, ult upgrade...). */
@@ -380,6 +390,8 @@ export type GameEvent =
   | { type: 'bossKilled'; killerId: number | null; team: Side }
   | { type: 'revive'; unitId: number }
   | { type: 'purchase'; unitId: number }
+  | { type: 'courierSend'; unitId: number }
+  | { type: 'courierDeliver'; unitId: number }
   | { type: 'itemDrop'; unitId: number }
   | { type: 'itemPickUp'; unitId: number; itemId?: ItemId }
   | { type: 'itemExpire'; unitId: number; itemId: ItemId }
@@ -438,6 +450,9 @@ export class World {
   readonly map: GameMap;
   /** Map + footprints of standing structures; used for pathing and movement. */
   nav: GameMap;
+  /** Where a walking courier may go (lanes and bases, minus buildings). */
+  courierNav: GameMap;
+  private courierLand: Uint8Array;
   readonly rng: Rng;
   tick = 0;
   time = 0;
@@ -469,6 +484,8 @@ export class World {
   constructor(opts: WorldOptions) {
     this.map = opts.map ?? createMap();
     this.nav = { ...this.map, walkable: new Uint8Array(this.map.walkable) };
+    this.courierLand = courierGround(this.map);
+    this.courierNav = { ...this.map, walkable: new Uint8Array(this.map.walkable) };
     this.rng = new Rng(opts.seed);
     this.time = -(opts.warmup ?? 0);
     // River curbs and hilltops block walking but not sight.
@@ -574,7 +591,7 @@ export class World {
     if (!u || !u.hero) return;
     const h = u.hero;
     // Shopping works while dead (you respawn at the fountain); everything else needs a living hero.
-    const whileDead = ['buy', 'sell', 'buyTp', 'learn', 'buyback', 'glyph', 'surrender', 'setAutoAttack', 'setAutoLearn', 'ping'];
+    const whileDead = ['buy', 'sell', 'buyTp', 'sellCourier', 'dropCourier', 'swapItems', 'learn', 'buyback', 'glyph', 'surrender', 'setAutoAttack', 'setAutoLearn', 'ping'];
     if (!u.alive && !whileDead.includes(cmd.type)) return;
     if (h.channel && (cmd.type === 'moveDir' || cmd.type === 'moveTo' || cmd.type === 'attack' || cmd.type === 'attackNearest' || cmd.type === 'cast' || cmd.type === 'stop')) {
       if (cmd.type !== 'moveDir' || Math.hypot(cmd.dx, cmd.dy) >= 0.15) h.channel = null;
@@ -648,6 +665,18 @@ export class World {
         break;
       case 'buyTp':
         buyTeleport(this, u);
+        break;
+      case 'courier':
+        sendCourier(this, u);
+        break;
+      case 'sellCourier':
+        sellCourierItem(this, u, cmd.slot);
+        break;
+      case 'dropCourier':
+        dropCourierItem(this, u, cmd.slot);
+        break;
+      case 'swapItems':
+        swapItems(u, cmd.courier, cmd.a, cmd.b);
         break;
       case 'useItem':
         useItem(this, u, cmd.slot, cmd.x, cmd.y);
@@ -846,6 +875,7 @@ export class World {
       attackCount: 0,
       items: emptyInventory(),
       tpCount: 0,
+      courier: null as unknown as CourierState,
       tpCooldown: 0,
       channel: null,
       bonus: itemBonuses([]),
@@ -854,6 +884,7 @@ export class World {
       reviveAt: null,
       bot: { thinkTimer: (index % 6) * 0.05, retreating: false, buildIndex: 0, difficulty: slot.difficulty ?? 'normal' },
     };
+    u.hero.courier = newCourier(this, u);
     this.applyHeroStats(u, true);
   }
 
@@ -1011,6 +1042,7 @@ export class World {
     this.updateSkillshots();
     this.updateAreas();
     updateItemAuras(this);
+    updateCouriers(this);
     this.separate();
     if (this.tick % Math.round(1 / (DT * VISION_HZ)) === 0) this.vision.update(this);
 
@@ -1798,6 +1830,8 @@ export class World {
         }
       }
     }
+    const cw = this.courierNav.walkable;
+    for (let i = 0; i < cw.length; i++) cw[i] = this.nav.walkable[i] & this.courierLand[i];
   }
 
   /**

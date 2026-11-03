@@ -1,5 +1,5 @@
 import { Side, Team } from './constants';
-import { BLINK_DAMAGE_LOCK, INVENTORY_SLOTS, ITEMS, ItemId, ItemStats, SALVE, SHOP_RADIUS, TELEPORT } from './data/items';
+import { BLINK_DAMAGE_LOCK, COURIER_SLOTS, INVENTORY_SLOTS, ITEMS, ItemId, ItemStats, SALVE, SHOP_RADIUS, TELEPORT } from './data/items';
 import { dist } from './math';
 import { cellCenter, nearestWalkableCell } from './pathfinding';
 import { onHillTop } from './objectives';
@@ -15,7 +15,27 @@ export interface ItemSlot {
   boughtAt?: number;
   /** Match time the item crumbles (wherever it is: in a bag or on the ground). */
   expiresAt?: number;
+  /**
+   * A part promised to a combined item that is on its way by courier: it combines when the
+   * courier delivers, so until then it can't be sold or dropped.
+   */
+  reserved?: boolean;
 }
+
+/** One courier slot: an item (or a stack of teleport scrolls) bought away from the shop. */
+export interface CourierSlot {
+  id: ItemId | 'tp';
+  count: number;
+  boughtAt?: number;
+  /** Gold actually paid (a combined item costs less when you own its parts). */
+  paid: number;
+  /** Inventory parts this combined item uses up on delivery (they are reserved until then). */
+  parts?: ItemId[];
+  /** On the courier (false = bought while the courier was away: it's waiting at the base). */
+  loaded: boolean;
+}
+
+export const emptyCourierBag = (): (CourierSlot | null)[] => Array<CourierSlot | null>(COURIER_SLOTS).fill(null);
 
 /** Changed your mind? Selling an item within this many seconds of buying it refunds the full price. */
 export const SELL_REFUND_WINDOW = 10;
@@ -71,31 +91,69 @@ export const inShop = (w: World, u: Unit) => {
   return dist(u.x, u.y, f.x, f.y) <= SHOP_RADIUS;
 };
 
-/** Inventory slots holding the parts of `id`'s recipe (each part matched to a different slot). */
-export function recipeParts(h: NonNullable<Unit['hero']>, id: ItemId): number[] {
-  const used: number[] = [];
+type Hero = NonNullable<Unit['hero']>;
+
+/**
+ * Where the parts of `id`'s recipe are: inventory slots (not already promised to another
+ * item) first, then courier slots. Each part is matched to a different slot.
+ */
+export function recipeSources(h: Hero, id: ItemId): { inv: number[]; bag: number[] } {
+  const inv: number[] = [];
+  const bag: number[] = [];
   for (const part of ITEMS[id].recipe ?? []) {
-    const i = h.items.findIndex((s, k) => s?.id === part && !used.includes(k));
-    if (i >= 0) used.push(i);
+    const i = h.items.findIndex((s, k) => s?.id === part && !s.reserved && !inv.includes(k));
+    if (i >= 0) {
+      inv.push(i);
+      continue;
+    }
+    const j = h.courier.bag.findIndex((s, k) => s?.id === part && !bag.includes(k));
+    if (j >= 0) bag.push(j);
   }
-  return used;
+  return { inv, bag };
 }
 
-/** What `id` costs this hero right now (parts already owned are subtracted). */
-export function priceFor(h: NonNullable<Unit['hero']>, id: ItemId): number {
-  return ITEMS[id].cost - recipeParts(h, id).reduce((sum, i) => sum + ITEMS[h.items[i]!.id].cost, 0);
+/** Inventory slots holding the parts of `id`'s recipe. */
+export const recipeParts = (h: Hero, id: ItemId): number[] => recipeSources(h, id).inv;
+
+/** What `id` costs this hero right now (parts already owned, in the bag or on the courier, are subtracted). */
+export function priceFor(h: Hero, id: ItemId): number {
+  const { inv, bag } = recipeSources(h, id);
+  const owned = inv.reduce((sum, i) => sum + ITEMS[h.items[i]!.id].cost, 0) + bag.reduce((sum, i) => sum + ITEMS[h.courier.bag[i]!.id as ItemId].cost, 0);
+  return ITEMS[id].cost - owned;
+}
+
+/** At the shop: near your fountain, or dead (you respawn there). */
+const atShop = (w: World, u: Unit) => !u.alive || inShop(w, u);
+
+/** Room for `id` in the inventory (a stack, a freed part slot or an empty slot). */
+function fitsInventory(h: Hero, id: ItemId, partSlots: number) {
+  const def = ITEMS[id];
+  const stack = def.consumable && h.items.some((s) => s?.id === id && s.count < def.consumable!.maxStack);
+  return !!stack || partSlots > 0 || h.items.includes(null);
+}
+/** Room for `id` on the courier. */
+function fitsCourier(h: Hero, id: ItemId | 'tp', partSlots: number) {
+  const max = id === 'tp' ? Infinity : ITEMS[id].consumable?.maxStack ?? 1;
+  const stack = max > 1 && h.courier.bag.some((s) => s?.id === id && s.count < max);
+  return stack || partSlots > 0 || h.courier.bag.includes(null);
+}
+
+/** Where a purchase of `id` would go right now: into the inventory, or onto the courier. */
+export function buyDestination(w: World, u: Unit, id: ItemId): 'inventory' | 'courier' | null {
+  const h = u.hero!;
+  const { inv, bag } = recipeSources(h, id);
+  if (atShop(w, u) && fitsInventory(h, id, inv.length)) return 'inventory';
+  // Away from the shop (or with a full inventory at base) it goes on the courier.
+  if (fitsCourier(h, id, bag.length)) return 'courier';
+  return null;
 }
 
 /** Why `id` can't be bought right now, or null. */
-export function buyBlocker(w: World, u: Unit, id: ItemId): 'shop' | 'gold' | 'full' | null {
+export function buyBlocker(w: World, u: Unit, id: ItemId): 'shop' | 'gold' | 'full' | 'courierFull' | null {
   const h = u.hero!;
-  // While dead you're back at base (you respawn at the fountain), so the shop is open.
-  if ((u.alive && !inShop(w, u)) || ITEMS[id].noShop) return 'shop';
+  if (ITEMS[id].noShop) return 'shop';
   if (h.gold < priceFor(h, id)) return 'gold';
-  const def = ITEMS[id];
-  const stack = def.consumable && h.items.some((s) => s?.id === id && s.count < def.consumable!.maxStack);
-  const freed = recipeParts(h, id).length;
-  if (!stack && freed === 0 && h.items.every((s) => s !== null)) return 'full';
+  if (!buyDestination(w, u, id)) return atShop(w, u) ? 'full' : 'courierFull';
   return null;
 }
 
@@ -103,16 +161,90 @@ export function buyItem(w: World, u: Unit, id: ItemId): boolean {
   if (buyBlocker(w, u, id)) return false;
   const h = u.hero!;
   const def = ITEMS[id];
-  h.gold -= priceFor(h, id);
-  // Combining: the parts are used up.
-  for (const i of recipeParts(h, id)) h.items[i] = null;
-  const stack = def.consumable ? h.items.find((s) => s?.id === id && s.count < def.consumable!.maxStack) : undefined;
-  if (stack) {
-    stack.count++;
-    stack.boughtAt = w.time;
-  } else h.items[h.items.indexOf(null)] = { id, count: 1, cooldown: 0, boughtAt: w.time };
+  const price = priceFor(h, id);
+  const where = buyDestination(w, u, id)!;
+  const { inv, bag } = recipeSources(h, id);
+  h.gold -= price;
+  // Parts already on the courier are used up right away (their own promised parts carry over).
+  const carried: ItemId[] = [];
+  let bagSpot = -1;
+  for (const j of bag) {
+    carried.push(...(h.courier.bag[j]!.parts ?? []));
+    h.courier.bag[j] = null;
+    if (bagSpot < 0) bagSpot = j;
+  }
+  if (where === 'inventory') {
+    // Combining at the shop: the parts are used up now (promised parts of a used courier part too).
+    for (const i of inv) h.items[i] = null;
+    for (const p of carried) {
+      const k = h.items.findIndex((s) => s?.id === p && s.reserved);
+      if (k >= 0) h.items[k] = null;
+    }
+    const stack = def.consumable ? h.items.find((s) => s?.id === id && s.count < def.consumable!.maxStack) : undefined;
+    if (stack) {
+      stack.count++;
+      stack.boughtAt = w.time;
+    } else h.items[h.items.indexOf(null)] = { id, count: 1, cooldown: 0, boughtAt: w.time };
+  } else {
+    // On the courier: inventory parts are promised to it and combine on delivery.
+    for (const i of inv) h.items[i]!.reserved = true;
+    const parts = [...carried, ...inv.map((i) => h.items[i]!.id)];
+    addToCourier(w, u, id, price, parts, bagSpot);
+  }
   w.applyHeroStats(u);
   w.events.push({ type: 'purchase', unitId: u.id });
+  return true;
+}
+
+/** Put a purchase on the courier (stacking consumables / scrolls). Loaded at once if the courier is home. */
+function addToCourier(w: World, u: Unit, id: ItemId | 'tp', paid: number, parts: ItemId[], spot = -1) {
+  const c = u.hero!.courier;
+  const max = id === 'tp' ? Infinity : ITEMS[id].consumable?.maxStack ?? 1;
+  const loaded = c.mode === 'home';
+  const stack = max > 1 ? c.bag.find((s) => s?.id === id && s.count < max) : undefined;
+  if (stack) {
+    stack.count++;
+    stack.paid += paid;
+    stack.boughtAt = w.time;
+    stack.loaded &&= loaded;
+    return;
+  }
+  const i = spot >= 0 ? spot : c.bag.indexOf(null);
+  c.bag[i] = { id, count: 1, boughtAt: w.time, paid, parts: parts.length ? parts : undefined, loaded };
+}
+
+/** Why a teleport scroll can't be bought right now, or null. */
+export function tpBuyBlocker(w: World, u: Unit): 'gold' | 'courierFull' | null {
+  const h = u.hero!;
+  if (h.gold < TELEPORT.cost) return 'gold';
+  if (!atShop(w, u) && !fitsCourier(h, 'tp', 0)) return 'courierFull';
+  return null;
+}
+
+/** Sell price of a courier slot: what you paid, in full within the refund window, else half. */
+export function courierSellPrice(w: World, s: CourierSlot): number {
+  return w.time - (s.boughtAt ?? -999) <= SELL_REFUND_WINDOW ? s.paid : Math.floor(s.paid / 2);
+}
+
+/** Sell an item off the courier (works anywhere). Its promised inventory parts are freed again. */
+export function sellCourierItem(w: World, u: Unit, slot: number): boolean {
+  const h = u.hero!;
+  const s = h.courier.bag[slot];
+  if (!s || (s.id !== 'tp' && ITEMS[s.id].noShop)) return false;
+  h.gold += courierSellPrice(w, s);
+  for (const p of s.parts ?? []) {
+    const k = h.items.findIndex((x) => x?.id === p && x.reserved);
+    if (k >= 0) h.items[k]!.reserved = false;
+  }
+  h.courier.bag[slot] = null;
+  return true;
+}
+
+/** Swap two slots of the inventory, or of the courier. */
+export function swapItems(u: Unit, courier: boolean, a: number, b: number): boolean {
+  const list: unknown[] = courier ? u.hero!.courier.bag : u.hero!.items;
+  if (a === b || a < 0 || b < 0 || a >= list.length || b >= list.length) return false;
+  [list[a], list[b]] = [list[b], list[a]];
   return true;
 }
 
@@ -125,7 +257,7 @@ export function sellPrice(w: World, s: ItemSlot): number {
 export function sellItem(w: World, u: Unit, slot: number): boolean {
   const h = u.hero!;
   const s = h.items[slot];
-  if (!s || (u.alive && !inShop(w, u)) || ITEMS[s.id].noShop) return false;
+  if (!s || (u.alive && !inShop(w, u)) || ITEMS[s.id].noShop || s.reserved) return false;
   h.gold += sellPrice(w, s);
   h.items[slot] = null;
   w.applyHeroStats(u);
@@ -219,9 +351,11 @@ export function useItem(w: World, u: Unit, slot: number, x?: number, y?: number)
 
 export function buyTeleport(w: World, u: Unit): boolean {
   const h = u.hero!;
-  if ((u.alive && !inShop(w, u)) || h.gold < TELEPORT.cost) return false;
+  if (tpBuyBlocker(w, u)) return false;
   h.gold -= TELEPORT.cost;
-  h.tpCount++;
+  // Away from the shop the scroll goes on the courier (into the TP slot on delivery).
+  if (atShop(w, u)) h.tpCount++;
+  else addToCourier(w, u, 'tp', TELEPORT.cost, []);
   w.events.push({ type: 'purchase', unitId: u.id });
   return true;
 }
@@ -314,7 +448,7 @@ export function canPickUp(u: Unit, g: GroundItem): boolean {
 export function dropItem(w: World, u: Unit, slot: number): boolean {
   const h = u.hero!;
   const s = h.items[slot];
-  if (!s || !u.alive) return false;
+  if (!s || !u.alive || s.reserved) return false;
   // A step in front of the hero, on walkable ground.
   const fx = u.x + Math.cos(u.facing) * (u.radius + 0.6);
   const fy = u.y + Math.sin(u.facing) * (u.radius + 0.6);

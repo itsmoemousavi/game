@@ -8,11 +8,13 @@ export type { HeroId, HeroDef, AbilityDef, AbilityId, Targeting } from './data/h
 export { castBlocker, abilityDef, abilityLevel } from './abilities';
 export { CREEPS, STRUCTURES } from './data/units';
 export { isNight, phaseTimeLeft } from './vision';
-export { ITEMS, ITEM_IDS, BUILDS, TELEPORT, SHOP_RADIUS, INVENTORY_SLOTS } from './data/items';
+export { ITEMS, ITEM_IDS, BUILDS, TELEPORT, SHOP_RADIUS, INVENTORY_SLOTS, COURIER_SLOTS } from './data/items';
 export type { ItemId, ItemDef } from './data/items';
-export { GROUND_ITEM_LIFETIME, SELL_REFUND_WINDOW, blinkLockLeft, buyBlocker, canPickUp, groundItemExpiry, inShop, itemBlocker, pickUpBlocker, priceFor, recipeParts, sellPrice, teleportTargets, tpBlocker } from './inventory';
+export { GROUND_ITEM_LIFETIME, SELL_REFUND_WINDOW, blinkLockLeft, buyBlocker, canPickUp, groundItemExpiry, inShop, itemBlocker, pickUpBlocker, priceFor, recipeParts, sellPrice, teleportTargets, tpBlocker, tpBuyBlocker, buyDestination, courierSellPrice } from './inventory';
+export { COURIER_FLY_AT, COURIER_SPEED, courierBlocker, courierFlying, courierHome } from './courier';
+export type { CourierState } from './courier';
 export type { GroundItem } from './inventory';
-export type { ItemSlot } from './inventory';
+export type { ItemSlot, CourierSlot } from './inventory';
 export { effectiveCooldown } from './abilities';
 export { RUNE_INFO } from './objectives';
 export type { Rune, RuneKind } from './objectives';

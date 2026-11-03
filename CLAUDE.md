@@ -48,7 +48,7 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
 
 - `src/sim/` deterministic 30 Hz simulation, no DOM. Commands pattern (players and bots send the same `Command`s).
   `world.ts` (units, combat, waves, structure rules), `map.ts` (layout written for 200 m and scaled by
-  `MAP_SIZE / 200`, now 300 m), `abilities.ts`, `inventory.ts` (shop, sell refund window), `objectives.ts`
+  `MAP_SIZE / 200`, now 300 m), `abilities.ts`, `inventory.ts` (shop, sell refund window, courier purchases), `courier.ts` (courier movement + delivery), `objectives.ts`
   (runes, Warden boss, wards, glyph, backdoor), `vision.ts` (fog, trees block sight, high ground, day/night),
   `ai/bots.ts` (team plans: farm / push / defend; difficulty easy/normal/hard), `data/*` (all numbers).
 - `src/client/` `main.ts` (menus, settings, loop), `renderer.ts` (2D; in 3D mode it draws only the ground
@@ -91,6 +91,9 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
   "Warden's Charm" stays). Never use "Dota" in anything public (store listing, screenshots, ads).
 - Each fountain sits in a walled yard with one doorway toward the centre; the Warden's house walls block sight
   both ways; the Warden returns 8–11 min after dying (random, unannounced); wards die to exactly 2 attacks.
+- Courier (owner's design, 2026-11-03): 3 slots per hero, buys away from base go on it, delivers in slot order as many as fit,
+  walks lanes only until 6:00 then flies, turns back on death, invulnerable for now (killable + bounty = later).
+  Its look is a placeholder mule (walking) / winged mule (flying): ask the owner before final art.
 - Dying costs gold; buyback exists. Android build: not now. App stores: later.
 
 ## Open items / next steps

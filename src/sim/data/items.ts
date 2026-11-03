@@ -386,6 +386,8 @@ export const ITEMS: Record<ItemId, ItemDef> = {
 
 export const ITEM_IDS = Object.keys(ITEMS) as ItemId[];
 export const INVENTORY_SLOTS = 6;
+/** The courier carries up to this many item slots. */
+export const COURIER_SLOTS = 3;
 
 export const TELEPORT = {
   cost: 50,

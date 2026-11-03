@@ -343,6 +343,14 @@ Numbers are in `src/sim/constants.ts`, `data/units.ts` and `objectives.ts`.
 
 **Shop:** tabs (For you, Supplies, Attack, Defense, Magic, Upgrades), an item grid and a detail panel with what the item does, its parts and a BUY button. Tapping an item only selects it, so scrolling never buys by accident. Selling: tap one of your items, then SELL: full refund within 10 s of buying, half price after. Dead heroes can shop (they respawn at the fountain). (Quick-buy was removed.)
 
+**Courier (each hero has one):** 3 courier slots at the right end of the item bar, and a courier button next to the TP slot.
+- **Buying away from the shop** puts the item on the courier (also at base when your inventory is full). Buying at the shop puts it straight into your inventory. A teleport scroll bought away takes a courier slot and goes into the TP slot on delivery. When all 3 slots are taken the Buy button says **COURIER FULL** (consumables and scrolls still stack onto their slot).
+- **Tap the courier button** to send it: it hands over its items **in slot order, as many as fit** in your 6 slots; leftovers stay on it. Then it goes home. Items bought while it is out wait at the base (dotted slot) and are picked up on its next trip; walking into the shop with the courier at home also gives you its items.
+- **Combined items:** parts you already own (inventory or courier) make it cheaper; parts in your inventory are **promised** (chain mark, can't be sold or dropped) and **combine when the courier delivers**.
+- **Movement:** for the first **6 minutes** it walks, **only along the lanes** (and inside the base), at 6.5 m/s; from 6:00 it **flies** straight over the trees at 8.5 m/s. It **turns back if you die**. It can't be attacked yet (a killable courier with a bounty comes later). Enemies see it only inside their vision.
+- **Slots:** tap a courier slot for its details (SELL anywhere: full refund for 10 s, then half; DROP puts it on the ground where the courier is). **Press and hold** = DROP. **Drag** one slot onto another to swap them; the same works in your 6 inventory slots.
+- **Bots** buy along their build wherever they are and send their courier right away; they only walk home to heal.
+
 **Hero stats (tap the portrait ⓘ):**
 - **Attack:** damage, attack speed and time, range, lifesteal, spell damage, cooldown reduction.
 - **Defense:** armor (with its damage reduction), move speed, health and mana with their regen.

@@ -150,6 +150,8 @@ function build(key: string): THREE.Object3D {
       return rubble(Number(a));
     case 'ward':
       return ward(a as 'observer' | 'sentry');
+    case 'courier':
+      return courier(a === 'fly', Number(b) as 0 | 1);
     case 'rune':
       return rune(a as RuneKind);
     case 'shot':
@@ -442,6 +444,39 @@ function ward(kind: 'observer' | 'sentry'): THREE.Object3D {
   add(g, mesh(cyl(0.05, 0.08, 1.4, 5), M(0x5a3d26)), 0, 0.7, 0);
   add(g, mesh(sph(0.22, 1), glow(kind === 'observer' ? 0xffd23f : 0x60a5fa, 2.5)), 0, 1.55, 0);
   add(g, mesh(new THREE.TorusGeometry(0.28, 0.04, 4, 12), M(0x8a6a3a)), 0, 1.55, 0);
+  return g;
+}
+
+/**
+ * Courier: a small pack mule with saddlebags in the team colour (faces +z). After 6:00 it grows
+ * feathered wings and flies. Placeholder look, our own.
+ */
+function courier(fly: boolean, team: 0 | 1): THREE.Object3D {
+  const g = grp();
+  const fur = M(0x7a6248);
+  const dark = M(0x3b2d22);
+  const tc = M(TEAM_HEX[team]);
+  add(g, mesh(box(0.55, 0.45, 1.0), fur), 0, 0.75, 0);
+  add(g, mesh(box(0.32, 0.34, 0.42), fur), 0, 1.05, 0.62).rotation.x = -0.5;
+  add(g, mesh(box(0.26, 0.26, 0.36), fur), 0, 1.12, 0.92);
+  add(g, mesh(box(0.2, 0.14, 0.14), dark), 0, 1.06, 1.12);
+  for (const sx of [-1, 1]) {
+    add(g, mesh(cone(0.06, 0.32, 4), fur), sx * 0.1, 1.36, 0.85).rotation.z = sx * -0.3;
+    for (const z of [-0.36, 0.36]) add(g, mesh(cyl(0.06, 0.05, 0.55, 5), dark), sx * 0.2, 0.28, z);
+    // Saddlebags.
+    add(g, mesh(box(0.14, 0.34, 0.42), tc), sx * 0.34, 0.78, -0.05);
+  }
+  add(g, mesh(box(0.5, 0.12, 0.6), M(0x5a3d26)), 0, 1.0, -0.05);
+  add(g, mesh(cyl(0.03, 0.05, 0.35, 4), dark), 0, 0.85, -0.6).rotation.x = 0.6;
+  if (fly) {
+    const feather = M(0xe9e4d8);
+    for (const sx of [-1, 1]) {
+      const wing = add(g, grp(), sx * 0.3, 1.05, 0.05);
+      wing.rotation.z = sx * 0.35;
+      add(wing, mesh(box(0.9, 0.05, 0.5), feather), sx * 0.45, 0, 0);
+      add(wing, mesh(box(0.55, 0.04, 0.35), feather), sx * 1.05, 0.05, -0.08);
+    }
+  }
   return g;
 }
 

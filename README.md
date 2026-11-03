@@ -28,13 +28,14 @@ npx vite-node scripts/simulate.ts [seed] [minutes]   # headless all-bot match lo
 | Move | Drag anywhere on the left half (virtual joystick) · tap an enemy to attack it · while holding the minimap, tap the map to walk there | Arrow keys, or right-click the ground |
 | Attack | **Hold Attack** (works together with the joystick: hits what's in range, otherwise you keep walking) · tap an enemy to attack it | Hold Space, or click an enemy |
 | Abilities | **Hold** Q/W/R: arrow appears · **drag** any direction to aim · release to cast · release on ✕ Cancel to abort | Q / W / R cast at the cursor |
-| Items | Tap an item to use it (poultices) · **totems** (Watcher / Seer): tap the slot, then tap the ground · 🛒 opens the shop (buy at base) · **TP** slot: tap, then pick a friendly building (teleports are bought in the shop) | same (click) |
+| Items | Tap an item to use it (poultices) · **totems** (Watcher / Seer): tap the slot, then tap the ground · 🛒 opens the shop (away from base, buys go on the courier) · **TP** slot: tap, then pick a friendly building (teleports are bought in the shop) | same (click) |
 | Deny | Tap one of your own creeps below half health (or your own tower below 10%) | Click it |
 | Team | 🛡 under the minimap: tower shield · 📍 ping (pick one, then tap the map/minimap) · **Buy back** in the respawn banner | same (click) |
 | Info | Tap the **top bar** for the scoreboard · tap your **portrait (ⓘ)** for hero stats · **long-press** an ability for its details | same (click / hold) |
 | Menu | **⏸** pause (resume / surrender) · **⚙** settings: graphics (3D / 2D), auto attack, sound, auto-learn, left-handed, vibration, joystick size, camera zoom | same (click) |
 | Shopping | 🛒 opens the shop (at base, or anywhere while dead): pick a tab, tap an item, then **BUY**. To sell, tap one of your items, then **SELL** (full refund within 10 s of buying, half price after) | same (click) |
-| Items | 6 slots in 2 rows of 3. Tap an item to use it. **Press and hold** an item → **DROP** puts it on the ground (also a DROP button in the shop). Tap a dropped item to walk over and pick it up. Only you can pick up your items; wards and sentries can be handed to allies. Dropped items vanish after 2 minutes | same (click) |
+| Items | 6 slots in 2 rows of 3. Tap an item to use it. **Press and hold** an item → **DROP** puts it on the ground (also a DROP button in the shop). Tap a dropped item to walk over and pick it up. Only you can pick up your items; wards and sentries can be handed to allies. Dropped items vanish after 2 minutes. **Drag** an item onto another slot to swap them | same (click) |
+| Courier | Buy away from base → the item goes on your courier (3 slots at the right of the item bar). Tap the **courier button** to send it; it walks the lanes until 6:00, then flies. Tap a courier slot to sell it, hold to drop, drag to re-order | same (click) |
 | Learn ability | Tap the yellow **+** next to the button | Ctrl + Q / W / R |
 | Camera | Hold/drag the minimap to look (while looking, the joystick is off and taps on the map are orders); release to return · while dead, drag anywhere to look around | Hold minimap to look, right-click minimap to walk there, wheel to zoom |
 

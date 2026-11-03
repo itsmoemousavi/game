@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { GLYPH_DURATION, GameMap, HEROES, House, TELEPORT, Team, Unit, World, isInvisible, isNight } from '../sim';
+import { GLYPH_DURATION, GameMap, HEROES, House, TELEPORT, Team, Unit, World, courierFlying, isInvisible, isNight } from '../sim';
 import type { Aim } from './input';
 import { Renderer, TEAM_COLORS } from './renderer';
 import { JOINTS, Joint, TEAM_HEX, model } from './three/models';
@@ -220,7 +220,7 @@ export class Renderer3D extends Renderer {
     const keys = [
       ...['brakk', 'vexa', 'orin', 'syl', 'grom', 'kaela'].map((h) => `hero:${h}`),
       ...[0, 1].flatMap((t) => [`creep:melee:${t}`, `creep:ranged:${t}`]),
-      'brute', 'imp', 'warden', 'ward:observer', 'ward:sentry',
+      'brute', 'imp', 'warden', 'ward:observer', 'ward:sentry', 'courier:walk:0', 'courier:walk:1', 'courier:fly:0', 'courier:fly:1',
       ...['haste', 'doubleDamage', 'regen', 'invisibility', 'bounty'].map((r) => `rune:${r}`),
       'shot:fireball', 'shot:piercingArrow', 'shot:tidalWave', 'shot:spell', 'shot:shot0', 'shot:shot1',
       'shot:arrow', 'shot:arrowCrit', 'shot:firebolt', 'shot:waterbolt',
@@ -955,6 +955,17 @@ export class Renderer3D extends Renderer {
       } else if (u.ward) {
         this.place(`ward:${u.ward.kind}`, id, u.x, u.y);
       }
+    }
+    // Couriers: your team's always, the enemy's only inside your vision.
+    const flying = courierFlying(w);
+    for (const hu of w.heroes) {
+      const c = hu.hero!.courier;
+      const x = c.px + (c.x - c.px) * alpha;
+      const y = c.py + (c.y - c.py) * alpha;
+      if (hu.team !== team && !w.vision.seesPoint(team, x, y)) continue;
+      const moving = Math.hypot(c.x - c.px, c.y - c.py) > 1e-3;
+      const lift = flying ? 3.2 + Math.sin(t * 3 + hu.id) * 0.25 : moving ? Math.abs(Math.sin(t * 9 + hu.id)) * 0.08 : 0;
+      this.place(`courier:${flying ? 'fly' : 'walk'}:${hu.team === 1 ? 1 : 0}`, 'cour' + hu.id, x, y, lift, face(c.facing), 1.5);
     }
     for (const r of w.runes) {
       if (!w.vision.seesPoint(team, r.x, r.y)) continue;

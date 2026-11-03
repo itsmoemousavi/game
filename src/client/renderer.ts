@@ -610,6 +610,19 @@ export class Renderer {
 
   protected drawRunes(w: World, team: Team) {
     const ctx = this.ctx;
+    // Couriers: a small brown body with saddlebags in the team colour (yours always, enemies' in vision).
+    for (const hu of w.heroes) {
+      const c = hu.hero!.courier;
+      if (hu.team !== team && !w.vision.seesPoint(team, c.x, c.y)) continue;
+      ctx.fillStyle = '#7a6248';
+      ctx.beginPath();
+      ctx.ellipse(c.x, c.y, 0.75, 0.5, c.facing, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = TEAM_COLORS[hu.team];
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, 0.32, 0, Math.PI * 2);
+      ctx.fill();
+    }
     for (const r of w.runes) {
       if (!w.vision.seesPoint(team, r.x, r.y)) continue;
       const info = RUNE_INFO[r.kind];

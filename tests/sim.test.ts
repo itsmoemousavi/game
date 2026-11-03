@@ -56,7 +56,10 @@ describe('simulation', () => {
     run(w, 180);
     for (const h of w.heroes) {
       // Bots spend gold, so count what they own too.
-      const owned = h.hero!.items.reduce((sum, it) => sum + (it ? ITEMS[it.id].cost * it.count : 0), 0) + h.hero!.tpCount * 50;
+      const owned =
+        h.hero!.items.reduce((sum, it) => sum + (it ? ITEMS[it.id].cost * it.count : 0), 0) +
+        h.hero!.tpCount * 50 +
+        h.hero!.courier.bag.reduce((sum, it) => sum + (it ? it.paid : 0), 0); // still on the courier
       expect(h.hero!.gold + owned).toBeGreaterThan(600);
       expect(Number.isFinite(h.x) && Number.isFinite(h.y)).toBe(true);
     }
