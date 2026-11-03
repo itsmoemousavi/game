@@ -375,6 +375,11 @@ export function createMap(): GameMap {
     }
     const t1 = sideOf(path, river * (lane === 'top' ? T1_HARD_LANE_FRACTION : lane === 'bot' ? T1_EASY_LANE_FRACTION : T1_FRACTION));
     const t2 = sideOf(path, river * (lane === 'top' ? T2_HARD_LANE_FRACTION : lane === 'bot' ? T2_EASY_LANE_FRACTION : T2_FRACTION));
+    // The easy lane's tier-1 stands on the outer side of the road (toward the map edge).
+    if (lane === 'bot') {
+      t1.px = -t1.px;
+      t1.py = -t1.py;
+    }
     const t1Pos = { x: t1.at.x + t1.px * TOWER_SIDE_OFFSET, y: t1.at.y + t1.py * TOWER_SIDE_OFFSET };
     const t2Pos = { x: t2.at.x + t2.px * TOWER_SIDE_OFFSET, y: t2.at.y + t2.py * TOWER_SIDE_OFFSET };
     // Gate: the tier-3 tower stands out front, the two barracks behind it on either side.

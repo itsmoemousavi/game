@@ -83,7 +83,8 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
 - Map look (2026-11-03): winding river is low ground (level 0) behind stone curbs (`map.cliff`: block walking, not sight),
   with slopes at lanes (no bridges), around runes, at the Warden's house and where trails meet it; normal speed in water.
   Only mid crosses water: the river ENDS at each side lane's inner edge with a slope (side lanes = solid ground, high
-  ground over the river). Towers sit 3 m off lane centre with a lane bulge; hard-lane T1 near the corner + trail behind it.
+  ground over the river). Towers sit 3 m off lane centre (inner side) with a lane bulge; hard-lane T1 near the corner + trail
+  behind it; easy-lane T1 (blue bottom, red top) on the OUTER side of the road.
   Trees are individual (`map.trees`): thickets, open woods with walkable gaps, glades; solid forest outside the side
   lanes and around bases. Painted ground in `src/client/map-art.ts`.
 - Item names must be our own (renamed 2026-11-03: Watcher Totem, Seer Totem, Herbal Poultice, Mystic Treads;
