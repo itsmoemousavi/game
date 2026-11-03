@@ -126,7 +126,7 @@ function riverAt(t: number): Vec2 {
   return { x: c + c * t + o * k, y: c + c * t - o * k };
 }
 
-const LANE_WIDTH = 13;
+export const LANE_WIDTH = 13;
 const JUNGLE_WIDTH = 10;
 
 const LANES_200: Record<LaneId, Vec2[]> = {

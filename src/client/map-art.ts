@@ -1,4 +1,4 @@
-import { GameMap, LANE_IDS, Vec2 } from '../sim';
+import { GameMap, LANE_IDS, LANE_WIDTH, Vec2 } from '../sim';
 
 /**
  * The painted ground of the map, baked once into a canvas: grass with patches of moss and dry
@@ -34,7 +34,7 @@ export function bakeMap(map: GameMap): HTMLCanvasElement {
   const W = map.size * px;
   const c = document.createElement('canvas');
   c.width = c.height = W;
-  const g = c.getContext('2d')!;
+  let g = c.getContext('2d')!;
   g.lineCap = 'round';
   g.lineJoin = 'round';
   const path = (pts: Vec2[]) => {
@@ -125,7 +125,15 @@ export function bakeMap(map: GameMap): HTMLCanvasElement {
   g.setLineDash([]);
 
   // 5. River: muddy banks, then shallows, then deep water down the middle, with ripples.
+  // Painted on its own layer, then wiped off the side lanes: the river ends at each side lane's
+  // edge (the lane is dry high ground), so no water colour may spill onto the road.
   const rw = map.riverWidth;
+  const main = g;
+  const layer = document.createElement('canvas');
+  layer.width = layer.height = W;
+  g = layer.getContext('2d')!;
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
   g.strokeStyle = '#4a3f2b';
   g.lineWidth = (rw + 4) * px;
   path(map.riverPath);
@@ -152,6 +160,19 @@ export function bakeMap(map: GameMap): HTMLCanvasElement {
     g.lineTo((a.x + (b.x - a.x) * 0.6 + nx * off) * px, (a.y + (b.y - a.y) * 0.6 + ny * off) * px);
     g.stroke();
   }
+  const dryLanes = () => {
+    g.globalCompositeOperation = 'destination-out';
+    g.strokeStyle = '#000';
+    g.lineWidth = LANE_WIDTH * px;
+    for (const id of ['top', 'bot'] as const) {
+      path(map.lanes[id]);
+      g.stroke();
+    }
+    g.globalCompositeOperation = 'source-over';
+  };
+  dryLanes();
+  main.drawImage(layer, 0, 0);
+  g = main;
 
   // 5b. Slopes and curbs. Where the bank is a slope (river cells reaching the bank), sandy
   // gravel runs down to the water; where it's a curb, a band of grey stones.
@@ -192,10 +213,15 @@ export function bakeMap(map: GameMap): HTMLCanvasElement {
       path(r);
       g.stroke();
     }
+    g = layer.getContext('2d')!;
+    g.clearRect(0, 0, W, W);
     g.strokeStyle = 'rgba(40,80,92,0.35)';
     g.lineWidth = rw * 0.5 * px;
     path(map.riverPath);
     g.stroke();
+    dryLanes();
+    main.drawImage(layer, 0, 0);
+    g = main;
   }
 
   // 6. Bridges (also built in 3D): planks across the river on stone footings.
