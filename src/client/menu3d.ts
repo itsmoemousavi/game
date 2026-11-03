@@ -109,13 +109,44 @@ export class MenuShowcase {
     return out;
   }
 
+  /** Tall card pictures (chest up, 3:4) for the draft screen, as image URLs. */
+  cards(): Record<HeroId, string> {
+    const out = {} as Record<HeroId, string>;
+    const w = 210;
+    const h = 280;
+    const prevStage = this.stage.visible;
+    const cam = new THREE.PerspectiveCamera(28, w / h, 0.1, 50);
+    this.gl.setSize(w, h, false);
+    this.stage.visible = false;
+    for (const id of HERO_IDS) {
+      const m = model(`hero:${id}`);
+      m.rotation.y = 0.45;
+      this.scene.add(m);
+      m.updateMatrixWorld(true);
+      const torso = m.getObjectByName('torso');
+      const chest = torso ? torso.getWorldPosition(new THREE.Vector3()).y + 0.35 : 1.4;
+      cam.position.set(1.1, chest + 0.45, 4.6);
+      cam.lookAt(0, chest + 0.05, 0);
+      this.rim.color.set(HEROES[id].color);
+      this.gl.setClearColor(0x000000, 0);
+      this.gl.render(this.scene, cam);
+      out[id] = this.canvas.toDataURL('image/png');
+      this.scene.remove(m);
+    }
+    this.stage.visible = prevStage;
+    this.resize();
+    return out;
+  }
+
   resize() {
     const w = this.canvas.clientWidth || 300;
     const h = this.canvas.clientHeight || 300;
     this.gl.setSize(w, h, false);
     this.camera.aspect = w / h;
-    // Fit the whole hero (about 2.6 m with props) with some room around it.
-    this.camera.position.set(2.6, 2.4, 7.6);
+    // Fit the whole hero (about 2.6 m with props) with some room around it; on a narrow
+    // canvas (the draft panel) step back so the width still fits.
+    const back = Math.max(1, 0.8 / this.camera.aspect);
+    this.camera.position.set(2.6 * back, 1.15 + 1.25 * back, 7.6 * back);
     this.camera.lookAt(0, 1.15, 0);
     this.camera.updateProjectionMatrix();
   }

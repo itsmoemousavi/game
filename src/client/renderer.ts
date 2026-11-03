@@ -89,8 +89,9 @@ export class Renderer {
     for (const e of events) {
       if (e.type === 'deny') {
         const u = w.unit(e.unitId);
-        if (u) this.floaters.push({ x: u.x, y: u.y - 1, t: 1, text: '!', color: '#ffffff' });
-        if (u && e.killerId === meId) this.floaters.push({ x: u.x, y: u.y - 2.2, t: 1.2, text: 'Denied!', color: '#e5e7eb' });
+        // "!" over every denied creep; a big "DENIED" when you did it, so it reads at a glance.
+        if (u) this.floaters.push({ x: u.x, y: u.y - 1, t: 1.1, text: '!', color: '#7dd3fc', big: true });
+        if (u && e.killerId === meId) this.floaters.push({ x: u.x, y: u.y - 2.4, t: 1.4, text: 'DENIED', color: '#7dd3fc', big: true });
         continue;
       }
       if (e.type === 'gold' && e.unitId === meId && e.amount >= 20) {
@@ -851,6 +852,21 @@ export class Renderer {
         ctx.fillStyle = 'rgba(80,255,120,0.25)';
         ctx.beginPath();
         ctx.arc(p.x, p.y, u.radius + 0.5 + Math.sin(time * 6) * 0.15, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (b.key === 'stoneskin') {
+        ctx.strokeStyle = 'rgba(168,162,158,0.9)';
+        ctx.lineWidth = 0.35;
+        ctx.setLineDash([0.5, 0.25]);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, u.radius + 0.45, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (b.damageMult) {
+        ctx.fillStyle = `rgba(255,77,77,${0.22 + Math.sin(time * 8) * 0.08})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, u.radius + 0.7, 0, Math.PI * 2);
         ctx.fill();
       }
       if (b.moveSpeedPct) {

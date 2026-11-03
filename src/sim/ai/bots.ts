@@ -203,7 +203,10 @@ export function botThink(w: World, me: Unit) {
   if (plan.mode === 'farm') {
     const seen = w.heroes.filter((e) => e.alive && e.team !== me.team && w.canSee(me.team, e) && dist(e.x, e.y, me.x, me.y) < 22).length;
     const withMe = w.heroes.filter((a) => a.alive && a.team === me.team && dist(a.x, a.y, me.x, me.y) < 15).length;
-    if (seen > withMe || (seen >= 1 && hpRatio < 0.55)) {
+    // Once outnumbered, keep waiting for a few seconds: walking back changes who is near us,
+    // and re-deciding every think made bots dither on the spot.
+    if (seen > withMe || (seen >= 1 && hpRatio < 0.55)) h.bot.holdBackUntil = w.time + 2;
+    if (w.time < (h.bot.holdBackUntil ?? 0)) {
       let tower = -1;
       for (const t of w.units) {
         if (t.structure && t.alive && t.team === me.team && t.structure.lane === lane && t.attackInterval > 0) {

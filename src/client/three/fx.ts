@@ -442,6 +442,105 @@ export class Fx3D {
       };
     });
   }
+  /**
+   * Effect around a hero while a buff lasts (item actives, salve, runes, level-up), kept while
+   * called each frame. Styles:
+   *  heal    pulsing ground ring + motes rising (salve: green, regen rune: green/blue)
+   *  bubble  a see-through sphere with a slowly turning lattice (spell immunity)
+   *  shell   a stony half-dome of plates around the hero (Stoneskin)
+   *  glow    a bright glow and ring at the feet (double damage, haste)
+   *  pillar  a rising column of light with rings (level-up)
+   */
+  heroAura(id: string, x: number, y: number, style: 'heal' | 'bubble' | 'shell' | 'glow' | 'pillar', color: number, strength: number, size = 1) {
+    this.keep(id, x, y, strength, () => {
+      const o = new THREE.Group();
+      const add = THREE.AdditiveBlending;
+      const parts: { m: THREE.Mesh | THREE.Sprite; base: number }[] = [];
+      const mat = (opacity: number, additive = true, wire = false) =>
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: additive ? add : THREE.NormalBlending, depthWrite: false, side: THREE.DoubleSide, wireframe: wire });
+      const ring = new THREE.Mesh(this.ringGeo, mat(0.75));
+      ring.position.y = 0.12;
+      ring.scale.setScalar(1.4 * size);
+      o.add(ring);
+      parts.push({ m: ring, base: 0.75 });
+      let spin: THREE.Object3D | null = null;
+      let rise: THREE.Mesh[] = [];
+      if (style === 'bubble') {
+        const ball = new THREE.Mesh(this.ballGeo, mat(0.2));
+        ball.scale.setScalar(1.7 * size);
+        ball.position.y = 1.3;
+        const lat = new THREE.Mesh(this.latticeGeo, mat(0.3, true, true));
+        lat.scale.setScalar(1.75 * size);
+        lat.position.y = 1.3;
+        o.add(ball, lat);
+        parts.push({ m: ball, base: 0.2 }, { m: lat, base: 0.45 });
+        spin = lat;
+      } else if (style === 'shell') {
+        // Solid rock chunks circling the hero, over a faint dusty dome.
+        const dome = new THREE.Mesh(this.domeGeo, mat(0.18, false));
+        dome.scale.set(1.5 * size, 2.2 * size, 1.5 * size);
+        o.add(dome);
+        parts.push({ m: dome, base: 0.18 });
+        const ringOfRocks = new THREE.Group();
+        const rockMat = new THREE.MeshStandardMaterial({ color: 0x4e3b2c, roughness: 0.9, flatShading: true, transparent: true, opacity: 1, emissive: 0x2a1a0c });
+        for (let i = 0; i < 8; i++) {
+          const r = new THREE.Mesh(this.chunkGeo, rockMat);
+          const a = (i / 8) * Math.PI * 2;
+          r.position.set(Math.cos(a) * 1.35 * size, (0.45 + (i % 3) * 0.5) * size, Math.sin(a) * 1.35 * size);
+          r.scale.setScalar((0.42 + (i % 2) * 0.16) * size);
+          r.rotation.set(i, i * 2, i * 3);
+          ringOfRocks.add(r);
+        }
+        o.add(ringOfRocks);
+        parts.push({ m: ringOfRocks.children[0] as THREE.Mesh, base: 1 }); // shared material: fades all rocks
+        spin = ringOfRocks;
+      } else if (style === 'pillar') {
+        const col = new THREE.Mesh(this.columnGeo, mat(0.35));
+        col.scale.set(1.2 * size, 7, 1.2 * size);
+        o.add(col);
+        parts.push({ m: col, base: 0.35 });
+        rise = [0, 1, 2].map(() => {
+          const r = new THREE.Mesh(this.ringGeo, mat(0.8));
+          o.add(r);
+          return r;
+        });
+      }
+      const glow = this.sprite(color, style === 'glow' ? 0.55 : 0.3, true);
+      glow.position.y = style === 'glow' ? 0.8 : 1;
+      glow.scale.setScalar((style === 'glow' ? 3.6 : 2.8) * size);
+      o.add(glow);
+      parts.push({ m: glow, base: style === 'glow' ? 0.55 : 0.3 });
+      let moteT = 0;
+      return {
+        o,
+        update: (dt, time, s) => {
+          const pulse = 0.75 + Math.sin(time * 6) * 0.25;
+          for (const p of parts) (p.m.material as THREE.Material & { opacity: number }).opacity = p.base * s * (p.m === ring || p.m === glow ? pulse : 1);
+          ring.scale.setScalar(size * (style === 'heal' ? 1.2 + ((time * 0.8) % 1) * 0.5 : 1.4));
+          if (spin) spin.rotation.y = time * 0.7;
+          rise.forEach((r, i) => {
+            const k = (time * 0.9 + i / 3) % 1;
+            r.position.y = k * 6;
+            r.scale.setScalar(size * (1.6 - k * 0.8));
+            (r.material as THREE.MeshBasicMaterial).opacity = 0.8 * s * (1 - k);
+          });
+          moteT += dt;
+          const every = style === 'pillar' ? 0.04 : style === 'heal' ? 0.1 : 0.16;
+          if (moteT > every && s > 0.3) {
+            moteT = 0;
+            const a = Math.random() * Math.PI * 2;
+            const rr = (style === 'heal' ? 0.4 + Math.random() * 0.9 : 1.3) * size;
+            const p = o.position.clone().add(new THREE.Vector3(Math.cos(a) * rr, 0.3 + Math.random() * (style === 'bubble' ? 2.4 : 0.8), Math.sin(a) * rr));
+            const up = style === 'shell' ? 0 : style === 'pillar' ? 5 : 1.8;
+            this.particle(p, color, style === 'pillar' ? 0.35 : 0.26, 0.9, { vel: new THREE.Vector3(0, up, 0), opacity: 0.9 });
+          }
+        },
+      };
+    });
+  }
+  private ballGeo = new THREE.SphereGeometry(1, 24, 16);
+  private chunkGeo = new THREE.DodecahedronGeometry(1, 0);
+  private columnGeo = new THREE.CylinderGeometry(1, 1, 1, 20, 1, true).translate(0, 0.5, 0);
   private domeGeo = new THREE.SphereGeometry(1, 28, 12, 0, Math.PI * 2, 0, Math.PI / 2);
   private latticeGeo = new THREE.IcosahedronGeometry(1, 2);
 

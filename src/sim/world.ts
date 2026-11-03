@@ -257,7 +257,7 @@ export interface HeroState {
   buybackCooldown: number;
   /** Set when a revive charm saves the hero: respawn here instead of the fountain. */
   reviveAt: Vec2 | null;
-  bot: { thinkTimer: number; retreating: boolean; buildIndex: number; difficulty: BotDifficulty };
+  bot: { thinkTimer: number; retreating: boolean; buildIndex: number; difficulty: BotDifficulty; holdBackUntil?: number };
 }
 
 export interface NeutralState {
@@ -1013,7 +1013,10 @@ export class World {
       if (u.hero) this.updateHeroUpkeep(u);
       if (u.alive) this.updateStatus(u);
     }
-    for (const u of this.units) {
+    // Units act one after another, and the list starts with Azure's. Going through it backwards
+    // every other tick means neither team always gets the first hit (or last hit) in a close call.
+    const order = this.tick % 2 === 0 ? this.units : [...this.units].reverse();
+    for (const u of order) {
       if (!u.alive) {
         if (u.hero?.controller === 'bot' && this.tick % 15 === 0) botWhileDead(this, u);
         continue;

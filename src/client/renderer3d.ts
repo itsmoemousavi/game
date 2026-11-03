@@ -742,7 +742,11 @@ export class Renderer3D extends Renderer {
     /** Syl's Execution this batch (its explosion event follows the cast). */
     let exec = -1;
     for (const e of events) {
-      if (e.type === 'glyph') {
+      if (e.type === 'levelUp' && e.unitId === meId) {
+        // Only you see your own level-up glow (bigger when an ultimate rank unlocks).
+        this.levelUpAt = this.clock;
+        this.levelUpBig = e.level === 6 || e.level === 10 || e.level === 14;
+      } else if (e.type === 'glyph') {
         for (const u of w.units) {
           if (!u.alive || !u.structure || u.team !== e.team || u.structure.glyph <= 0) continue;
           this.fx3.flash(u.x, u.y, 4, u.radius * 4, 0xffd36a, 0.5);
@@ -801,6 +805,13 @@ export class Renderer3D extends Renderer {
         if (e.kind === 'manaBurst') {
           this.fx3.shockwave(u.x, u.y, 10, 0x60a5fa, 0.5, 0.8);
           this.fx3.sparks(u.x, u.y, 1, 14, 0xbfdbfe, 4);
+          // Every ally who got mana sparkles blue.
+          for (const a of w.heroes) {
+            if (a.alive && a.team === u.team && a.id !== u.id && Math.hypot(a.x - u.x, a.y - u.y) <= 10) {
+              this.fx3.sparks(a.x, a.y, 1.6, 10, 0x93c5fd, 3);
+              this.fx3.flash(a.x, a.y, 1.4, 2.6, 0x60a5fa, 0.4);
+            }
+          }
         } else if (e.kind === 'frostNova') {
           this.fx3.shockwave(u.x, u.y, 6.5, 0xbae6fd, 0.4, 0.95);
           this.fx3.shockwave(u.x, u.y, 5, 0xffffff, 0.3, 0.6);
@@ -813,6 +824,14 @@ export class Renderer3D extends Renderer {
       } else if (e.type === 'blink') {
         const u = w.unit(e.unitId);
         if (u && w.canSee(this.viewTeam, u)) heroBlink(c, u, e.fromX, e.fromY);
+      } else if (e.type === 'revive') {
+        // Warden's Charm: a golden burst where the hero gets back up.
+        const u = w.unit(e.unitId);
+        if (u && w.canSee(this.viewTeam, u)) {
+          this.fx3.flash(u.x, u.y, 1.5, 8, 0xffd36a, 0.6);
+          this.fx3.shockwave(u.x, u.y, 5, 0xffd36a, 0.6);
+          this.fx3.sparks(u.x, u.y, 1, 24, 0xfff1b8, 7);
+        }
       } else if (e.type === 'teleport') {
         const u = w.unit(e.unitId);
         const from = this.tpFrom.get(e.unitId);
@@ -838,6 +857,34 @@ export class Renderer3D extends Renderer {
         const mk = live.joints.rig && !u.hero ? monsterKind(live.key) : null;
         this.corpses.push({ o: live.o, t: 0, joints: live.joints, kind: live.joints.rig && u.hero ? u.hero.defId : undefined, mkind: mk ?? undefined, x: u.x, y: u.y });
       }
+    }
+  }
+
+  private levelUpAt = -1e9;
+  private levelUpBig = false;
+
+  /**
+   * Lasting effects around a hero while an item or power-up works on it, so everyone can see
+   * them: salve (green healing ring), spell immunity (golden bubble), Stoneskin (stone shell),
+   * frost slow, and the runes. Plus your own level-up pillar (only on your screen).
+   */
+  private heroAuras(u: Unit, x: number, y: number) {
+    const fade = (t: number) => Math.min(1, t / 0.35);
+    for (const b of u.buffs) {
+      const id = `aura:${u.id}:${b.key}`;
+      if (b.key === 'salve') this.fx3.heroAura(id, x, y, 'heal', 0x4ade80, fade(b.t));
+      else if (b.key === 'immunity') this.fx3.heroAura(id, x, y, 'bubble', 0xfbbf24, fade(b.t));
+      else if (b.key === 'stoneskin') this.fx3.heroAura(id, x, y, 'shell', 0x8b7d6b, fade(b.t));
+      else if (b.key === 'slow:frostHorn') this.fx3.heroAura(id, x, y, 'glow', 0x93c5fd, fade(b.t) * 0.7, 0.8);
+      else if (b.key === 'rune') {
+        if (b.damageMult) this.fx3.heroAura(id + 'dd', x, y, 'glow', 0xff4d4d, fade(b.t));
+        else if (b.healPerSec) this.fx3.heroAura(id + 'regen', x, y, 'heal', 0x5eead4, fade(b.t));
+        else if (b.moveSpeedPct) this.fx3.heroAura(id + 'haste', x, y, 'glow', 0xfff1a8, fade(b.t) * 0.8, 0.9);
+      }
+    }
+    if (u.id === this.meId) {
+      const k = (this.clock - this.levelUpAt) / (this.levelUpBig ? 2.6 : 2);
+      if (k >= 0 && k < 1) this.fx3.heroAura('levelup', x, y, 'pillar', 0xffd36a, Math.min(1, (1 - k) * 3), this.levelUpBig ? 1.5 : 1);
     }
   }
 
@@ -951,6 +998,7 @@ export class Renderer3D extends Renderer {
         if (u.kind === 'hero') {
           setOpacity(e.o, isInvisible(u) ? 0.45 : 1);
           buffFx(this.actx, e.o, u, this.anim(u.id));
+          this.heroAuras(u, x, y);
         }
       } else if (u.ward) {
         this.place(`ward:${u.ward.kind}`, id, u.x, u.y);

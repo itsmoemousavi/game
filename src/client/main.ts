@@ -2,12 +2,14 @@
 import './style.css';
 import { BotDifficulty, DRAFT_TIME, DT, Draft, DraftStep, HeroId, LANE_IDS, LaneId, PlayerSlot, Team, WARMUP_SECONDS, World, XP_TABLE } from '../sim';
 import { DraftUi } from './draft-ui';
-import { Hud, heroPortraits } from './hud';
+import { Hud, heroCards, heroPortraits } from './hud';
 import { Input } from './input';
 import { ItemsUi } from './items-ui';
 import { Sfx, SoundName } from './audio';
 import { Tutorial, spawnDummy } from './tutorial';
 import { playEvents } from './sound-events';
+import { ScreenFx } from './screen-fx';
+import { EndScreen } from './end-screen';
 import { GameEvent, HEROES as HERO_DEFS, PingKind, RUNE_INFO, RuneKind, TEAM_NAMES } from '../sim';
 import { PING_STYLE } from './renderer';
 import { Renderer } from './renderer';
@@ -19,6 +21,7 @@ const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as
 
 const canvas = $<HTMLCanvasElement>('#game');
 const canvas3d = $<HTMLCanvasElement>('#game3d');
+const screenFx = new ScreenFx(canvas); // after both canvases (#game3d comes first in the page)
 declare const __BUILD__: string;
 const app = $<HTMLElement>('#app');
 const select = $<HTMLElement>('#select');
@@ -45,6 +48,7 @@ try {
 try {
   const showcase = new MenuShowcase($<HTMLCanvasElement>('#menu3d'));
   Object.assign(heroPortraits, showcase.portraits());
+  Object.assign(heroCards, showcase.cards());
   showcase.dispose();
 } catch (err) {
   console.warn('Hero headshots unavailable', err);
@@ -120,11 +124,19 @@ function buildSlots(d: Draft): PlayerSlot[] {
   return slots;
 }
 
-const hud = new Hud(app, () => {
-  app.classList.add('hidden');
-  select.classList.remove('hidden');
-  world = null;
-});
+const hud = new Hud(app);
+/** The last match's mode and line-ups, for "play again with the same heroes". */
+let lastMatch: { m: Mode; d: Draft } | null = null;
+const endScreen = new EndScreen(
+  app,
+  () => lastMatch && startMatch(lastMatch.m, lastMatch.d),
+  () => {
+    app.classList.add('hidden');
+    select.classList.remove('hidden');
+    world = null;
+  },
+);
+hud.onGameOver = (w) => endScreen.show(w, myTeam, myHeroId);
 
 const sfx = new Sfx();
 const itemsUi = new ItemsUi(
@@ -397,10 +409,6 @@ function announce(w: World, events: GameEvent[]) {
       if (hud.announce(w, e, myTeam)) sfx.play(w.unit(e.unitId)?.team === myTeam ? 'victory' : 'defeat', 0.5);
       continue;
     }
-    if (e.type === 'gameOver') {
-      hud.showEndStats(w, myTeam, myHeroId);
-      continue;
-    }
     if (e.type === 'bossKilled') {
       // Told to everyone, enemies included: who landed the killing blow, and for which team.
       const killer = e.killerId !== null ? w.unit(e.killerId) : undefined;
@@ -465,6 +473,9 @@ practicePanel.querySelectorAll<HTMLElement>('[data-cheat]').forEach((b) =>
 );
 
 function startMatch(m: Mode, d: Draft) {
+  screenFx.clear();
+  endScreen.reset();
+  lastMatch = { m, d };
   select.classList.add('hidden');
   app.classList.remove('hidden');
   const slots = m === 'bots' ? buildSlots(d) : [{ team: myTeam, heroId: d.picks[myTeam][0], controller: 'human' as const, lane: pickedLane }];
@@ -537,6 +548,7 @@ function frame(now: number) {
       tutorial?.update(world, world.unit(myHeroId)!);
       playEvents(sfx, world, world.events, myHeroId, myTeam, { x: renderer.camX, y: renderer.camY });
       announce(world, world.events);
+      screenFx.onEvents(world, world.events, myHeroId);
       for (const e of world.events) {
         if (e.type === 'attack' && e.targetId === myHeroId && world.unit(e.sourceId)?.kind === 'hero') buzz(20);
         else if (e.type === 'damage' && e.targetId === myHeroId) buzz(35);
@@ -564,6 +576,8 @@ function frame(now: number) {
       renderer.camY = prev.camY;
       input.renderer = renderer;
     }
+    screenFx.frame(me);
+    endScreen.record(world);
     hud.update(world, me, myTeam);
     if (!statsPanel.classList.contains('hidden')) hud.updateStats(world, me);
     if (!scorePanel.classList.contains('hidden')) hud.updateScoreboard(world, myTeam, myHeroId);
@@ -574,4 +588,4 @@ function frame(now: number) {
 requestAnimationFrame(frame);
 
 // Debug handle for console / automated tests.
-(window as unknown as { game: unknown }).game = { get world() { return world; }, get heroId() { return myHeroId; }, get renderer() { return renderer; } };
+(window as unknown as { game: unknown }).game = { get world() { return world; }, get heroId() { return myHeroId; }, get renderer() { return renderer; }, endScreen };

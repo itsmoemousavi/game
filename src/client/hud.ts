@@ -31,6 +31,8 @@ const fmtTime = (t: number) => {
 
 /** Hero headshots (image URLs), filled in by main.ts once the 3D portraits are rendered. */
 export const heroPortraits: Partial<Record<HeroId, string>> = {};
+/** Tall chest-up pictures for the draft cards. */
+export const heroCards: Partial<Record<HeroId, string>> = {};
 
 /** DOM overlay: scores, timer, hero status, ability buttons, respawn + game-over screens. */
 export class Hud {
@@ -40,10 +42,7 @@ export class Hud {
   private buttons: HTMLElement[] = [];
   private learnButtons: HTMLElement[] = [];
 
-  constructor(
-    root: HTMLElement,
-    private onRestart: () => void,
-  ) {
+  constructor(root: HTMLElement) {
     for (const id of [
       'score-0',
       'score-1',
@@ -59,8 +58,6 @@ export class Hud {
       'portrait',
       'respawn',
       'respawn-time',
-      'gameover',
-      'gameover-title',
       'daynight',
       'btn-buyback',
       'buyback-cost',
@@ -76,7 +73,6 @@ export class Hud {
       this.buttons.push(root.querySelector(`[data-slot="${i}"]`)!);
       this.learnButtons.push(root.querySelector(`[data-learn="${i}"]`)!);
     }
-    root.querySelector('#btn-restart')!.addEventListener('click', () => this.onRestart());
   }
 
   setHero(me: Unit) {
@@ -94,7 +90,6 @@ export class Hud {
       pips.innerHTML = '<i></i>'.repeat(a.manaCost.length);
     });
     this.abilityKeys = ['', '', ''];
-    this.el.gameover.style.display = 'none';
     this.endShown = false;
   }
 
@@ -410,29 +405,10 @@ export class Hud {
   }
 
   private endShown = false;
+  /** The match just ended (shown once per match). */
+  onGameOver: (w: World) => void = () => {};
 
   /** End-of-match table: everyone's numbers, with the MVP highlighted. */
-  showEndStats(w: World, myTeam: Team, meId: number) {
-    if (this.endShown) return;
-    this.endShown = true;
-    const score = (h: NonNullable<Unit['hero']>) =>
-      h.kills * 3 + h.assists * 1.5 - h.deaths + h.stats.heroDamage / 400 + h.stats.buildingDamage / 600 + h.stats.healing / 300 + h.lastHits / 10;
-    const heroes = [...w.heroes].sort((a, b) => (a.team === b.team ? score(b.hero!) - score(a.hero!) : a.team === myTeam ? -1 : 1));
-    const mvp = [...w.heroes].sort((a, b) => score(b.hero!) - score(a.hero!))[0];
-    const n = (v: number) => Math.round(v).toLocaleString();
-    let html =
-      '<table><tr><th>Hero</th><th>Lv</th><th>K / D / A</th><th>LH / DN</th><th>Gold</th><th>Hero dmg</th><th>Building dmg</th><th>Healing</th><th>Items</th></tr>';
-    for (const u of heroes) {
-      const h = u.hero!;
-      const def = HEROES[h.defId];
-      const items = h.items.map((it) => (it ? `<i style="display:inline-block;width:16px;height:16px;vertical-align:middle">${itemIcon(it.id)}</i>` : '')).join('');
-      html += `<tr class="${u.id === meId ? 'me' : ''}"><td class="t${u.team}">${u === mvp ? '<span class="mvp">★ MVP</span> ' : ''}${def.name}${h.controller === 'bot' ? ' <small>(bot)</small>' : ''}</td>
-        <td>${h.level}</td><td>${h.kills} / ${h.deaths} / ${h.assists}</td><td>${h.lastHits} / ${h.denies}</td><td>${n(h.goldEarned)}</td>
-        <td>${n(h.stats.heroDamage)}</td><td>${n(h.stats.buildingDamage)}</td><td>${n(h.stats.healing)}</td><td>${items}</td></tr>`;
-    }
-    this.el.toasts.ownerDocument.getElementById('endstats')!.innerHTML = html + '</table>';
-  }
-
   /** Show how much gold this death cost, in the respawn banner. */
   goldLost(amount: number) {
     const el = this.el['killed-by'];
@@ -498,16 +474,9 @@ export class Hud {
     this.el.daynight.title = night ? 'Night: everyone sees less' : 'Day';
     this.el['respawn-time'].textContent = String(Math.max(0, Math.ceil(h.respawnTimer)));
 
-    if (w.winner !== null) {
-      this.showEndStats(w, myTeam, me.id);
-      this.el.gameover.style.display = 'flex';
-      const won = w.winner === myTeam;
-      this.el['gameover-title'].textContent = won ? 'Victory' : 'Defeat';
-      this.el['gameover-title'].className = won ? 'win' : 'lose';
-      this.el.gameover.querySelector('.sub')!.textContent =
-        w.surrendered !== null
-          ? `${TEAM_NAMES[w.surrendered]} surrendered at ${fmtTime(w.time)}`
-          : `${TEAM_NAMES[w.winner]} destroyed the enemy Shrine at ${fmtTime(w.time)}`;
+    if (w.winner !== null && !this.endShown) {
+      this.endShown = true;
+      this.onGameOver(w);
     }
   }
 }

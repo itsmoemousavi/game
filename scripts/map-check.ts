@@ -1,6 +1,6 @@
 /**
  * Balance + map check: bots-only matches with random 3v3 lineups. Prints one JSON line per match
- * (winner, length, heroes, when each building fell, places where heroes got stuck).
+ * (each lineup twice, sides swapped; winner, length, heroes, when each building fell, places where heroes got stuck).
  *   npx vite-node scripts/map-check.ts [firstSeed] [matches] > out.jsonl
  * Summarise many files with: npx vite-node scripts/map-check-report.ts out*.jsonl
  */
@@ -9,10 +9,17 @@ import { HERO_IDS, HeroId, LANE_IDS, PlayerSlot, Rng, Team, World } from '../src
 const first = Number(process.argv[2] ?? 100);
 const count = Number(process.argv[3] ?? 6);
 
-for (let seed = first; seed < first + count; seed++) {
+// Each lineup is played twice, the second time with the teams swapped (odd "seeds"), so side
+// differences can't come from which heroes happened to land where.
+for (let game = first * 2; game < (first + count) * 2; game++) {
+  const seed = game >> 1;
   const rng = new Rng(seed * 7919);
-  const pool = [...HERO_IDS].sort(() => rng.next() - 0.5);
-  const teams: HeroId[][] = [pool.slice(0, 3), pool.slice(3, 6)];
+  const pool = [...HERO_IDS];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rng.next() * (i + 1)); // fair shuffle
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const teams: HeroId[][] = game % 2 === 0 ? [pool.slice(0, 3), pool.slice(3, 6)] : [pool.slice(3, 6), pool.slice(0, 3)];
   const slots: PlayerSlot[] = [];
   for (const team of [0, 1] as Team[]) teams[team].forEach((heroId, i) => slots.push({ team, heroId, controller: 'bot', lane: LANE_IDS[i] }));
   const w = new World({ seed, slots });
@@ -59,6 +66,6 @@ for (let seed = first; seed < first + count; seed++) {
       items: s.items.filter(Boolean).map((it) => it!.id),
     };
   });
-  console.log(JSON.stringify({ seed, winner: w.winner, minutes: +(w.time / 60).toFixed(1), firstBlood, wardenKills, teamKills: w.teamKills, heroes, buildings, stuck }));
+  console.log(JSON.stringify({ seed, swapped: game % 2 === 1, winner: w.winner, minutes: +(w.time / 60).toFixed(1), firstBlood, wardenKills, teamKills: w.teamKills, heroes, buildings, stuck }));
   await new Promise((r) => setTimeout(r, 0));
 }
