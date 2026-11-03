@@ -48,8 +48,16 @@ export interface Character {
 const loaded = new Map<string, { gltf: GLTF; scale: number; offset: THREE.Vector3 }>();
 let loading: Promise<void> | null = null;
 
+/**
+ * Switched off (owner, 2026-11-02): the artist models lacked proper animations (Vexa shooting in
+ * her idle clip, sword skeletons as ranged creeps). The game uses the placeholder models until each
+ * model has a full set of clips (idle, walk, attack, cast, death) on one shared skeleton.
+ */
+export const ARTIST_MODELS_ENABLED = false;
+
 /** Start loading every model (safe to call more than once). Resolves when all have loaded or failed. */
 export function loadAssets(base: string): Promise<void> {
+  if (!ARTIST_MODELS_ENABLED) return (loading ??= Promise.resolve());
   loading ??= Promise.all(
     Object.entries(ASSETS).map(async ([key, def]) => {
       try {
