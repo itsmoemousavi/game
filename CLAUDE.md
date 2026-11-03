@@ -80,6 +80,10 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
   Rejected: cute kits (KayKit, Kenney), Grab3D, Mixamo realistic humans. Models must be free for commercial use
   (CC0 / CC BY, no fan art of other games). Owner's Sketchfab API token is in `~/.sketchfab-token` (never commit it).
 - Warden: walled house on the river (bot/mid side), seen and fought only from inside, slam stun, charm anyone can grab.
+- Map look (2026-11-03): winding river is low ground (level 0) behind stone curbs (`map.cliff`: block walking, not sight),
+  with slopes at lanes (no bridges), around runes, at the Warden's house and where trails meet it; normal speed in water.
+  Trees are individual (`map.trees`): thickets, open woods with walkable gaps, glades; solid forest outside the side
+  lanes and around bases. Painted ground in `src/client/map-art.ts`.
 - Dying costs gold; buyback exists. Android build: not now. App stores: later.
 
 ## Open items / next steps
