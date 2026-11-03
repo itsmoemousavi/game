@@ -479,6 +479,8 @@ svg.icon { display: block; width: 100%; height: 100%; }
 #btn-courier.ready { border-color: #ffd23f !important; animation: pulse 0.9s infinite alternate; }
 #btn-courier.out { border-color: #4ade80 !important; }
 #btn-courier .state { position: absolute; left: 50%; bottom: -1px; transform: translateX(-50%); font-size: 8px; font-weight: 900; letter-spacing: 0.04em; color: #fff; text-shadow: 0 1px 2px #000; white-space: nowrap; z-index: 1; }
+#btn-courier .state { bottom: 0; width: 16px; height: 16px; border-radius: 50%; background: rgba(20,14,30,0.85); box-shadow: 0 0 0 1px rgba(196,181,253,0.7); }
+#btn-courier .state svg { display: block; width: 12px; height: 12px; margin: 2px; fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 #courier-slots { --cs: calc((var(--slot) * 2 + 4px - 6px) / 3); grid-column: 6; grid-row: 1 / span 2; display: flex; flex-direction: column; gap: 3px; margin-left: 2px; padding: 0 3px; border-left: 1px solid rgba(196,181,253,0.35); }
 #itembar #courier-slots .cslot { width: var(--cs); height: var(--cs); border-radius: 5px; border-color: rgba(196,181,253,0.55); background: rgba(40,28,52,0.85); }
 #itembar #courier-slots .cslot.empty { background: rgba(0,0,0,0.4); border-style: dashed; border-color: rgba(196,181,253,0.3); }

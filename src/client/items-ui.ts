@@ -592,8 +592,14 @@ export class ItemsUi {
     b.classList.toggle('empty', blocked === 'empty' && c.mode === 'home');
     b.classList.toggle('ready', blocked === null);
     b.classList.toggle('out', c.mode !== 'home');
-    const label = c.mode === 'deliver' ? 'ON WAY' : c.mode === 'fetch' ? 'TO BASE' : c.mode === 'return' ? 'BACK' : '';
-    b.innerHTML = `<span class="lbl">${itemIcon('courier')}</span>${label ? `<span class="state">${label}</span>` : ''}`;
+    // Coming to the hero = straight arrow; heading back to base (to fetch items or go home) = curved U-turn arrow.
+    const arrow =
+      c.mode === 'deliver'
+        ? '<svg viewBox="0 0 24 24"><path d="M4 12h14M12 5l7 7-7 7"/></svg>'
+        : c.mode === 'fetch' || c.mode === 'return'
+          ? '<svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>'
+          : '';
+    b.innerHTML = `<span class="lbl">${itemIcon('courier')}</span>${arrow ? `<span class="state">${arrow}</span>` : ''}`;
     b.title = `Courier (${flying ? 'flying' : 'walks along the lanes until 6:00'}): tap to send it with its items`;
   }
 
