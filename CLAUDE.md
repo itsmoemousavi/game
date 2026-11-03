@@ -36,6 +36,8 @@ npm run build
 npx tsc --noEmit
 npx vite-node scripts/simulate.ts [seed] [minutes]           # headless all-bot match log
 npx vite-node scripts/hero-winrates.ts [firstSeed] [matches] # random 3v3 bot lineups → win % per hero
+# Animation close-ups (dev only): npm run dev, open /anim-preview.html, then in the console
+#   run('syl', 'attack', 0.1, 'front')  /  run('orin', 'cast', 0.8, 'game', 2)  /  area('maelstrom', 1.5)
 python3 scripts/tune-hero.py 'vexa.baseDamage=35' 'brakk.ironHide.block=[5, 8, 11, 14]'   # edit hero numbers
 ```
 
@@ -51,8 +53,10 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
   `ai/bots.ts` (team plans: farm / push / defend; difficulty easy/normal/hard), `data/*` (all numbers).
 - `src/client/` `main.ts` (menus, settings, loop), `renderer.ts` (2D; in 3D mode it draws only the ground
   layer into a texture), `renderer3d.ts` (Three.js view, animations, overlay bars/text, picking),
-  `three/assets.ts` (artist models from Sketchfab, CC BY 4.0, in `public/models/`, credits in
-  Settings and `public/models/CREDITS.md`; they replace the placeholders once loaded), `three/hero-models.ts` +
+  `three/assets.ts` (artist models from Sketchfab, CC BY 4.0, in `public/models/`; **switched off**:
+  the owner chose our own models), `three/hero-anims.ts` (hand-made hero animations: idle, walk,
+  attacks, every spell, buffs, deaths), `three/spell-fx.ts` (projectile trails, area spells),
+  `three/fx.ts` (dust, sparks, slashes, roots, meteor, whirlpool, camera shake), `three/hero-models.ts` +
   `three/models.ts` (low-poly placeholder models, baked into few meshes with animatable joints; still the fallback), `menu3d.ts` (start screen 3D hero + portraits), `hud.ts`, `input.ts`, `items-ui.ts`
   (shop), `audio.ts` (synthesized sounds), `tutorial.ts`.
 - `tests/` vitest. Positions in tests are on the 300 m map. Long full-match tests must `await` a

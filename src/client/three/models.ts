@@ -63,7 +63,17 @@ export function bake(top: THREE.Object3D): THREE.Group {
   });
   // Rebuild the joint tree with the same rest pose; each joint holds its merged meshes.
   const out = new THREE.Group();
-  const made = new Map<THREE.Object3D, THREE.Object3D>([[top, out]]);
+  // When the model's top is the body joint itself (humanoids), keep it as a named child so the
+  // renderer can move the body (bob, leap, fall) without touching the unit's own position.
+  let base: THREE.Object3D = out;
+  if (rig && rig === top) {
+    base = new THREE.Group();
+    base.name = 'rig';
+    base.userData.rest = base.quaternion.toArray();
+    base.userData.restPos = base.position.toArray();
+    out.add(base);
+  }
+  const made = new Map<THREE.Object3D, THREE.Object3D>([[top, base]]);
   const nodeFor = (j: THREE.Object3D): THREE.Object3D => {
     let node = made.get(j);
     if (node) return node;
@@ -310,7 +320,24 @@ function shot(kind: string): THREE.Object3D {
     add(g, rot(mesh(cyl(0.05, 0.05, 1.6, 4), glow(0xd9fff0, 2)), Math.PI / 2, 0, 0), 0, 0, 0);
     add(g, rot(mesh(cone(0.16, 0.4, 4), glow(0x9fffc8, 3)), Math.PI / 2, 0, 0), 0, 0, 0.95);
   } else if (kind === 'tidalWave') {
-    add(g, mesh(box(3, 0.9, 0.6), glow(0x67e8f9, 1.6)), 0, 0, 0);
+    // A curling wall of water with a foam crest, rolling forward (+z).
+    add(g, mesh(box(3.2, 0.8, 1.2), glow(0x1fa3c4, 1.3)), 0, 0, -0.2);
+    add(g, rot(mesh(cyl(0.55, 0.55, 3.3, 8), glow(0x5fe0f5, 1.5)), 0, 0, Math.PI / 2), 0, 0.55, 0.15);
+    for (let i = 0; i < 9; i++) add(g, mesh(sph(0.2 + (i % 2) * 0.06, 0), glow(0xe8fdff, 1.6)), -1.6 + i * 0.4, 1.05, 0.35 + (i % 2) * 0.1);
+  } else if (kind === 'arrow' || kind === 'arrowCrit') {
+    const crit = kind === 'arrowCrit';
+    add(g, rot(mesh(cyl(0.035, 0.035, 1.3, 4), crit ? glow(0x9fffc8, 1.6) : M(0xd8c8a0)), Math.PI / 2, 0, 0), 0, 0, 0);
+    add(g, rot(mesh(cone(0.08, 0.26, 4), crit ? glow(0x6dff9e, 3) : M(0xc9d2d8, { metalness: 0.7 })), Math.PI / 2, 0, 0), 0, 0, 0.75);
+    for (const s of [-1, 1]) add(g, mesh(box(0.02, 0.14, 0.22), M(0x2f5a3a)), s * 0.03, 0, -0.55);
+    if (crit) add(g, mesh(sph(0.3, 1), glow(0x6dff9e, 1.2, 0.35)), 0, 0, 0.6);
+  } else if (kind === 'firebolt') {
+    add(g, mesh(sph(0.26, 1), glow(0xffd25a, 3)), 0, 0, 0);
+    add(g, mesh(sph(0.42, 1), glow(0xff5a1a, 1.5, 0.4)), 0, 0, -0.1);
+    add(g, rot(mesh(cone(0.3, 0.9, 6), glow(0xff7a2a, 1.6, 0.5)), -Math.PI / 2, 0, 0), 0, 0, -0.55);
+  } else if (kind === 'waterbolt') {
+    add(g, mesh(sph(0.24, 1), glow(0x9ff0ff, 2)), 0, 0, 0);
+    add(g, mesh(sph(0.38, 1), glow(0x1fa3c4, 1.3, 0.45)), 0, 0, -0.08);
+    add(g, mesh(new THREE.TorusGeometry(0.34, 0.03, 4, 16), glow(0xe8fdff, 1.5, 0.7)), 0, 0, 0);
   } else if (kind === 'spell') {
     add(g, mesh(sph(0.4, 1), glow(0xffb347, 3)), 0, 0, 0);
   } else {

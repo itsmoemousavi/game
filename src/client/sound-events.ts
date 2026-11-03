@@ -7,20 +7,37 @@ const chargeAt = new Map<number, number>();
 const CAST_SOUNDS: Record<string, SoundName> = {
   shieldCharge: 'shieldCharge',
   earthsplitter: 'quakeCharge',
-  piercingArrow: 'arrow',
-  arrowStorm: 'storm',
-  fireball: 'fire',
-  mendingFlame: 'heal',
-  cataclysm: 'meteor',
-  shadowLunge: 'charge',
-  veil: 'teleport',
-  execution: 'slam',
-  rootSnare: 'cast',
-  barkSkin: 'glyph',
-  overgrowth: 'cast',
-  tidalWave: 'storm',
-  brineVeil: 'heal',
-  maelstrom: 'storm',
+  piercingArrow: 'piercingShot',
+  arrowStorm: 'arrowRain',
+  fireball: 'fireballCast',
+  mendingFlame: 'mendFlame',
+  cataclysm: 'meteorFall',
+  shadowLunge: 'shadowStep',
+  veil: 'vanish',
+  execution: 'execute',
+  rootSnare: 'rootSnare',
+  barkSkin: 'barkSkin',
+  overgrowth: 'overgrowth',
+  tidalWave: 'tidalWave',
+  brineVeil: 'brineVeil',
+  maelstrom: 'maelstrom',
+};
+
+/** Each hero's basic attack. */
+const ATTACK_SOUNDS: Record<string, SoundName> = {
+  brakk: 'hammerAttack',
+  vexa: 'bowShot',
+  orin: 'fireBolt',
+  syl: 'daggerSlash',
+  grom: 'woodPunch',
+  kaela: 'waterBolt',
+};
+
+/** A hero's delayed blast landing (Earthsplitter, Cataclysm, Root Snare / Overgrowth). */
+const BLAST_SOUNDS: Record<string, SoundName> = {
+  brakk: 'earthsplitter',
+  orin: 'meteorImpact',
+  grom: 'rootsErupt',
 };
 
 /**
@@ -43,8 +60,10 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
         if (!s) break;
         const involvesMe = s.id === meId || t?.id === meId;
         if (s.kind === 'structure') sfx.play('tower', near(s) * (involvesMe ? 1 : 0.5));
-        else if (s.hero?.defId === 'brakk') sfx.play('hammerAttack', near(s));
-        else if (s.kind === 'hero') sfx.play(s.projectileSpeed ? 'shoot' : 'swing', near(s));
+        else if (s.hero) {
+          sfx.play(ATTACK_SOUNDS[s.hero.defId] ?? 'swing', near(s));
+          if (s.hero.defId === 'vexa' && s.hero.lastCrit) sfx.play('critPing', near(s));
+        }
         else if (s.kind === 'neutral' && s.neutral?.boss) sfx.play('hit', near(s));
         else sfx.play('creep', near(s) * (involvesMe ? 1 : 0.4));
         if (t && t.id === meId && s.projectileSpeed === 0) sfx.play('hit', 0.6);
@@ -54,8 +73,8 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
         const u = w.unit(e.unitId);
         if (!u?.hero) break;
         if (e.slot < 0) {
-          // Delayed blast landed (Earthsplitter / Cataclysm).
-          sfx.play(u.hero.defId === 'brakk' ? 'earthsplitter' : 'slam', near(u));
+          // Delayed blast landed (Earthsplitter / Cataclysm / roots), heard where it lands.
+          sfx.play(BLAST_SOUNDS[u.hero.defId] ?? 'slam', u.team === team || u.id === meId ? near(u) : near(undefined, u.x, u.y));
           break;
         }
         const id = HEROES[u.hero.defId].abilities[e.slot]?.id;
@@ -64,7 +83,8 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
         break;
       }
       case 'explosion':
-        sfx.play('explosion', near(undefined, e.x, e.y) * 0.8);
+        // Fireball bursting (Execution has its own sound when cast).
+        if (e.radius >= 2) sfx.play('fireBlast', near(undefined, e.x, e.y) * 0.9);
         break;
       case 'death': {
         const u = w.unit(e.unitId);
