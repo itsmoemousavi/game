@@ -589,6 +589,21 @@ export class Renderer3D extends Renderer {
         } else this.spells.onSpellHit(c, src.hero.defId, t.x, t.y);
       } else if (e.type === 'explosion') {
         this.spells.onExplosion(c, w, this.viewTeam, e.x, e.y, e.radius, e.radius < 2 ? exec : -1);
+      } else if (e.type === 'itemActive') {
+        const u = w.unit(e.unitId);
+        if (!u || !w.canSee(this.viewTeam, u)) continue;
+        if (e.kind === 'manaBurst') {
+          this.fx3.shockwave(u.x, u.y, 10, 0x60a5fa, 0.5, 0.8);
+          this.fx3.sparks(u.x, u.y, 1, 14, 0xbfdbfe, 4);
+        } else if (e.kind === 'frostNova') {
+          this.fx3.shockwave(u.x, u.y, 6.5, 0xbae6fd, 0.4, 0.95);
+          this.fx3.shockwave(u.x, u.y, 5, 0xffffff, 0.3, 0.6);
+          this.fx3.dust(u.x, u.y, 10, 1.4, 0xe0f2fe, 4, 0.8);
+          this.fx3.sparks(u.x, u.y, 1, 18, 0xe0f2fe, 7);
+        } else {
+          this.fx3.flash(u.x, u.y, 2, 5, 0xd6d3d1, 0.4);
+          this.fx3.shockwave(u.x, u.y, 2.6, 0xa8a29e, 0.35);
+        }
       } else if (e.type === 'blink') {
         const u = w.unit(e.unitId);
         if (u && w.canSee(this.viewTeam, u)) heroBlink(c, u, e.fromX, e.fromY);

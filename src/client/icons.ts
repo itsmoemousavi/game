@@ -80,6 +80,46 @@ const ICONS: Record<ItemId | 'tp' | 'shop' | 'courier', string> = {
     '<path d="M12 3c3 0 6 1.5 7 3l-2 14H7L5 6c1-1.5 4-3 7-3z" fill="#0ea5e9" stroke="#0c4a6e" stroke-width="1"/><path d="M12 8l3 1.3v2.4c0 2.3-1.4 3.9-3 4.6-1.6-.7-3-2.3-3-4.6V9.3z" fill="#e0f2fe" stroke="#0c4a6e" stroke-width="0.8"/>',
     '#082f49',
   ),
+  fleetBoots: svg(
+    '<path d="M7 4h5v8l6 3c1.5.8 2 2 2 3.5V20H5v-3l2-1z" fill="#fde68a" stroke="#713f12" stroke-width="1"/><path d="M12 6l4-3M12 9l5-2" stroke="#fef3c7" stroke-width="1.3" stroke-linecap="round"/><path d="M2 10h4M1 13h5M2 16h4" stroke="#facc15" stroke-width="1.5" stroke-linecap="round"/>',
+    '#422006',
+  ),
+  platedBoots: svg(
+    '<path d="M7 4h5v8l6 3c1.5.8 2 2 2 3.5V20H5v-3l2-1z" fill="#94a3b8" stroke="#0f172a" stroke-width="1"/><path d="M7 7h5M7 10h5M13 14l4 2" stroke="#e2e8f0" stroke-width="1.2"/><path d="M5 18h15" stroke="#475569" stroke-width="1.5"/>',
+    '#1e293b',
+  ),
+  arcaneBoots: svg(
+    '<path d="M7 4h5v8l6 3c1.5.8 2 2 2 3.5V20H5v-3l2-1z" fill="#60a5fa" stroke="#1e3a8a" stroke-width="1"/><path d="M9.5 6l1.5 2.5L9.5 11 8 8.5z" fill="#dbeafe"/><circle cx="17" cy="7" r="1.2" fill="#bfdbfe"/><circle cx="20" cy="10" r="0.8" fill="#bfdbfe"/>',
+    '#172554',
+  ),
+  keenEdge: svg(
+    '<path d="M18 3l3 3-11 11-3-3z" fill="#fee2e2" stroke="#7f1d1d" stroke-width="1"/><path d="M18 3l3 3-3 1z" fill="#ef4444"/><path d="M6 15l3 3-2 1.5-2.5-2.5z" fill="#a16207"/><path d="M3 19l2 2-1.5 1-1.5-1.5z" fill="#78350f"/><path d="M13 4l1 2M16 9l2 1" stroke="#fca5a5" stroke-width="1.1" stroke-linecap="round"/>',
+    '#3f0d0d',
+  ),
+  reaperEdge: svg(
+    '<path d="M5 20L14 6" stroke="#57534e" stroke-width="2" stroke-linecap="round"/><path d="M14 6c3-3 7-2 8 1-3-1-6 0-8 3z" fill="#e5e7eb" stroke="#450a0a" stroke-width="1"/><path d="M15 7c2-1 4-1 6 0" stroke="#dc2626" stroke-width="1.2" fill="none"/><circle cx="6" cy="18.5" r="1.3" fill="#dc2626"/>',
+    '#1c0a0a',
+  ),
+  cleavingAxe: svg(
+    '<path d="M6 21L15 6" stroke="#78350f" stroke-width="2" stroke-linecap="round"/><path d="M12 5c2-3 7-3 9 0l-2 6c-2 1-5 0-6-2z" fill="#d6d3d1" stroke="#292524" stroke-width="1"/><path d="M19 4.5l-1.5 6" stroke="#f97316" stroke-width="1.2"/><path d="M3 9l3 1M4 13l3-.5" stroke="#fdba74" stroke-width="1.2" stroke-linecap="round"/>',
+    '#431407',
+  ),
+  soulChalice: svg(
+    '<path d="M6 4h12l-1.5 6a4.5 4.5 0 0 1-9 0z" fill="#e879f9" stroke="#4a044e" stroke-width="1"/><path d="M12 14.5V19M8 20.5h8" stroke="#f5d0fe" stroke-width="1.6" stroke-linecap="round"/><path d="M9.5 7c1 1.5 4 1.5 5 0" stroke="#fdf4ff" stroke-width="1" fill="none"/><circle cx="12" cy="2.5" r="1" fill="#f0abfc"/>',
+    '#3b0764',
+  ),
+  bannerOfValor: svg(
+    '<path d="M6 3v18" stroke="#78350f" stroke-width="1.8" stroke-linecap="round"/><path d="M7 4h11l-2.5 4 2.5 4H7z" fill="#f59e0b" stroke="#713f12" stroke-width="1"/><path d="M11 6.5l1 1.5 1.8.2-1.3 1.2.3 1.8-1.8-.9-1.6.9.3-1.8-1.3-1.2 1.8-.2z" fill="#fff7ed"/>',
+    '#422006',
+  ),
+  frostHorn: svg(
+    '<path d="M4 18c3 1 8 0 11-4l4-8-6 4c-3 2-6 2-8 1z" fill="#e0f2fe" stroke="#0c4a6e" stroke-width="1"/><path d="M15 14l4-8" stroke="#7dd3fc" stroke-width="1.2"/><path d="M18 15l3 2M19 18.5h3M16 18l1 3" stroke="#bae6fd" stroke-width="1.3" stroke-linecap="round"/>',
+    '#082f49',
+  ),
+  stoneskinAmulet: svg(
+    '<path d="M8 3l4 5 4-5" stroke="#d6d3d1" stroke-width="1.2" fill="none"/><path d="M12 8l6 4-2 7h-8l-2-7z" fill="#a8a29e" stroke="#292524" stroke-width="1"/><path d="M9 12l3 2 3-2M12 14v4" stroke="#57534e" stroke-width="1"/>',
+    '#1c1917',
+  ),
   wardenCharm: svg(
     '<circle cx="12" cy="7.5" r="3.5" fill="none" stroke="#fcd34d" stroke-width="2"/><path d="M12 11v10M7.5 14h9" stroke="#fcd34d" stroke-width="2" stroke-linecap="round"/>',
     '#422006',
@@ -114,6 +154,8 @@ export function itemImage(id: ItemId): HTMLImageElement {
 
 /** Status effect icons (same hand-made 24×24 style as the item icons). */
 const STATUS_ICONS: Record<StatusId, string> = {
+  stoneskin: ICONS.stoneskinAmulet,
+  banner: ICONS.bannerOfValor,
   stun: svg(
     '<path d="M12 4l1.4 3 3.3.3-2.5 2.2.8 3.2L12 11l-3 1.7.8-3.2-2.5-2.2 3.3-.3z" fill="#fde047" stroke="#713f12" stroke-width="0.8"/><ellipse cx="12" cy="17" rx="7" ry="2.6" fill="none" stroke="#fde047" stroke-width="1.4" stroke-dasharray="2.5 1.5"/>',
     '#3f2a0a',

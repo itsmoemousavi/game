@@ -22,7 +22,17 @@ export type ItemId =
   | 'archmageStaff'
   | 'wardedCloak'
   | 'shadowStep'
-  | 'wardenCharm';
+  | 'wardenCharm'
+  | 'fleetBoots'
+  | 'platedBoots'
+  | 'arcaneBoots'
+  | 'keenEdge'
+  | 'reaperEdge'
+  | 'cleavingAxe'
+  | 'soulChalice'
+  | 'bannerOfValor'
+  | 'frostHorn'
+  | 'stoneskinAmulet';
 
 export interface ItemStats {
   damage?: number;
@@ -42,6 +52,20 @@ export interface ItemStats {
   lifestealPct?: number;
   /** Ultimate upgrade: +25% ultimate effect, −30% ultimate cooldown. */
   ultUpgrade?: boolean;
+  /** Chance (%) for an attack to be a critical hit (not on buildings), and its damage multiplier. */
+  critChance?: number;
+  critMult?: number;
+  /** Melee attacks also hit enemies near the target for this % of the damage. */
+  cleavePct?: number;
+  /** Ability damage returned as health, % (a third as much against creeps and monsters). */
+  spellLifestealPct?: number;
+}
+
+/** Aura carried by an item: nearby allied heroes (and the holder) get these bonuses. */
+export interface ItemAura {
+  radius: number;
+  armor: number;
+  hpRegen: number;
 }
 
 export interface ItemDef {
@@ -60,7 +84,8 @@ export interface ItemDef {
    */
   recipe?: ItemId[];
   /** Item with a button. */
-  active?: { kind: 'blink' | 'immunity'; cooldown: number; range?: number; duration?: number };
+  active?: { kind: 'blink' | 'immunity' | 'manaBurst' | 'frostNova' | 'stoneskin'; cooldown: number; range?: number; duration?: number; amount?: number };
+  aura?: ItemAura;
   summary: string;
   /** Not sold in the shop and can't be sold back (the Warden's revive charm). */
   noShop?: boolean;
@@ -238,6 +263,114 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     stats: { ultUpgrade: true, hp: 200, mana: 200 },
     summary: 'Upgrades your Ultimate: +25% effect, −30% cooldown. +200 health, +200 mana.',
   },
+  // ---- boot upgrades (built from Swift Boots; only one pair of boots counts for speed)
+  fleetBoots: {
+    id: 'fleetBoots',
+    name: 'Fleet Boots',
+    short: 'Fleet',
+    cost: 1050,
+    icon: '#fde68a',
+    stats: { moveSpeedPct: 24, attackSpeedPct: 10 },
+    recipe: ['swiftBoots'],
+    summary: '+24% move speed, +10% attack speed. Upgraded from Swift Boots.',
+  },
+  platedBoots: {
+    id: 'platedBoots',
+    name: 'Plated Boots',
+    short: 'Plated',
+    cost: 1150,
+    icon: '#94a3b8',
+    stats: { moveSpeedPct: 18, armor: 5, hpRegen: 3 },
+    recipe: ['swiftBoots', 'guardPlate'],
+    summary: '+18% move speed, +5 armor, +3 health regen. Built from Swift Boots + Guard Plate.',
+  },
+  arcaneBoots: {
+    id: 'arcaneBoots',
+    name: 'Arcane Boots',
+    short: 'Arcane',
+    cost: 1150,
+    icon: '#60a5fa',
+    stats: { moveSpeedPct: 18, mana: 250 },
+    recipe: ['swiftBoots', 'manaCrystal'],
+    active: { kind: 'manaBurst', cooldown: 45, range: 10, amount: 135 },
+    summary: '+18% move speed, +250 mana. Use: restores 135 mana to you and allied heroes within 10 m. Built from Swift Boots + Mana Crystal.',
+  },
+  // ---- critical hits
+  keenEdge: {
+    id: 'keenEdge',
+    name: 'Keen Edge',
+    short: 'Keen',
+    cost: 1000,
+    icon: '#fca5a5',
+    stats: { damage: 15, critChance: 20, critMult: 1.6 },
+    recipe: ['ironBlade'],
+    summary: '+15 damage. Attacks have a 20% chance to deal 160% damage (not on buildings). Built from Iron Blade.',
+  },
+  reaperEdge: {
+    id: 'reaperEdge',
+    name: "Reaper's Edge",
+    short: 'Reaper',
+    cost: 2700,
+    icon: '#dc2626',
+    stats: { damage: 45, critChance: 25, critMult: 2.1 },
+    recipe: ['keenEdge', 'ironBlade'],
+    summary: '+45 damage. Attacks have a 25% chance to deal 210% damage (not on buildings). Built from Keen Edge + Iron Blade.',
+  },
+  // ---- melee only
+  cleavingAxe: {
+    id: 'cleavingAxe',
+    name: 'Cleaving Axe',
+    short: 'Cleave',
+    cost: 1650,
+    icon: '#f97316',
+    stats: { damage: 25, cleavePct: 40 },
+    recipe: ['ironBlade', 'quickGloves'],
+    summary: '+25 damage. Melee heroes only: attacks also hit enemies within 3 m of the target for 40% damage. Built from Iron Blade + Quick Gloves.',
+  },
+  // ---- casters
+  soulChalice: {
+    id: 'soulChalice',
+    name: 'Soul Chalice',
+    short: 'Chalice',
+    cost: 1500,
+    icon: '#e879f9',
+    stats: { hp: 250, mana: 200, spellLifestealPct: 15 },
+    recipe: ['vitalStone', 'manaCrystal'],
+    summary: '+250 health, +200 mana. Ability damage heals you for 15% of it (5% against creeps and monsters). Built from Vital Stone + Mana Crystal.',
+  },
+  // ---- team
+  bannerOfValor: {
+    id: 'bannerOfValor',
+    name: 'Banner of Valor',
+    short: 'Banner',
+    cost: 1500,
+    icon: '#f59e0b',
+    stats: { hp: 200, armor: 2 },
+    recipe: ['guardPlate', 'vitalStone'],
+    aura: { radius: 12, armor: 4, hpRegen: 3 },
+    summary: '+200 health, +2 armor. Aura: you and allied heroes within 12 m get +4 armor and +3 health regen (auras of the same kind don\'t stack). Built from Guard Plate + Vital Stone.',
+  },
+  // ---- actives
+  frostHorn: {
+    id: 'frostHorn',
+    name: 'Frost Horn',
+    short: 'Frost',
+    cost: 1400,
+    icon: '#7dd3fc',
+    stats: { hp: 150, damage: 10 },
+    active: { kind: 'frostNova', cooldown: 20, range: 6, duration: 3, amount: 80 },
+    summary: '+150 health, +10 damage. Use: a blast of frost deals 80 damage to enemies within 6 m and slows them by 45% for 3 s.',
+  },
+  stoneskinAmulet: {
+    id: 'stoneskinAmulet',
+    name: 'Stoneskin Amulet',
+    short: 'Stone',
+    cost: 1300,
+    icon: '#a8a29e',
+    stats: { hp: 250, armor: 3 },
+    active: { kind: 'stoneskin', cooldown: 30, duration: 4, amount: 15 },
+    summary: '+250 health, +3 armor. Use: +15 armor for 4 s.',
+  },
   wardenCharm: {
     id: 'wardenCharm',
     name: "Warden's Charm",
@@ -269,12 +402,12 @@ export const SALVE = { heal: 350, duration: 8 };
 
 /** Default build orders (also the "recommended" list in the shop). */
 export const BUILDS: Record<'brakk' | 'vexa' | 'orin' | 'syl' | 'grom' | 'kaela', ItemId[]> = {
-  brakk: ['healingSalve', 'swiftBoots', 'vitalStone', 'vitalStone', 'titanHeart', 'shadowStep', 'crownOfAscension', 'wardedCloak'],
-  vexa: ['healingSalve', 'swiftBoots', 'ironBlade', 'quickGloves', 'twinBlades', 'lifedrinker', 'crownOfAscension', 'wardedCloak'],
-  orin: ['healingSalve', 'swiftBoots', 'manaCrystal', 'arcaneAmplifier', 'archmageStaff', 'focusLens', 'crownOfAscension', 'wardedCloak'],
-  syl: ['healingSalve', 'swiftBoots', 'ironBlade', 'lifedrinker', 'shadowStep', 'quickGloves', 'twinBlades', 'crownOfAscension'],
-  grom: ['healingSalve', 'swiftBoots', 'vitalStone', 'guardPlate', 'vitalStone', 'titanHeart', 'wardedCloak', 'crownOfAscension'],
-  kaela: ['healingSalve', 'swiftBoots', 'manaCrystal', 'focusLens', 'guardPlate', 'wardedCloak', 'arcaneAmplifier', 'crownOfAscension'],
+  brakk: ['healingSalve', 'swiftBoots', 'vitalStone', 'guardPlate', 'platedBoots', 'ironBlade', 'quickGloves', 'cleavingAxe', 'shadowStep', 'crownOfAscension', 'stoneskinAmulet'],
+  vexa: ['healingSalve', 'swiftBoots', 'ironBlade', 'keenEdge', 'fleetBoots', 'quickGloves', 'twinBlades', 'ironBlade', 'reaperEdge', 'crownOfAscension', 'lifedrinker'],
+  orin: ['healingSalve', 'swiftBoots', 'manaCrystal', 'arcaneBoots', 'vitalStone', 'manaCrystal', 'soulChalice', 'arcaneAmplifier', 'crownOfAscension', 'focusLens'],
+  syl: ['healingSalve', 'swiftBoots', 'ironBlade', 'keenEdge', 'shadowStep', 'fleetBoots', 'ironBlade', 'reaperEdge', 'lifedrinker', 'crownOfAscension'],
+  grom: ['healingSalve', 'swiftBoots', 'vitalStone', 'guardPlate', 'platedBoots', 'guardPlate', 'vitalStone', 'bannerOfValor', 'frostHorn', 'crownOfAscension', 'titanHeart'],
+  kaela: ['healingSalve', 'swiftBoots', 'manaCrystal', 'arcaneBoots', 'guardPlate', 'vitalStone', 'bannerOfValor', 'focusLens', 'frostHorn', 'crownOfAscension'],
 };
 
 /** Blink can't be used this long after taking damage from an enemy hero. */

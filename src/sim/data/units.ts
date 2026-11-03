@@ -68,10 +68,12 @@ const tower = (hp: number, damage: number): CombatStats => ({
 });
 
 export const STRUCTURES: Record<StructureTier, CombatStats & { teamGold: number }> = {
-  tower1: { ...tower(1400, 100), teamGold: 140 },
-  tower2: { ...tower(1550, 110), teamGold: 160 },
-  tower3: { ...tower(1750, 125), teamGold: 190 },
-  shrineTower: { ...tower(1700, 140), teamGold: 220 },
+  // Each tier is tougher than the one before it (health, armor and damage), but kept within reach
+  // so pushing stays possible: check average match length with scripts/match-length.ts.
+  tower1: { ...tower(1150, 95), armor: 10, teamGold: 140 },
+  tower2: { ...tower(1350, 110), armor: 12, teamGold: 160 },
+  tower3: { ...tower(1550, 125), armor: 14, teamGold: 190 },
+  shrineTower: { ...tower(1700, 140), armor: 15, teamGold: 220 },
   barracks: { ...tower(1500, 0), attackInterval: 0, attackRange: 0, acquireRange: 0, armor: 10, radius: 3, teamGold: 200 },
   shrine: { ...tower(3000, 0), attackInterval: 0, attackRange: 0, acquireRange: 0, armor: 13, radius: 4.5, teamGold: 0 },
   fountain: {

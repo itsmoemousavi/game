@@ -266,8 +266,6 @@ function orin() {
   add(b.head, rot(mesh(cone(0.2, 0.45, 7), M(0x4a1410)), -0.9, 0, 0), 0, 0.12, -0.3);
   add(b.head, mesh(box(0.26, 0.2, 0.08), dark), 0, 0.0, 0.15);
   add(b.head, rot(mesh(cone(0.14, 0.5, 6), M(0xb9b3a8)), Math.PI + 0.15, 0, 0), 0, -0.3, 0.14);
-  // Ember in the right palm.
-  add(b.handR, mesh(sph(0.07, 1), ember), 0, -0.04, 0.05);
   // Gnarled staff with an iron cage around a fire crystal.
   const w = add(b.armL, grp(), 0, -0.62, 0.02);
   w.name = 'weapon';

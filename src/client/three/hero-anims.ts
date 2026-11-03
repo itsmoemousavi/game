@@ -754,6 +754,12 @@ export function buffFx(c: AnimCtx, o: THREE.Object3D, u: Unit, a: Anim) {
     } else if (b.key === 'huntersRhythm' && Math.hypot(u.x - u.px, u.y - u.py) > 0.01) {
       c.fx.particle(around(0.8, 0.3), 0x9fffc8, 0.5, 0.35, { grow: 1, opacity: 0.5 });
       any = true;
+    } else if (b.key === 'slow:frostHorn') {
+      c.fx.particle(around(1.2, 0.3 + Math.random() * 1.5), 0xe0f2fe, 0.25, 0.7, { vel: v3(0, -0.6, 0), opacity: 0.8 });
+      any = true;
+    } else if (b.key === 'stoneskin') {
+      c.fx.particle(around(1.4, 0.5 + Math.random() * 2), 0xd6d3d1, 0.3, 0.4, { opacity: 0.9 });
+      any = true;
     } else if (b.key === 'veil') {
       c.fx.particle(around(1.0, 0.3), 0x2a1f3d, 0.8, 0.6, { grow: 1, opacity: 0.35, additive: false, vel: v3(0, 0.6, 0) });
       any = true;

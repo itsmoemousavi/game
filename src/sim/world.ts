@@ -36,7 +36,7 @@ import {
 import { HEROES, HeroId, maxAbilityLevel } from './data/heroes';
 import { BARRACKS, CREEPS, CombatStats, HERO_VISION, NEUTRALS, STRUCTURES, SUPER_CREEP_MULT } from './data/units';
 import { ITEMS, ItemId, ItemStats, TELEPORT } from './data/items';
-import { GroundItem, ItemSlot, charmSlot, buyItem, buyTeleport, dropItem, emptyInventory, expireGroundItems, itemBonuses, pickUpItem, sellItem, startTeleport, updateChannel, useItem } from './inventory';
+import { GroundItem, ItemSlot, charmSlot, updateItemAuras, buyItem, buyTeleport, dropItem, emptyInventory, expireGroundItems, itemBonuses, pickUpItem, sellItem, startTeleport, updateChannel, useItem } from './inventory';
 import { Vision, isInvisible } from './vision';
 import { Rune, activateGlyph, buyback, placeWard, spawnBoss, updateObjectives } from './objectives';
 import { GameMap, LaneId, StructureTier, createMap, fits, heightAt, inHouse, isWalkable, lineClear, teamLanePath } from './map';
@@ -391,6 +391,8 @@ export type GameEvent =
   /** Announcer moments: first blood, multi-kills, kill streaks, shutdowns. */
   | { type: 'announce'; unitId: number; victimId: number; firstBlood: boolean; multi: number; streak: number; shutdown: number }
   | { type: 'immunity'; unitId: number }
+  /** An item button was used (Arcane Boots, Frost Horn, Stoneskin Amulet). */
+  | { type: 'itemActive'; unitId: number; kind: 'manaBurst' | 'frostNova' | 'stoneskin' }
   | { type: 'miss'; sourceId: number; targetId: number }
   /** Notable damage (spells, critical hits) for floating numbers. */
   | { type: 'damage'; sourceId: number; targetId: number; amount: number; kind: DamageKind; crit: boolean };
@@ -428,6 +430,8 @@ export interface WorldOptions {
   warmup?: number;
 }
 
+/** Cleave reaches enemies this far from the attack's target (meters). */
+const CLEAVE_RADIUS = 3;
 const armorMultiplier = (armor: number) => 1 - (0.06 * armor) / (1 + 0.06 * Math.abs(armor));
 
 export class World {
@@ -1001,6 +1005,7 @@ export class World {
     this.updateProjectiles();
     this.updateSkillshots();
     this.updateAreas();
+    updateItemAuras(this);
     this.separate();
     if (this.tick % Math.round(1 / (DT * VISION_HZ)) === 0) this.vision.update(this);
 
@@ -1060,6 +1065,20 @@ export class World {
   private unstick(u: Unit) {
     const m = this.nav;
     if (u.hero?.order.type === 'idle' || fits(m, u.x, u.y, u.radius)) return;
+    // First the smallest nudge that frees it (keeps it moving along its way instead of
+    // snapping back to a cell centre, which can loop next to a building).
+    for (const r of [0.15, 0.3, 0.5, 0.8]) {
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        const x = u.x + Math.cos(a) * r;
+        const y = u.y + Math.sin(a) * r;
+        if (fits(m, x, y, u.radius)) {
+          u.x = x;
+          u.y = y;
+          return;
+        }
+      }
+    }
     const cx = Math.floor(u.x / m.cell);
     const cy = Math.floor(u.y / m.cell);
     for (let r = 1; r <= 6; r++) {
@@ -1496,6 +1515,15 @@ export class World {
       this.events.push({ type: 'miss', sourceId: u.id, targetId: t.id });
     } else {
       this.dealDamage(u.id, t, damage, 'attack', { crit });
+      // Cleave (melee heroes): a share of the hit splashes onto enemies around the target.
+      const cleave = u.hero?.bonus.cleavePct ?? 0;
+      if (cleave > 0 && u.projectileSpeed === 0 && t.kind !== 'structure') {
+        for (const e of this.units) {
+          if (e === t || !e.alive || e.team === u.team || e.kind === 'structure' || e.ward) continue;
+          if (dist(e.x, e.y, t.x, t.y) > CLEAVE_RADIUS + e.radius) continue;
+          this.dealDamage(u.id, e, (damage * cleave) / 100, 'attack', { cleave: true });
+        }
+      }
     }
     return true;
   }
@@ -1503,7 +1531,7 @@ export class World {
   /**
    * Attacks are reduced by armor. Spells ignore armor but cannot hurt structures.
    */
-  dealDamage(sourceId: number, target: Unit, raw: number, kind: DamageKind = 'attack', opts: { crit?: boolean; dot?: boolean } = {}) {
+  dealDamage(sourceId: number, target: Unit, raw: number, kind: DamageKind = 'attack', opts: { crit?: boolean; dot?: boolean; cleave?: boolean } = {}) {
     if (!target.alive) return;
     if (target.structure && (!target.structure.vulnerable || kind === 'spell' || target.structure.glyph > 0)) return;
     if (kind === 'spell' && this.isSpellImmune(target)) return;
@@ -1529,8 +1557,11 @@ export class World {
     if ((kind === 'spell' && !opts.dot) || opts.crit) {
       this.events.push({ type: 'damage', sourceId, targetId: target.id, amount, kind, crit: !!opts.crit });
     }
-    if (kind === 'attack' && src?.hero && src.hero.bonus.lifestealPct > 0) {
+    if (kind === 'attack' && !opts.cleave && src?.hero && src.hero.bonus.lifestealPct > 0) {
       this.heal(src, (amount * src.hero.bonus.lifestealPct) / 100);
+    }
+    if (kind === 'spell' && src?.hero && src.team !== target.team && src.hero.bonus.spellLifestealPct > 0) {
+      this.heal(src, (amount * src.hero.bonus.spellLifestealPct * (target.hero ? 1 : 1 / 3)) / 100);
     }
     // Wake the whole camp when a neutral is hit (and keep it angry while it's being hit).
     if (target.neutral && src && src.team !== 2 && src.kind !== 'structure') {
@@ -1784,12 +1815,27 @@ export class World {
       return;
     }
     // Slide along the wall: keep whichever axis component is free.
+    const x0 = u.x;
+    const y0 = u.y;
     if (Math.abs(dx) >= Math.abs(dy)) {
       if (ok(nx, u.y)) u.x = nx;
       else if (ok(u.x, ny)) u.y = ny;
     } else {
       if (ok(u.x, ny)) u.y = ny;
       else if (ok(nx, u.y)) u.x = nx;
+    }
+    if (Math.abs(u.x - x0) + Math.abs(u.y - y0) > 1e-6) return;
+    // Still blocked (e.g. heading straight along a building's edge): try angled directions.
+    for (const a of [0.6, -0.6, 1.1, -1.1]) {
+      const c = Math.cos(a);
+      const sn = Math.sin(a);
+      const tx = u.x + (dx * c - dy * sn) * d;
+      const ty = u.y + (dx * sn + dy * c) * d;
+      if (ok(tx, ty)) {
+        u.x = tx;
+        u.y = ty;
+        return;
+      }
     }
   }
 

@@ -313,6 +313,22 @@ function useItems(w: World, me: Unit, target: Unit, d: number): boolean {
     w.applyCommand({ type: 'useItem', unitId: me.id, slot: cloak });
     return true;
   }
+  const ready = (i: number) => i >= 0 && !itemBlocker(w, me, i);
+  const horn = slotOf('frostHorn');
+  if (ready(horn) && target.hero && d < 5) {
+    w.applyCommand({ type: 'useItem', unitId: me.id, slot: horn });
+    return true;
+  }
+  const stone = slotOf('stoneskinAmulet');
+  if (ready(stone) && target.hero && d < 6 && me.hp < me.maxHp * 0.5) {
+    w.applyCommand({ type: 'useItem', unitId: me.id, slot: stone });
+    return true;
+  }
+  const boots = slotOf('arcaneBoots');
+  if (ready(boots) && me.mana < me.maxMana * 0.55) {
+    w.applyCommand({ type: 'useItem', unitId: me.id, slot: boots });
+    return true;
+  }
   const step = slotOf('shadowStep');
   if (step >= 0 && target.hero && d > me.attackRange + 3 && d < 12 && me.hp > me.maxHp * 0.6 && !itemBlocker(w, me, step)) {
     w.applyCommand({ type: 'useItem', unitId: me.id, slot: step, x: target.x, y: target.y });

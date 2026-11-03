@@ -444,12 +444,23 @@ export class ItemsUi {
     g.drawImage(c.terrain, 0, 0, S, S);
     g.fillStyle = 'rgba(0,0,0,0.25)';
     g.fillRect(0, 0, S, S);
-    for (const h of c.w.units) {
-      if (!h.hero || !h.alive || h.team !== c.team) continue;
-      g.fillStyle = h === c.me ? '#ffe066' : TEAM_COLORS[h.team];
+    // Everything your team can see, like the minimap: buildings, creeps, then heroes on top.
+    const seen = c.w.units.filter((u) => u.alive && !u.ward && u.kind !== 'neutral' && (u.team === c.team || c.w.canSee(c.team, u)));
+    for (const u of seen) {
+      if (u.kind === 'hero') continue;
+      g.fillStyle = TEAM_COLORS[u.team];
+      const r = u.kind === 'structure' ? S * 0.011 : S * 0.0045;
+      g.fillRect(u.x * k - r, u.y * k - r, r * 2, r * 2);
+    }
+    for (const h of seen) {
+      if (h.kind !== 'hero') continue;
+      g.fillStyle = TEAM_COLORS[h.team];
+      g.strokeStyle = h === c.me ? '#ffe066' : '#fff';
+      g.lineWidth = S * 0.004;
       g.beginPath();
-      g.arc(h.x * k, h.y * k, S * 0.012, 0, Math.PI * 2);
+      g.arc(h.x * k, h.y * k, S * (h === c.me ? 0.015 : 0.012), 0, Math.PI * 2);
       g.fill();
+      g.stroke();
     }
     for (const s of teleportTargets(c.w, c.team)) {
       g.fillStyle = 'rgba(140,200,255,0.35)';
@@ -499,17 +510,18 @@ const SHOP_TABS: { id: ShopTab; name: string; icon: string }[] = [
   { id: 'attack', name: 'Attack', icon: '⚔' },
   { id: 'defense', name: 'Defense', icon: '⛨' },
   { id: 'magic', name: 'Magic', icon: '✦' },
-  { id: 'upgrade', name: 'Upgrades', icon: '▲' },
+  { id: 'upgrade', name: 'Boots & gear', icon: '▲' },
 ];
 
 /** Shop tab for an item, from what it gives. */
 function categoryOf(id: ItemId): ShopTab {
   const d = ITEMS[id];
   if (d.consumable) return 'consumable';
-  if (d.recipe || d.active) return 'upgrade';
   const s = d.stats;
-  if (s.damage || s.attackSpeedPct || s.lifestealPct) return 'attack';
-  if (s.mana || s.manaRegen || s.spellAmpPct || s.cdrPct) return 'magic';
+  // Boots, item buttons, auras and the Crown share a tab.
+  if (s.moveSpeedPct || d.active || d.aura || s.ultUpgrade) return 'upgrade';
+  if (s.damage || s.attackSpeedPct || s.lifestealPct || s.critChance || s.cleavePct) return 'attack';
+  if (s.mana || s.manaRegen || s.spellAmpPct || s.cdrPct || s.spellLifestealPct) return 'magic';
   return 'defense';
 }
 

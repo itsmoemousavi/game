@@ -26,7 +26,9 @@ export type StatusId =
   | 'rhythmCount'
   | 'immunity'
   | 'charm'
-  | 'ironHide';
+  | 'ironHide'
+  | 'stoneskin'
+  | 'banner';
 
 export interface Status {
   id: StatusId;
@@ -57,6 +59,8 @@ export const STATUS_INFO: Record<StatusId, { name: string; good: boolean }> = {
   immunity: { name: 'Immune to spells', good: true },
   charm: { name: 'Revive charm: you come back to life where you fall', good: true },
   ironHide: { name: 'Iron Hide: extra armor while hurt', good: true },
+  stoneskin: { name: 'Stoneskin: extra armor', good: true },
+  banner: { name: 'Banner of Valor: armor and regeneration', good: true },
 };
 
 const BUFF_STATUS: Record<string, StatusId> = {
@@ -68,6 +72,8 @@ const BUFF_STATUS: Record<string, StatusId> = {
   huntersRhythm: 'huntersRhythm',
   immunity: 'immunity',
   charm: 'charm',
+  stoneskin: 'stoneskin',
+  'aura:bannerOfValor': 'banner',
 };
 
 export function statusEffects(w: World, u: Unit): Status[] {

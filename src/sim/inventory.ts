@@ -34,6 +34,10 @@ export function itemBonuses(items: (ItemSlot | null)[]): Required<ItemStats> {
     spellAmpPct: 0,
     lifestealPct: 0,
     ultUpgrade: false,
+    critChance: 0,
+    critMult: 1,
+    cleavePct: 0,
+    spellLifestealPct: 0,
   };
   for (const slot of items) {
     if (!slot) continue;
@@ -50,6 +54,13 @@ export function itemBonuses(items: (ItemSlot | null)[]): Required<ItemStats> {
     b.spellAmpPct += s.spellAmpPct ?? 0;
     b.lifestealPct += s.lifestealPct ?? 0;
     b.ultUpgrade ||= !!s.ultUpgrade;
+    // Crits and cleave don't stack: the best item counts.
+    if ((s.critChance ?? 0) > b.critChance) {
+      b.critChance = s.critChance!;
+      b.critMult = s.critMult ?? 1.5;
+    }
+    b.cleavePct = Math.max(b.cleavePct, s.cleavePct ?? 0);
+    b.spellLifestealPct += s.spellLifestealPct ?? 0;
   }
   return b;
 }
@@ -167,6 +178,23 @@ export function useItem(w: World, u: Unit, slot: number, x?: number, y?: number)
       u.path = null;
       h.channel = null;
       if (h.order.type === 'move') h.order = { type: 'idle' };
+    } else if (active.kind === 'manaBurst') {
+      for (const a of w.heroes) {
+        if (!a.alive || a.team !== u.team || dist(a.x, a.y, u.x, u.y) > (active.range ?? 10)) continue;
+        a.mana = Math.min(a.maxMana, a.mana + (active.amount ?? 0));
+      }
+      w.events.push({ type: 'itemActive', unitId: u.id, kind: 'manaBurst' });
+    } else if (active.kind === 'frostNova') {
+      for (const e of w.units) {
+        if (!e.alive || e.team === u.team || e.kind === 'structure' || dist(e.x, e.y, u.x, u.y) > (active.range ?? 6) + e.radius) continue;
+        if (w.isSpellImmune(e)) continue;
+        w.dealDamage(u.id, e, active.amount ?? 0, 'spell');
+        w.addBuff(e, { key: 'slow:frostHorn', t: active.duration ?? 3, slowPct: 45 });
+      }
+      w.events.push({ type: 'itemActive', unitId: u.id, kind: 'frostNova' });
+    } else if (active.kind === 'stoneskin') {
+      w.addBuff(u, { key: 'stoneskin', t: active.duration ?? 4, armor: active.amount ?? 10 });
+      w.events.push({ type: 'itemActive', unitId: u.id, kind: 'stoneskin' });
     } else if (active.kind === 'immunity') {
       u.buffs = u.buffs.filter((b) => !b.slowPct); // shrug off slows
       w.addBuff(u, { key: 'immunity', t: active.duration ?? 4, spellImmune: true });
@@ -351,3 +379,21 @@ export function expireGroundItems(w: World) {
 export const charmSlot = (u: Unit) => u.hero?.items.findIndex((s) => s?.id === 'wardenCharm') ?? -1;
 
 export const emptyInventory = (): (ItemSlot | null)[] => Array<ItemSlot | null>(INVENTORY_SLOTS).fill(null);
+
+/**
+ * Item auras (Banner of Valor): every tick, refresh a short buff on allied heroes near each
+ * holder. Same-kind auras share one buff key, so two banners don't stack.
+ */
+export function updateItemAuras(w: World) {
+  for (const u of w.heroes) {
+    if (!u.alive) continue;
+    for (const slot of u.hero!.items) {
+      const aura = slot && ITEMS[slot.id].aura;
+      if (!aura) continue;
+      for (const a of w.heroes) {
+        if (!a.alive || a.team !== u.team || dist(a.x, a.y, u.x, u.y) > aura.radius) continue;
+        w.addBuff(a, { key: `aura:${slot!.id}`, t: 0.5, armor: aura.armor, healPerSec: aura.hpRegen });
+      }
+    }
+  }
+}

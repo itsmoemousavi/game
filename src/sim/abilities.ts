@@ -388,6 +388,12 @@ export function applyAttackPassives(w: World, u: Unit, target?: Unit): number {
     u.hero.lastCrit = true;
     return u.damage * val(def, 'critMult', lvl);
   }
+  // Critical hit items (Keen Edge, Reaper's Edge); not on buildings.
+  const b = u.hero.bonus;
+  if (b.critChance > 0 && target?.kind !== 'structure' && w.rng.next() * 100 < b.critChance) {
+    u.hero.lastCrit = true;
+    return u.damage * b.critMult;
+  }
   u.hero.lastCrit = false;
   return u.damage;
 }

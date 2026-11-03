@@ -81,7 +81,8 @@ export type SoundName =
   | 'brineVeil'
   | 'maelstrom'
   | 'treeFall'
-  | 'bodyFall';
+  | 'bodyFall'
+  | 'frostNova';
 
 type Recipe = (s: Sfx, v: number) => void;
 
@@ -347,6 +348,12 @@ const RECIPES: Record<SoundName, Recipe> = {
     s.noise(3.5, 0.3 * v, 'bandpass', 300, 900);
     s.noise(3.5, 0.12 * v, 'highpass', 2500, 4000);
     s.tone('sine', 60, 90, 3.5, 0.15 * v);
+  },
+  /** Frost Horn: a cold blast, a crackle of ice. */
+  frostNova: (s, v) => {
+    s.noise(0.5, 0.35 * v, 'highpass', 2500, 6000);
+    s.tone('sine', 1400, 600, 0.4, 0.08 * v);
+    for (let i = 0; i < 5; i++) s.tone('triangle', 2600 + i * 300, 2400, 0.05, 0.05 * v, 0.05 + i * 0.05);
   },
   // ---- Brakk
   /** A heavy armored footstep. */
