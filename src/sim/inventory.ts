@@ -213,6 +213,7 @@ export function startTeleport(w: World, u: Unit, targetId: number): boolean {
   if (tpBlocker(u) || !t || !t.structure || !t.alive || t.team !== u.team) return false;
   const h = u.hero!;
   h.channel = { kind: 'tp', t: TELEPORT.channel, total: TELEPORT.channel, targetId };
+  w.events.push({ type: 'teleportStart', unitId: u.id, targetId });
   h.order = { type: 'idle' };
   u.path = null;
   return true;

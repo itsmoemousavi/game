@@ -369,6 +369,8 @@ export type GameEvent =
   | { type: 'cast'; unitId: number; slot: number }
   | { type: 'heal'; unitId: number; amount: number }
   | { type: 'teleport'; unitId: number }
+  /** A hero started channelling a teleport to building `targetId` (everyone can see where). */
+  | { type: 'teleportStart'; unitId: number; targetId: number }
   | { type: 'explosion'; x: number; y: number; radius: number }
   | { type: 'deny'; unitId: number; killerId: number }
   | { type: 'rune'; unitId: number; kind: string }

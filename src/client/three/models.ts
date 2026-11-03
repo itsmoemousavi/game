@@ -8,7 +8,7 @@ export const TEAM_HEX = [0x3d8bfd, 0xe5484d] as const;
 // ------------------------------------------------------------------ baking
 
 /** Joints that animate, in parent → child order. */
-export const JOINTS = ['rig', 'torso', 'legL', 'legR', 'armL', 'armR'] as const;
+export const JOINTS = ['rig', 'torso', 'head', 'legL', 'legR', 'armL', 'armR', 'weapon'] as const;
 export type Joint = (typeof JOINTS)[number];
 
 /**

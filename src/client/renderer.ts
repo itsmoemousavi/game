@@ -35,6 +35,8 @@ export class Renderer {
   protected swings: { x: number; y: number; ang: number; reach: number; t: number; color: string }[] = [];
   protected lunges = new Map<number, { ang: number; t: number }>();
   protected blasts: { x: number; y: number; r: number; t: number; color: string }[] = [];
+  /** Ground cracks left by Earthsplitter (drawn on the ground in both views). */
+  protected cracks: { x: number; y: number; r: number; t: number; seed: number }[] = [];
   /** Floating text: "Denied!", "+38" gold... */
   protected floaters: { x: number; y: number; t: number; text: string; color: string; big?: boolean }[] = [];
   /** Inventory slot of a ward being placed (shows the placement range). */
@@ -130,6 +132,9 @@ export class Renderer {
         const color = '#ffffff';
         this.swings.push({ x: src.x, y: src.y, ang, reach: src.radius + src.attackRange + tgt.radius * 0.5, t: 0.2, color });
         this.lunges.set(src.id, { ang, t: 0.16 });
+      } else if (e.type === 'cast' && e.slot === -1 && w.unit(e.unitId)?.hero?.defId === 'brakk') {
+        const u = w.unit(e.unitId)!;
+        this.cracks.push({ x: u.x, y: u.y, r: 7, t: 0, seed: (u.x * 7 + u.y * 13) | 0 });
       } else if (e.type === 'wardenSlam' && e.phase === 'hit') {
         this.blasts.push({ x: e.x, y: e.y, r: e.radius * 1.4, t: 0.45, color: '196,181,253' });
       } else if (e.type === 'explosion') {
@@ -212,6 +217,7 @@ export class Renderer {
 
     if (this.flat) for (const s of structures) this.drawStructure(s, w.time);
     this.drawAreas(w, seesPoint);
+    this.drawCracks();
     this.drawRunes(w, viewTeam);
     this.drawGroundItems(w, viewTeam, focus);
     this.drawWardenSlam(w, sees);
@@ -423,7 +429,7 @@ export class Renderer {
     if (this.flat) this.drawFog(w, viewTeam);
     this.drawPings(w, viewTeam);
     if (this.marker) {
-      const pulse = (w.time * 1.2) % 1;
+      const pulse = (((w.time * 1.2) % 1) + 1) % 1;
       ctx.strokeStyle = '#ffd23f';
       ctx.lineWidth = 0.35;
       ctx.globalAlpha = 1 - pulse * 0.7;
@@ -696,6 +702,46 @@ export class Renderer {
   }
 
   /** Channelling teleports: ring around the hero and a marker on the destination. */
+  /** Jagged cracks radiating from Earthsplitter: glowing at first, then dark scars that fade. */
+  protected drawCracks() {
+    const ctx = this.ctx;
+    this.cracks = this.cracks.filter((c) => (c.t += 1 / 60) < 3.2);
+    for (const c of this.cracks) {
+      let r = c.seed;
+      const rnd = () => ((r = (r * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+      const fade = Math.min(1, (3.2 - c.t) / 1.2);
+      const hot = Math.max(0, 1 - c.t / 1.1);
+      const grow = Math.min(1, c.t / 0.18);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      for (let i = 0; i < 11; i++) {
+        const a0 = (i / 11) * Math.PI * 2 + rnd() * 0.4;
+        const len = c.r * (0.55 + rnd() * 0.45) * grow;
+        const pts: [number, number][] = [[c.x, c.y]];
+        let a = a0;
+        for (let s = 1; s <= 5; s++) {
+          a += (rnd() - 0.5) * 0.7;
+          const d = (len * s) / 5;
+          pts.push([c.x + Math.cos(a) * d, c.y + Math.sin(a) * d]);
+        }
+        const path = () => {
+          ctx.beginPath();
+          pts.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+        };
+        ctx.strokeStyle = `rgba(20,14,8,${0.75 * fade})`;
+        ctx.lineWidth = 0.42;
+        path();
+        ctx.stroke();
+        if (hot > 0) {
+          ctx.strokeStyle = `rgba(255,150,40,${0.95 * hot})`;
+          ctx.lineWidth = 0.16;
+          path();
+          ctx.stroke();
+        }
+      }
+    }
+  }
+
   protected drawTeleports(w: World, viewTeam: Team) {
     const ctx = this.ctx;
     for (const h of w.units) {
@@ -711,8 +757,9 @@ export class Renderer {
         ctx.stroke();
       }
       const t = w.unit(c.targetId);
-      if (t && (h.team === viewTeam || visible)) {
-        ctx.fillStyle = `rgba(140,200,255,${0.15 + 0.2 * k})`;
+      // Everyone sees where a hero is teleporting to (like in Dota), in that hero's team colour.
+      if (t) {
+        ctx.fillStyle = h.team === 0 ? `rgba(110,170,255,${0.18 + 0.25 * k})` : `rgba(255,110,110,${0.18 + 0.25 * k})`;
         ctx.beginPath();
         ctx.arc(t.x, t.y, t.radius + 3 + Math.sin(w.time * 8) * 0.3, 0, Math.PI * 2);
         ctx.fill();
@@ -1050,6 +1097,22 @@ export class Renderer {
         ctx.lineWidth = 1;
         ctx.stroke();
       } else ctx.fillRect(ux - 1, uy - 1, 2, 2);
+    }
+    // Teleports in progress: a pulsing marker where the hero will arrive (visible to everyone).
+    for (const h of w.heroes) {
+      const c = h.hero!.channel;
+      const t = c?.kind === 'tp' && h.alive ? w.unit(c.targetId) : undefined;
+      if (!t) continue;
+      const pulse = (((w.time * 2) % 1) + 1) % 1; // the clock is negative during the warm-up
+      ctx.strokeStyle = TEAM_COLORS[h.team];
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x + t.x * k, y + t.y * k, 4 + pulse * 6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = TEAM_COLORS[h.team];
+      ctx.beginPath();
+      ctx.arc(x + t.x * k, y + t.y * k, 2.5, 0, Math.PI * 2);
+      ctx.fill();
     }
     for (const p of w.pings) {
       if (p.team !== viewTeam || w.time - p.at > PING_DURATION) continue;

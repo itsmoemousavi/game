@@ -1,9 +1,12 @@
 import { GameEvent, HEROES, Team, Unit, World } from '../sim';
 import { Sfx, SoundName } from './audio';
 
+/** When each Brakk last started a Shield Charge (to give its hits a shield-bash sound). */
+const chargeAt = new Map<number, number>();
+
 const CAST_SOUNDS: Record<string, SoundName> = {
-  shieldCharge: 'charge',
-  earthsplitter: 'cast',
+  shieldCharge: 'shieldCharge',
+  earthsplitter: 'quakeCharge',
   piercingArrow: 'arrow',
   arrowStorm: 'storm',
   fireball: 'fire',
@@ -40,6 +43,7 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
         if (!s) break;
         const involvesMe = s.id === meId || t?.id === meId;
         if (s.kind === 'structure') sfx.play('tower', near(s) * (involvesMe ? 1 : 0.5));
+        else if (s.hero?.defId === 'brakk') sfx.play('hammerAttack', near(s));
         else if (s.kind === 'hero') sfx.play(s.projectileSpeed ? 'shoot' : 'swing', near(s));
         else if (s.kind === 'neutral' && s.neutral?.boss) sfx.play('hit', near(s));
         else sfx.play('creep', near(s) * (involvesMe ? 1 : 0.4));
@@ -50,10 +54,12 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
         const u = w.unit(e.unitId);
         if (!u?.hero) break;
         if (e.slot < 0) {
-          sfx.play('slam', near(u)); // delayed blast landed (Earthsplitter / Cataclysm)
+          // Delayed blast landed (Earthsplitter / Cataclysm).
+          sfx.play(u.hero.defId === 'brakk' ? 'earthsplitter' : 'slam', near(u));
           break;
         }
         const id = HEROES[u.hero.defId].abilities[e.slot]?.id;
+        if (id === 'shieldCharge') chargeAt.set(u.id, w.time);
         sfx.play(CAST_SOUNDS[id] ?? 'cast', near(u));
         break;
       }
@@ -76,6 +82,19 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
       case 'teleport':
         sfx.play('teleport', near(w.unit(e.unitId)));
         break;
+      case 'teleportStart': {
+        // Heard at the hero (if you can see them) and at the destination (everyone).
+        const u = w.unit(e.unitId);
+        const t = w.unit(e.targetId);
+        sfx.play('tpChannel', Math.max(near(u), t ? near(undefined, t.x, t.y) : 0));
+        break;
+      }
+      case 'damage': {
+        // Shield Charge connecting with someone.
+        const s = w.unit(e.sourceId);
+        if (e.kind === 'spell' && s?.hero?.defId === 'brakk' && w.time - (chargeAt.get(s.id) ?? -9) < 0.6) sfx.play('shieldBash', near(s));
+        break;
+      }
       case 'deny':
         sfx.play('deny', e.killerId === meId ? 1 : near(w.unit(e.killerId)) * 0.6);
         break;

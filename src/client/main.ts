@@ -5,7 +5,7 @@ import { DraftUi } from './draft-ui';
 import { Hud, heroPortraits } from './hud';
 import { Input } from './input';
 import { ItemsUi } from './items-ui';
-import { Sfx } from './audio';
+import { Sfx, SoundName } from './audio';
 import { Tutorial, spawnDummy } from './tutorial';
 import { playEvents } from './sound-events';
 import { GameEvent, HEROES as HERO_DEFS, PingKind, RUNE_INFO, RuneKind, TEAM_NAMES } from '../sim';
@@ -248,6 +248,11 @@ function makeRenderer(map: World['map']): Renderer {
     try {
       canvas3d.classList.remove('hidden');
       const r = new Renderer3D(canvas, canvas3d, map, settings.quality);
+      // Animation sounds (footsteps, Iron Hide, falling armor) fade with distance from the camera.
+      r.sound = (name, x, y, volume) => {
+        const d = Math.hypot(x - r.camX, y - r.camY);
+        sfx.play(name as SoundName, volume * (d < 22 ? 1 : Math.max(0, 1 - (d - 22) / 25)));
+      };
       showGfx(`3D ${settings.quality}`);
       return r;
     } catch (err) {

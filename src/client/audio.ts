@@ -42,7 +42,16 @@ export type SoundName =
   | 'click'
   | 'ping'
   | 'victory'
-  | 'defeat';
+  | 'defeat'
+  | 'stomp'
+  | 'hammerAttack'
+  | 'shieldCharge'
+  | 'shieldBash'
+  | 'quakeCharge'
+  | 'earthsplitter'
+  | 'ironClang'
+  | 'armorFall'
+  | 'tpChannel';
 
 type Recipe = (s: Sfx, v: number) => void;
 
@@ -134,6 +143,62 @@ const RECIPES: Record<SoundName, Recipe> = {
   },
   victory: (s, v) => [523, 659, 784, 1046, 1318].forEach((f, i) => s.tone('triangle', f, f, 0.4, 0.25 * v, i * 0.15)),
   defeat: (s, v) => [392, 349, 311, 262].forEach((f, i) => s.tone('triangle', f, f, 0.5, 0.22 * v, i * 0.22)),
+  // ---- Brakk
+  /** A heavy armored footstep. */
+  stomp: (s, v) => {
+    s.tone('sine', 75, 45, 0.16, 0.35 * v);
+    s.noise(0.08, 0.12 * v, 'lowpass', 500, 200);
+  },
+  /** Hammer swing whoosh, then the heavy crunch of the hit as it lands. */
+  hammerAttack: (s, v) => {
+    s.noise(0.14, 0.28 * v, 'bandpass', 700, 2200);
+    s.tone('sine', 140, 50, 0.22, 0.6 * v, 0.17);
+    s.noise(0.12, 0.38 * v, 'lowpass', 2200, 400, 0.17);
+    s.tone('square', 420, 260, 0.06, 0.07 * v, 0.17);
+  },
+  /** Armor rattle and rushing air as Brakk charges. */
+  shieldCharge: (s, v) => {
+    s.noise(0.4, 0.38 * v, 'bandpass', 380, 1800);
+    s.tone('sawtooth', 90, 60, 0.35, 0.12 * v);
+    for (let i = 0; i < 4; i++) s.noise(0.04, 0.12 * v, 'highpass', 4500, 4500, i * 0.07);
+  },
+  /** Metal shield slamming into someone: a clang with a dull thump. */
+  shieldBash: (s, v) => {
+    s.tone('square', 640, 520, 0.18, 0.12 * v);
+    s.tone('triangle', 1280, 1100, 0.3, 0.1 * v);
+    s.tone('sine', 120, 50, 0.2, 0.55 * v);
+    s.noise(0.08, 0.3 * v, 'lowpass', 2500, 600);
+  },
+  /** Earthsplitter wind-up: a rising rumble as Brakk leaps. */
+  quakeCharge: (s, v) => {
+    s.tone('sawtooth', 50, 110, 0.6, 0.18 * v);
+    s.noise(0.6, 0.3 * v, 'lowpass', 200, 900);
+  },
+  /** Earthsplitter impact: a deep boom, cracking rock and a rolling rumble. */
+  earthsplitter: (s, v) => {
+    s.tone('sine', 70, 28, 1.1, 0.95 * v);
+    s.noise(0.25, 0.6 * v, 'lowpass', 3500, 500);
+    for (let i = 0; i < 5; i++) s.noise(0.06, 0.25 * v, 'highpass', 1800, 1200, 0.05 + i * 0.06);
+    s.noise(1.4, 0.45 * v, 'lowpass', 400, 80, 0.1);
+  },
+  /** Iron Hide kicking in: a ringing metallic clang. */
+  ironClang: (s, v) => {
+    s.tone('triangle', 880, 860, 0.5, 0.16 * v);
+    s.tone('sine', 1320, 1300, 0.4, 0.1 * v);
+    s.tone('sine', 1975, 1950, 0.3, 0.06 * v);
+  },
+  /** A heavy armored body hitting the ground. */
+  armorFall: (s, v) => {
+    s.tone('sine', 90, 40, 0.35, 0.6 * v);
+    s.noise(0.3, 0.35 * v, 'lowpass', 1500, 300);
+    s.tone('square', 500, 350, 0.08, 0.06 * v, 0.05);
+  },
+  /** Teleport channel starting: a shimmering hum that rises. */
+  tpChannel: (s, v) => {
+    s.tone('sine', 220, 880, 2.8, 0.1 * v);
+    s.tone('triangle', 330, 1320, 2.8, 0.05 * v);
+    s.noise(2.8, 0.06 * v, 'bandpass', 2000, 6000);
+  },
 };
 
 export class Sfx {

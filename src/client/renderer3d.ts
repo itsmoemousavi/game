@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { GameMap, HEROES, Team, Unit, World, isHouseWallAt, isInvisible, isNight } from '../sim';
+import { GameMap, HEROES, TELEPORT, Team, Unit, World, abilityLevel, isHouseWallAt, isInvisible, isNight } from '../sim';
 import type { Aim } from './input';
 import { Renderer, TEAM_COLORS } from './renderer';
 import { JOINTS, Joint, TEAM_HEX, model } from './three/models';
 import { Character, character, hasAsset, loadAssets } from './three/assets';
+import { Fx3D } from './three/fx';
 import type { GameEvent } from '../sim';
 
 /** Ground level per map height (1 = normal, 2 = base plateau, 3 = ward hill), in meters. */
@@ -64,12 +65,21 @@ export class Renderer3D extends Renderer {
   /** Per-unit animation clocks (walk cycle, attack swing, cast). */
   private anims = new Map<number, Anim>();
   /** Units that just died: they fall over and sink for a moment. */
-  private corpses: { o: THREE.Object3D; t: number; joints: Partial<Record<Joint, THREE.Object3D>> }[] = [];
+  private corpses: { o: THREE.Object3D; t: number; joints: Partial<Record<Joint, THREE.Object3D>>; kind?: 'brakk'; x?: number; y?: number; thud?: boolean }[] = [];
   private lastFrame = performance.now();
   private dt = 1 / 60;
   private frameNo = 0;
   private raycaster = new THREE.Raycaster();
   private night = 0;
+  private fx3!: Fx3D;
+  /** Seconds, for animation timelines (independent of the simulation clock). */
+  private clock = 0;
+  private meId = -1;
+  /** Plays a sound at a map point (set by the game; volume already includes distance). */
+  sound: ((name: string, x: number, y: number, volume: number) => void) | null = null;
+  /** Where each hero started channelling a teleport (for the departure flash). */
+  private tpFrom = new Map<number, { x: number; y: number }>();
+  private world: World | null = null;
 
   constructor(
     overlay: HTMLCanvasElement,
@@ -159,6 +169,7 @@ export class Renderer3D extends Renderer {
 
     this.buildTrees(map);
     this.buildHouse(map);
+    this.fx3 = new Fx3D(this.scene, (x, y) => this.elevationAt(x, y));
     // Artist models load in the background; compile their shaders as soon as they arrive.
     void loadAssets(import.meta.env.BASE_URL).then(() => this.prewarmAssets());
     this.resize();
@@ -414,10 +425,15 @@ export class Renderer3D extends Renderer {
 
     // 3. Units and buildings.
     this.placeCamera();
+    this.camera.position.add(this.fx3.shakeOffset(this.clock));
     this.sun.position.set(this.camX + 25, 60, this.camY + 18);
     this.sun.target.position.set(this.camX, 0, this.camY - 6);
+    this.clock += this.dt;
+    this.world = w;
     this.syncUnits(w, alpha, viewTeam);
+    this.updateTeleports(w, viewTeam);
     this.updateCorpses();
+    this.fx3.update(this.dt, this.clock);
     this.gl.render(this.scene, this.camera);
 
     // 4. Bars, names, numbers and the minimap on top.
@@ -501,10 +517,46 @@ export class Renderer3D extends Renderer {
 
   pushEvents(w: World, events: GameEvent[], meId = -1) {
     super.pushEvents(w, events, meId);
+    this.meId = meId;
     for (const e of events) {
-      if (e.type === 'attack') this.anim(e.sourceId).atk = 1;
-      else if (e.type === 'cast') this.anim(e.unitId).cast = 1;
-      else if (e.type === 'death') {
+      if (e.type === 'attack') {
+        const a = this.anim(e.sourceId);
+        a.atk = 1;
+        a.atkAt = this.clock;
+        a.atkTarget = e.targetId;
+        a.impactDone = false;
+      } else if (e.type === 'cast') {
+        const a = this.anim(e.unitId);
+        const u = w.unit(e.unitId);
+        if (e.slot >= 0) {
+          a.cast = 1;
+          a.castSlot = e.slot;
+          a.castAt = this.clock;
+        }
+        if (u?.hero?.defId === 'brakk') this.brakkCast(u, e.slot, a);
+      } else if (e.type === 'damage' && e.kind === 'spell') {
+        // Shield Charge connecting: a shield bash flash on whoever got hit.
+        const src = w.unit(e.sourceId);
+        const t = w.unit(e.targetId);
+        if (src?.hero?.defId === 'brakk' && t && this.clock - this.anim(src.id).castAt < 0.6 && this.anim(src.id).castSlot === 0) {
+          this.fx3.sparks(t.x, t.y, 1.6, 10, 0xffe2a0, 6);
+          this.fx3.shockwave(t.x, t.y, 2.4, 0xffe2a0, 0.3);
+        }
+      } else if (e.type === 'teleport') {
+        const u = w.unit(e.unitId);
+        const from = this.tpFrom.get(e.unitId);
+        const col = TEAM_HEX[u?.team === 1 ? 1 : 0];
+        if (u) {
+          this.fx3.flash(u.x, u.y, 1.5, 7, col, 0.5);
+          this.fx3.shockwave(u.x, u.y, 4, col, 0.5);
+          this.fx3.sparks(u.x, u.y, 1, 14, 0xffffff, 6);
+        }
+        if (from) {
+          this.fx3.flash(from.x, from.y, 1.5, 6, col, 0.45);
+          this.fx3.dust(from.x, from.y, 6, 1.2, 0xbcd7ff, 1);
+        }
+        this.tpFrom.delete(e.unitId);
+      } else if (e.type === 'death') {
         const u = w.unit(e.unitId);
         const k = u && this.keyOf(u);
         const live = this.objs.get('u' + e.unitId);
@@ -512,14 +564,60 @@ export class Renderer3D extends Renderer {
         // Reuse the live model as the corpse.
         this.objs.delete('u' + e.unitId);
         this.anims.delete(e.unitId);
-        this.corpses.push({ o: live.o, t: 0, joints: live.joints });
+        this.corpses.push({ o: live.o, t: 0, joints: live.joints, kind: u.hero?.defId === 'brakk' ? 'brakk' : undefined, x: u.x, y: u.y });
+      }
+    }
+  }
+
+  /** Brakk's spell effects: Shield Charge burst, Earthsplitter leap and slam. */
+  private brakkCast(u: Unit, slot: number, a: Anim) {
+    if (slot === 0) {
+      this.fx3.dust(u.x, u.y, 8, 1.4, 0x9a8466, 1);
+      a.trailAt = 0;
+    } else if (slot === 2) {
+      this.fx3.dust(u.x, u.y, 6, 1.3, 0x9a8466, 0.8);
+    } else if (slot === -1) {
+      // Earthsplitter lands: shockwaves, flying rocks, a dust ring and a shaking camera.
+      a.blastAt = this.clock;
+      this.fx3.flash(u.x, u.y, 0.6, 9, 0xffb050, 0.45);
+      this.fx3.shockwave(u.x, u.y, 7.5, 0xffb060, 0.5, 0.95);
+      this.fx3.shockwave(u.x, u.y, 9, 0x9a8466, 0.9, 0.6);
+      this.fx3.debris(u.x, u.y, 18, 3.5, 8);
+      for (let i = 0; i < 14; i++) {
+        const ang = (i / 14) * Math.PI * 2;
+        const r = 3 + Math.random() * 3.5;
+        this.fx3.dust(u.x + Math.cos(ang) * r, u.y + Math.sin(ang) * r, 2, 2, 0x8a7558, 0.6, 1.3);
+      }
+      this.fx3.sparks(u.x, u.y, 0.5, 16, 0xffb347, 7);
+      const d = Math.hypot(u.x - this.camX, u.y - this.camY);
+      this.fx3.shake = Math.max(this.fx3.shake, d < 30 ? 0.75 * (1 - d / 30) + (u.id === this.meId ? 0.25 : 0) : 0);
+    }
+  }
+
+  /** Teleport beams: at the hero (if you can see them) and at the destination (everyone sees it). */
+  private updateTeleports(w: World, team: Team) {
+    for (const h of w.heroes) {
+      const c = h.hero!.channel;
+      if (!c || c.kind !== 'tp' || !h.alive) continue;
+      const k = 1 - c.t / c.total;
+      const col = TEAM_HEX[h.team === 1 ? 1 : 0];
+      if (!this.tpFrom.has(h.id)) this.tpFrom.set(h.id, { x: h.x, y: h.y });
+      if (w.canSee(team, h)) this.fx3.beam('from' + h.id, h.x, h.y, col, k);
+      const t = w.unit(c.targetId);
+      if (t) {
+        const dest = tpLanding(w, h.team as Team, t);
+        this.fx3.beam('to' + h.id, dest.x, dest.y, col, k);
       }
     }
   }
 
   private anim(id: number): Anim {
     let a = this.anims.get(id);
-    if (!a) this.anims.set(id, (a = { phase: 0, walk: 0, atk: 0, cast: 0 }));
+    if (!a)
+      this.anims.set(
+        id,
+        (a = { phase: 0, walk: 0, atk: 0, cast: 0, atkAt: -9, atkTarget: -1, impactDone: true, castAt: -9, castSlot: -1, blastAt: -9, trailAt: 0, stepSign: 1, ironHide: false, glintAt: 0 }),
+      );
     return a;
   }
 
@@ -549,9 +647,121 @@ export class Renderer3D extends Renderer {
     c.mixer?.update(dt);
   }
 
+  /**
+   * Brakk, animated by hand: a heavy stomping walk, breathing idle, an overhead hammer slam,
+   * Shield Charge (lean in behind the shield), Earthsplitter (leap, then slam the ground) and a
+   * dazed sway while stunned. Each part is a few keyframes per joint, added on top of the stance.
+   */
+  private animateBrakk(e: Obj, u: Unit, time: number) {
+    const a = this.anim(u.id);
+    const dt = this.dt;
+    const now = this.clock;
+    const j = e.joints;
+    const speed = Math.hypot(u.x - u.px, u.y - u.py) * 30;
+    const dashing = !!u.dash;
+    const moving = speed > 0.5 && u.stunTimer <= 0 && !dashing;
+    a.walk += ((moving ? 1 : 0) - a.walk) * Math.min(1, dt * 8);
+    if (moving || dashing) a.phase += dt * (dashing ? 22 : 4.2 + speed * 0.75);
+    const s = Math.sin(a.phase);
+    const walk = a.walk;
+    // Base: idle breathing, slow look-around, then a heavy walk on top.
+    const breathe = Math.sin(time * 1.8 + u.id) * 0.035 * (1 - walk);
+    const P = { torso: [breathe + walk * 0.12, s * 0.12 * walk, 0], head: [-walk * 0.08, Math.sin(time * 0.45 + u.id) * 0.18 * (1 - walk), 0], legL: [s * 0.6 * walk, 0, 0], legR: [-s * 0.6 * walk, 0, 0], armL: [s * 0.1 * walk, 0, 0], armR: [-s * 0.35 * walk, 0, 0], weapon: [Math.sin(time * 1.1 + u.id) * 0.05 * (1 - walk) - walk * 0.15, 0, 0] } as Record<string, number[]>;
+    let rigY = -Math.abs(s) * 0.1 * walk;
+    let rigX = 0;
+    const addP = (k: string, x: number, y = 0, z = 0) => {
+      P[k][0] += x;
+      P[k][1] += y;
+      P[k][2] += z;
+    };
+    // Heavy footfalls: a dust puff (and a thud for your own hero) each time a foot lands.
+    const sign = s >= 0 ? 1 : -1;
+    if (moving && sign !== a.stepSign && walk > 0.6) {
+      const side = sign > 0 ? 1 : -1;
+      const fx = u.x + Math.cos(u.facing + Math.PI / 2) * 0.5 * side;
+      const fy = u.y + Math.sin(u.facing + Math.PI / 2) * 0.5 * side;
+      this.fx3.dust(fx, fy, 2, 0.7, 0x8a7558, 0.25, 0.6);
+      if (u.id === this.meId) this.sound?.('stomp', u.x, u.y, 0.5);
+    }
+    a.stepSign = sign;
+    // Hammer slam attack: wind up overhead, smash down, recover. Impact flash at ~0.19 s.
+    const ta = now - a.atkAt;
+    if (ta < 0.65) {
+      addP('armR', track(ta, [[0, 0], [0.12, -2.9], [0.2, -0.75], [0.32, -0.75], [0.62, 0]]));
+      addP('weapon', track(ta, [[0, 0], [0.12, -0.4], [0.2, -1.05], [0.32, -1.05], [0.62, 0]]));
+      addP('torso', track(ta, [[0, 0], [0.12, -0.22], [0.2, 0.45], [0.32, 0.45], [0.62, 0]]), track(ta, [[0, 0], [0.12, 0.35], [0.2, -0.12], [0.62, 0]]));
+      addP('armL', track(ta, [[0, 0], [0.12, 0.25], [0.2, -0.2], [0.62, 0]]));
+      rigY += track(ta, [[0, 0], [0.2, -0.12], [0.32, -0.12], [0.62, 0]]);
+      if (!a.impactDone && ta >= 0.19) {
+        a.impactDone = true;
+        const t = this.world?.unit(a.atkTarget);
+        const hx = t ? t.x : u.x + Math.cos(u.facing) * 2.2;
+        const hy = t ? t.y : u.y + Math.sin(u.facing) * 2.2;
+        this.fx3.sparks(hx, hy, 1.1, 7, 0xffd27a, 4);
+        this.fx3.dust(hx, hy, 3, 0.9, 0x8a7558, 0.4, 0.6);
+      }
+    }
+    // Shield Charge: lean in behind the raised shield, hammer pulled back, legs pumping.
+    const tc = now - a.castAt;
+    if (a.castSlot === 0 && (dashing || tc < 0.5)) {
+      const c = dashing ? 1 : 1 - Math.min(1, tc / 0.5);
+      addP('torso', 0.5 * c);
+      addP('head', -0.35 * c);
+      addP('armL', -0.55 * c, 0, 0.15 * c);
+      addP('armR', 0.75 * c);
+      addP('weapon', 0.45 * c);
+      addP('legL', Math.sin(a.phase) * 0.9 * c);
+      addP('legR', -Math.sin(a.phase) * 0.9 * c);
+      rigY += -Math.abs(Math.sin(a.phase)) * 0.12 * c;
+      if (dashing && now - a.trailAt > 0.05) {
+        a.trailAt = now;
+        this.fx3.dust(u.x - Math.cos(u.facing) * 0.8, u.y - Math.sin(u.facing) * 0.8, 2, 1.1, 0x9a8466, 0.4, 0.7);
+      }
+    }
+    // Earthsplitter: crouch, leap with the hammer high, slam down as the ground breaks.
+    const te = Math.min(now - a.castAt, a.blastAt > a.castAt ? 0.6 + (now - a.blastAt) : 9);
+    if (a.castSlot === 2 && te < 1.35) {
+      rigY += track(te, [[0, 0], [0.08, -0.18], [0.34, 1.5], [0.56, 0.4], [0.62, -0.3], [0.95, -0.3], [1.35, 0]]);
+      addP('armR', track(te, [[0, 0], [0.3, -3.1], [0.56, -3.25], [0.63, -0.45], [0.95, -0.45], [1.35, 0]]));
+      addP('weapon', track(te, [[0, 0], [0.3, -0.2], [0.56, -0.2], [0.63, -1.35], [0.95, -1.35], [1.35, 0]]));
+      addP('torso', track(te, [[0, 0], [0.3, -0.38], [0.56, -0.3], [0.63, 0.75], [0.95, 0.75], [1.35, 0]]));
+      addP('armL', track(te, [[0, 0], [0.3, 0.45], [0.63, -0.25], [1.35, 0]]));
+      const tuck = track(te, [[0, 0], [0.08, 0.25], [0.34, -0.55], [0.56, -0.2], [0.63, 0.35], [0.95, 0.35], [1.35, 0]]);
+      addP('legL', tuck);
+      addP('legR', tuck * 0.6);
+      rigX += track(te, [[0, 0], [0.63, 0.1], [0.95, 0.1], [1.35, 0]]);
+    }
+    // Stunned: a dazed sway, head down, hammer drooping.
+    if (u.stunTimer > 0) {
+      addP('torso', 0.12, 0, Math.sin(time * 5) * 0.14);
+      addP('head', 0.35, Math.sin(time * 3.3) * 0.2);
+      addP('armR', 0.3);
+      addP('weapon', 0.5);
+    }
+    // Iron Hide (below half health): a metal ring when it kicks in, then a glint now and then.
+    const iron = abilityLevel(u, 'ironHide') > 0 && u.hp < u.maxHp * 0.5;
+    if (iron && !a.ironHide) {
+      this.fx3.flash(u.x, u.y, 2, 5, 0xc9d6e3, 0.4);
+      this.fx3.shockwave(u.x, u.y, 2.6, 0xc9d6e3, 0.35);
+      this.sound?.('ironClang', u.x, u.y, 1);
+    }
+    if (iron && now - a.glintAt > 1.6) {
+      a.glintAt = now;
+      this.fx3.sparks(u.x, u.y, 2.2, 4, 0xe2e8f0, 2.5);
+    }
+    a.ironHide = iron;
+    for (const k of ['torso', 'head', 'legL', 'legR', 'armL', 'armR', 'weapon'] as const) pose(j[k], P[k][0], P[k][1], P[k][2]);
+    if (j.rig) {
+      const rp = j.rig.userData.restPos as number[];
+      j.rig.position.set(rp[0], rp[1] + rigY, rp[2]);
+      pose(j.rig, rigX, 0, 0);
+    }
+  }
+
   /** Walk cycle, attack swing and casting pose, layered on the model's rest pose. */
   private animate(e: Obj, u: Unit, time: number) {
     if (e.char) return this.animateChar(e.char, u);
+    if (e.key === 'hero:brakk') return this.animateBrakk(e, u, time);
     const a = this.anim(u.id);
     const dt = this.dt;
     const speed = Math.hypot(u.x - u.px, u.y - u.py) * 30; // meters per second
@@ -579,6 +789,7 @@ export class Renderer3D extends Renderer {
   private updateCorpses() {
     this.corpses = this.corpses.filter((c) => {
       c.t += this.dt;
+      if (c.kind === 'brakk') return this.brakkCorpse(c);
       const fall = Math.min(1, c.t / 0.45);
       c.o.rotation.order = 'YXZ';
       c.o.rotation.x = -fall * fall * (Math.PI / 2) * 0.95;
@@ -591,6 +802,36 @@ export class Renderer3D extends Renderer {
       }
       return true;
     });
+  }
+
+  /** Brakk falls to his knees, the hammer drops, then he topples forward with a thud of dust. */
+  private brakkCorpse(c: { o: THREE.Object3D; t: number; joints: Partial<Record<Joint, THREE.Object3D>>; x?: number; y?: number; thud?: boolean }): boolean {
+    const t = c.t;
+    const j = c.joints;
+    pose(j.torso, track(t, [[0, 0], [0.35, 0.45], [0.9, 0.3]]), 0, 0);
+    pose(j.head, track(t, [[0, 0], [0.35, 0.45]]), 0, 0);
+    pose(j.armR, track(t, [[0, 0], [0.35, 0.5]]), 0, 0.3);
+    pose(j.weapon, track(t, [[0, 0], [0.4, 1.4]]), 0, 0);
+    pose(j.armL, track(t, [[0, 0], [0.35, 0.3]]), 0, 0);
+    pose(j.legL, track(t, [[0, 0], [0.3, -1.1]]), 0, 0);
+    pose(j.legR, track(t, [[0, 0], [0.3, -1.0]]), 0, 0);
+    if (j.rig) {
+      const rp = j.rig.userData.restPos as number[];
+      j.rig.position.set(rp[0], rp[1] + track(t, [[0, 0], [0.3, -0.55]]), rp[2]);
+    }
+    c.o.rotation.order = 'YXZ';
+    c.o.rotation.x = track(t, [[0, 0], [0.45, 0], [0.85, 1.3]]);
+    if (!c.thud && t > 0.85 && c.x !== undefined && c.y !== undefined) {
+      c.thud = true;
+      this.fx3.dust(c.x, c.y, 7, 1.5, 0x8a7558, 1.2, 1);
+      this.sound?.('armorFall', c.x, c.y, 1);
+    }
+    if (t > 2.2) c.o.position.y -= this.dt * 1.4;
+    if (t > 3) {
+      this.scene.remove(c.o);
+      return false;
+    }
+    return true;
   }
 
   private syncUnits(w: World, alpha: number, team: Team) {
@@ -759,6 +1000,40 @@ interface Anim {
   walk: number;
   atk: number;
   cast: number;
+  /** Renderer clock times of the last attack, cast and Earthsplitter blast. */
+  atkAt: number;
+  atkTarget: number;
+  impactDone: boolean;
+  castAt: number;
+  castSlot: number;
+  blastAt: number;
+  trailAt: number;
+  stepSign: number;
+  ironHide: boolean;
+  glintAt: number;
+}
+
+/** Where a teleport lands: on the home side of the target building (same rule as the simulation). */
+function tpLanding(w: World, team: Team, t: Unit) {
+  const f = w.map.fountains[team];
+  const d = Math.hypot(t.x - f.x, t.y - f.y) || 1;
+  const off = t.radius + TELEPORT.offset;
+  return { x: t.x + ((f.x - t.x) / d) * off, y: t.y + ((f.y - t.y) / d) * off };
+}
+
+/** Smooth value along keyframes [time, value] (holds the ends). */
+function track(t: number, keys: [number, number][]): number {
+  if (t <= keys[0][0]) return keys[0][1];
+  for (let i = 1; i < keys.length; i++) {
+    const [t1, v1] = keys[i];
+    if (t <= t1) {
+      const [t0, v0] = keys[i - 1];
+      const k = (t - t0) / (t1 - t0 || 1);
+      const e = k * k * (3 - 2 * k);
+      return v0 + (v1 - v0) * e;
+    }
+  }
+  return keys[keys.length - 1][1];
 }
 function jointsOf(o: THREE.Object3D): Partial<Record<Joint, THREE.Object3D>> {
   const j: Partial<Record<Joint, THREE.Object3D>> = {};

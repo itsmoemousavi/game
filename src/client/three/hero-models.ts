@@ -93,6 +93,7 @@ function humanoid(o: BodyOpts): Body {
   // Named joints: the renderer animates these (walk, attack, cast, death).
   root.name = 'rig';
   torso.name = 'torso';
+  head.name = 'head';
   legs[0].name = 'legL';
   legs[1].name = 'legR';
   arms[0].g.name = 'armL';
@@ -109,48 +110,76 @@ function at(b: Body, hand: THREE.Object3D): THREE.Vector3 {
 }
 
 // ------------------------------------------------------------ heroes
+/**
+ * Brakk the Bulwark: a heavy armored warrior with a tower shield on the left arm and a war
+ * hammer in the right hand. Built in a neutral stance; the renderer animates the joints
+ * (rig, torso, head, legs, arms and the hammer as its own 'weapon' joint).
+ */
 function brakk() {
-  const b = humanoid({ skin: 0xb98b67, cloth: 0x8a7a55, cloth2: 0x4b4033, boots: 0x3a2f25, bulk: 1.35, hip: 0.85 });
-  const gold = M(0xc9a227, { metalness: 0.6, roughness: 0.35 });
-  const steel = M(0x9aa3ad, { metalness: 0.7, roughness: 0.35 });
-  add(b.torso, mesh(cyl(0.47, 0.36, 0.5, 8), steel), 0, 0.5, 0.02);
+  const b = humanoid({ skin: 0x9c7558, cloth: 0x4a3a2c, cloth2: 0x3a3029, boots: 0x2e2722, bulk: 1.4, hip: 0.88, torsoH: 0.78 });
+  const steel = M(0x8a929c, { metalness: 0.75, roughness: 0.35 });
+  const iron = M(0x4b5058, { metalness: 0.7, roughness: 0.45 });
+  const gold = M(0xb8902c, { metalness: 0.7, roughness: 0.3 });
+  const leather = M(0x5a3d26);
+  const fur = M(0x6e5a44, { roughness: 0.95 });
+  const bone = M(0xd9ccb0);
+  // Breastplate with a gold rim, fur mantle on the shoulders, belt and a hanging tabard.
+  add(b.torso, mesh(cyl(0.52, 0.4, 0.56, 8), steel), 0, 0.52, 0.02);
+  add(b.torso, mesh(box(0.08, 0.5, 0.06), gold), 0, 0.5, 0.45);
+  add(b.torso, mesh(box(0.52, 0.07, 0.08), gold), 0, 0.3, 0.42);
+  add(b.torso, mesh(cyl(0.58, 0.52, 0.2, 10), fur), 0, 0.86, -0.03).scale.set(1, 1, 0.85);
+  add(b.torso, mesh(cyl(0.42, 0.42, 0.13, 8), leather), 0, 0.06, 0);
+  add(b.torso, mesh(box(0.2, 0.15, 0.07), gold), 0, 0.06, 0.41);
+  add(b.torso, mesh(box(0.44, 0.62, 0.05), M(0x4d1b1b)), 0, -0.3, 0.33);
+  add(b.torso, mesh(box(0.44, 0.06, 0.06), gold), 0, -0.6, 0.34);
+  add(b.torso, rot(mesh(box(0.55, 0.7, 0.05), M(0x3f2a1e)), 0.15, 0, 0), 0, 0.35, -0.42); // back cloak piece
+  // Pauldrons with spikes and gauntlets: on the arms, so they move with them.
+  for (const [arm, s] of [[b.armL, -1], [b.armR, 1]] as const) {
+    add(arm, mesh(sph(0.27, 0), iron), 0, 0.04, 0).scale.set(1.3, 0.85, 1.15);
+    add(arm, mesh(box(0.46, 0.06, 0.42), gold), 0, 0.2, 0);
+    for (const k of [-1, 1]) add(arm, rot(mesh(cone(0.055, 0.28, 5), steel), 0, 0, -s * 0.45), s * 0.16, 0.26, k * 0.12);
+    add(arm, mesh(cyl(0.12, 0.14, 0.28, 7), iron), 0, -0.5, 0);
+    add(arm, mesh(cyl(0.135, 0.135, 0.05, 7), gold), 0, -0.36, 0);
+  }
+  // Greaves, knee guards and armored boots.
+  for (const leg of [b.legL, b.legR]) {
+    add(leg, mesh(cyl(0.16, 0.14, 0.42, 7), iron), 0, -0.55, 0.02);
+    add(leg, mesh(sph(0.13, 0), steel), 0, -0.3, 0.1);
+    add(leg, mesh(box(0.3, 0.13, 0.42), iron), 0, -0.82, 0.06);
+  }
+  // Horned helm with a face guard and glowing eye slit; braided beard below.
+  add(b.head, mesh(sph(0.26, 1), iron), 0, 0.05, 0).scale.set(1, 0.95, 1.05);
+  add(b.head, mesh(box(0.32, 0.22, 0.08), iron), 0, -0.07, 0.2);
+  add(b.head, mesh(box(0.24, 0.035, 0.02), glow(0xffb347, 2.2)), 0, 0.0, 0.245);
+  add(b.head, mesh(box(0.05, 0.32, 0.06), gold), 0, 0.05, 0.235);
   for (const s of [-1, 1]) {
-    add(b.torso, mesh(sph(0.24, 0), gold), s * 0.55, 0.66, 0).scale.set(1.2, 0.8, 1.1);
-    add(b.torso, rot(mesh(cone(0.06, 0.22, 5), steel), 0, 0, -s * 0.9), s * 0.72, 0.78, 0);
+    add(b.head, rot(mesh(cone(0.075, 0.42, 6), bone), 0, 0, -s * 1.05), s * 0.33, 0.2, 0);
+    add(b.head, rot(mesh(cone(0.045, 0.22, 5), bone), 0, 0, -s * 0.15), s * 0.55, 0.42, 0);
   }
-  add(b.head, mesh(sph(0.235, 1), steel), 0, 0.04, 0).scale.set(1, 0.9, 1);
-  add(b.head, mesh(box(0.06, 0.22, 0.05), gold), 0, -0.02, 0.21);
-  for (const s of [-1, 1]) add(b.head, rot(mesh(cone(0.06, 0.38, 6), M(0xe8dcc0)), 0, 0, -s * 1.0), s * 0.3, 0.18, 0);
-  rot(b.legL, -0.25, 0, 0.12);
-  rot(b.legR, 0.25, 0, -0.12);
-  b.root.position.y = -0.03;
-  // tower shield held out front-left
-  rot(b.armL, -0.6, 0, -0.35);
-  const sh = add(b.root, grp(), 0, 0, 0);
-  sh.position.copy(at(b, b.handL)).add(new THREE.Vector3(-0.05, 0.05, 0.12));
-  rot(sh, 0, -0.5, 0);
-  add(sh, mesh(box(0.7, 1.05, 0.09), steel), 0, 0, 0);
-  add(sh, mesh(box(0.78, 0.09, 0.12), gold), 0, 0.5, 0);
-  add(sh, mesh(box(0.78, 0.09, 0.12), gold), 0, -0.5, 0);
-  add(sh, mesh(box(0.09, 1.0, 0.12), gold), 0, 0, 0.01);
-  add(sh, mesh(sph(0.14, 0), gold), 0, 0.08, 0.07);
-  // war hammer raised overhead, ready to slam
-  rot(b.armR, Math.PI - 0.35, 0, -0.25);
-  const hm = add(b.root, grp(), 0, 0, 0);
-  hm.position.copy(at(b, b.handR));
-  rot(hm, -0.6, 0, -0.2);
-  add(hm, mesh(cyl(0.045, 0.045, 1.2), M(0x5a3d26)), 0, 0.25, 0);
-  add(hm, mesh(box(0.55, 0.32, 0.32), steel), 0, 0.85, 0);
-  add(hm, mesh(box(0.57, 0.09, 0.34), gold), 0, 0.85, 0);
-  b.root.rotation.y = 0.15;
-  for (let i = 0; i < 7; i++) {
-    const a = (i / 7) * Math.PI * 2;
-    add(fx, rot(mesh(box(0.08, 0.02, 0.9), glow(0xffa53a, 1.8)), 0, a, 0), Math.sin(a) * 0.9, 0.012, Math.cos(a) * 0.9);
-  }
-  for (let i = 0; i < 9; i++) {
-    const a = i * 0.7;
-    add(fx, rot(mesh(sph(0.08 + (i % 3) * 0.03, 0), M(0x7a6a55)), a, a, a), Math.cos(a) * 1.6, 0.06 + (i % 3) * 0.15, Math.sin(a) * 1.6);
-  }
+  add(b.head, rot(mesh(cone(0.11, 0.32, 5), M(0x7a5a3a)), Math.PI, 0, 0), 0, -0.3, 0.17);
+  // Tower shield strapped to the left forearm, facing forward.
+  const sh = add(b.armL, grp(), 0.02, -0.46, 0.2);
+  rot(sh, 0.7, 0, 0);
+  add(sh, mesh(box(0.78, 1.1, 0.1), iron), 0, 0, 0);
+  add(sh, mesh(box(0.86, 0.09, 0.13), gold), 0, 0.53, 0);
+  add(sh, mesh(box(0.86, 0.09, 0.13), gold), 0, -0.53, 0);
+  for (const s of [-1, 1]) add(sh, mesh(box(0.09, 1.1, 0.13), gold), s * 0.4, 0, 0);
+  add(sh, mesh(sph(0.15, 0), steel), 0, 0.06, 0.08);
+  add(sh, rot(mesh(cone(0.2, 0.36, 3), gold), Math.PI / 2, 0, 0), 0, -0.22, 0.06);
+  // War hammer in the right hand, held upright at rest: its own joint so it can swing.
+  const w = add(b.armR, grp(), 0, -0.62, 0.04);
+  w.name = 'weapon';
+  add(w, mesh(cyl(0.05, 0.055, 1.35), leather), 0, 0.38, 0);
+  add(w, mesh(sph(0.08, 0), gold), 0, -0.3, 0);
+  for (const y of [0.05, 0.75]) add(w, mesh(cyl(0.065, 0.065, 0.06), gold), 0, y, 0);
+  add(w, mesh(box(0.66, 0.38, 0.38), iron), 0, 1.08, 0);
+  add(w, mesh(box(0.7, 0.08, 0.4), gold), 0, 1.08, 0);
+  add(w, mesh(box(0.12, 0.42, 0.42), steel), -0.34, 1.08, 0);
+  add(w, rot(mesh(cone(0.1, 0.28, 5), steel), 0, 0, Math.PI / 2), 0.46, 1.08, 0);
+  add(w, mesh(cone(0.08, 0.24, 5), steel), 0, 1.38, 0);
+  // Neutral stance: shield arm forward, hammer arm relaxed slightly out.
+  rot(b.armL, -0.75, 0, -0.18);
+  rot(b.armR, -0.15, 0, 0.16);
   return b.root;
 }
 

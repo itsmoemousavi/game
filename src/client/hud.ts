@@ -202,12 +202,14 @@ export class Hud {
       const canLearn = h.skillPoints > 0 && st.level < maxAbilityLevel(a, h.level);
       const cd = Math.ceil(st.cooldown);
       const cost = a.manaCost[Math.max(0, st.level - 1)];
-      const key = `${st.level}|${blocker}|${cd}|${canLearn}`;
+      // Short of mana shows even while the spell is cooling down, so you know before it's ready.
+      const lowMana = st.level > 0 && a.targeting !== 'passive' && me.mana < cost;
+      const key = `${st.level}|${blocker}|${cd}|${canLearn}|${lowMana}`;
       if (key === this.abilityKeys[i]) return;
       this.abilityKeys[i] = key;
       const b = this.buttons[i];
       b.classList.toggle('unlearned', st.level === 0);
-      b.classList.toggle('nomana', blocker === 'mana');
+      b.classList.toggle('nomana', lowMana);
       b.classList.toggle('cooling', blocker === 'cooldown');
       b.querySelector('.cd')!.textContent = blocker === 'cooldown' ? String(cd) : '';
       b.querySelectorAll('.pips i').forEach((p, k) => p.classList.toggle('on', k < st.level));
