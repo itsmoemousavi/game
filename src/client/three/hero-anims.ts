@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { HeroId, Unit, World, abilityLevel, isInvisible } from '../../sim';
 import type { Fx3D } from './fx';
 import type { Joint } from './models';
+import type { MonsterKind } from './monster-anims';
 
 /**
  * Hand-made animation for the six heroes: idle, walk, attacks, every spell, buffs and deaths.
@@ -83,7 +84,7 @@ const BONES = ['torso', 'head', 'legL', 'legR', 'armL', 'armR', 'weapon'] as con
 type Bone = (typeof BONES)[number];
 
 /** Collects joint offsets for one frame, then applies them. */
-class Pose {
+export class Pose {
   p: Record<Bone, [number, number, number]> = { torso: [0, 0, 0], head: [0, 0, 0], legL: [0, 0, 0], legR: [0, 0, 0], armL: [0, 0, 0], armR: [0, 0, 0], weapon: [0, 0, 0] };
   rigY = 0;
   rigX = 0;
@@ -104,15 +105,15 @@ class Pose {
   }
 }
 
-const v3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
+export const v3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 /** World position of a point given in a joint's own coordinates (call after posing). */
-function at(root: THREE.Object3D, j: THREE.Object3D | undefined, x: number, y: number, z: number): THREE.Vector3 {
+export function at(root: THREE.Object3D, j: THREE.Object3D | undefined, x: number, y: number, z: number): THREE.Vector3 {
   if (!j) return root.getWorldPosition(v3()).add(v3(0, 2, 0));
   root.updateMatrixWorld(true);
   return j.localToWorld(v3(x, y, z));
 }
 /** World point beside the unit on the ground: `fwd` meters ahead, `side` to the right. */
-function near(_c: AnimCtx, u: Unit, fwd: number, side = 0): [number, number] {
+export function near(_c: AnimCtx, u: Unit, fwd: number, side = 0): [number, number] {
   const f = u.facing;
   return [u.x + Math.cos(f) * fwd - Math.sin(f) * side, u.y + Math.sin(f) * fwd + Math.cos(f) * side];
 }
@@ -126,7 +127,7 @@ interface Walk {
 }
 
 /** Shared walk cycle + footstep detection. `cadence` = cycle speed at rest, `perMs` per m/s. */
-function locomotion(c: AnimCtx, u: Unit, a: Anim, cadence: number, perMs: number, onStep?: (side: number) => void): Walk {
+export function locomotion(c: AnimCtx, u: Unit, a: Anim, cadence: number, perMs: number, onStep?: (side: number) => void): Walk {
   const speed = Math.hypot(u.x - u.px, u.y - u.py) * 30;
   const dashing = !!u.dash;
   const moving = speed > 0.5 && u.stunTimer <= 0 && !dashing;
@@ -140,13 +141,13 @@ function locomotion(c: AnimCtx, u: Unit, a: Anim, cadence: number, perMs: number
 }
 
 /** A footstep puff at the foot that just landed. */
-function footDust(c: AnimCtx, u: Unit, side: number, color = 0x8a7558, size = 0.6) {
+export function footDust(c: AnimCtx, u: Unit, side: number, color = 0x8a7558, size = 0.6) {
   const [x, y] = near(c, u, 0, side * 0.4);
   c.fx.dust(x, y, 1, size, color, 0.2, 0.5);
 }
 
 /** Stunned: dazed sway and drooping head, on any hero. */
-function stunned(P: Pose, u: Unit, time: number) {
+export function stunned(P: Pose, u: Unit, time: number) {
   if (u.stunTimer <= 0) return;
   P.add('torso', 0.15, 0, Math.sin(time * 5) * 0.14);
   P.add('head', 0.35, Math.sin(time * 3.3) * 0.2);
@@ -728,7 +729,7 @@ let groundFn: ((x: number, y: number) => number) | null = null;
 export function setGround(fn: (x: number, y: number) => number) {
   groundFn = fn;
 }
-function groundAt(_c: AnimCtx, x: number, y: number) {
+export function groundAt(_c: AnimCtx, x: number, y: number) {
   return groundFn ? groundFn(x, y) : 0;
 }
 
@@ -775,6 +776,8 @@ export interface Corpse {
   t: number;
   joints: Joints;
   kind?: HeroId;
+  /** Creeps, jungle monsters and the Warden. */
+  mkind?: MonsterKind;
   x?: number;
   y?: number;
   thud?: boolean;

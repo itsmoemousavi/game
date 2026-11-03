@@ -242,6 +242,13 @@ const HOUSE_CLEARING = 12;
  * (as a fraction), so every lane's outer tower is equally "half-way out".
  */
 const T1_FRACTION = 0.86;
+/**
+ * Like Dota, each team has an easy lane and a hard lane: team 0's easy lane is the bottom one
+ * (its first tower stands out near the river) and its hard lane is the top one (first tower
+ * much closer to base). Mirrored, team 1's easy lane is the top and its hard lane the bottom,
+ * so both teams get one of each.
+ */
+const T1_HARD_LANE_FRACTION = 0.6;
 /** Tier-2 towers stand a bit further back toward the base. */
 const T2_FRACTION = 0.45;
 /**
@@ -345,7 +352,7 @@ export function createMap(): GameMap {
         break;
       }
     }
-    const t1 = sideOf(path, river * T1_FRACTION);
+    const t1 = sideOf(path, river * (lane === 'top' ? T1_HARD_LANE_FRACTION : T1_FRACTION));
     const t2 = sideOf(path, river * T2_FRACTION);
     const t1Pos = { x: t1.at.x + t1.px * TOWER_SIDE_OFFSET, y: t1.at.y + t1.py * TOWER_SIDE_OFFSET };
     const t2Pos = { x: t2.at.x + t2.px * TOWER_SIDE_OFFSET, y: t2.at.y + t2.py * TOWER_SIDE_OFFSET };
@@ -455,7 +462,9 @@ export function createMap(): GameMap {
       const i = cy * GRID + cx;
       const ramp = onRamp(x, y) || onRamp(MAP_SIZE - x, MAP_SIZE - y);
       if (d <= half - 1.6 || ramp) {
-        if (Math.hypot(x - HOUSE.x, y - HOUSE.y) > HOUSE_CLEARING && Math.hypot(MAP_SIZE - x - HOUSE.x, MAP_SIZE - y - HOUSE.y) > HOUSE_CLEARING) height[i] = 0;
+        // Only the water itself is low ground; the top of a slope counts as the bank.
+        const water = d <= half - 1.6;
+        if (water && Math.hypot(x - HOUSE.x, y - HOUSE.y) > HOUSE_CLEARING && Math.hypot(MAP_SIZE - x - HOUSE.x, MAP_SIZE - y - HOUSE.y) > HOUSE_CLEARING) height[i] = 0;
         if (ramp && d > half) continue; // the top of a slope keeps whatever is there
         if (d <= half) walkable[i] = 1;
       } else {

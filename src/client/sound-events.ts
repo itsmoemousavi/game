@@ -64,7 +64,8 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
           sfx.play(ATTACK_SOUNDS[s.hero.defId] ?? 'swing', near(s));
           if (s.hero.defId === 'vexa' && s.hero.lastCrit) sfx.play('critPing', near(s));
         }
-        else if (s.kind === 'neutral' && s.neutral?.boss) sfx.play('hit', near(s));
+        else if (s.kind === 'neutral' && s.neutral?.boss) sfx.play('wardenPunch', near(s));
+        else if (s.kind === 'neutral') sfx.play(s.radius > 0.9 ? 'woodPunch' : 'impStab', near(s) * (involvesMe ? 0.9 : 0.5));
         else sfx.play('creep', near(s) * (involvesMe ? 1 : 0.4));
         if (t && t.id === meId && s.projectileSpeed === 0) sfx.play('hit', 0.6);
         break;
@@ -153,7 +154,7 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
         break;
       case 'wardenSlam': {
         const b = w.unit(e.unitId);
-        if (b && w.canSee(team, b)) sfx.play(e.phase === 'hit' ? 'slam' : 'roar', near(b) * (e.phase === 'hit' ? 1 : 0.35));
+        if (b && w.canSee(team, b)) sfx.play(e.phase === 'hit' ? 'earthsplitter' : 'roar', near(b) * (e.phase === 'hit' ? 0.85 : 0.6));
         break;
       }
       case 'itemDrop':

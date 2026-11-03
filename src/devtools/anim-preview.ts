@@ -115,3 +115,41 @@ const fx = new Fx3D(scene, () => 0);
   o.traverse((c) => { if ((c as THREE.Mesh).isMesh) meshes++; });
   return meshes;
 };
+import { animateMonster, monsterCorpse, monsterKind } from '../client/three/monster-anims';
+/** Monsters: key = 'creep:melee:0' | 'creep:ranged:1' | 'imp' | 'brute' | 'warden'; scenario idle|walk|attack|slam|die. */
+(window as any).runM = (key: string, scenario: string, t: number, view = 'front', scale = 1.6) => {
+  for (const c of [...scene.children]) if (c.userData.hero) scene.remove(c);
+  const o = model(key);
+  o.userData.hero = true;
+  o.scale.setScalar(scale);
+  scene.add(o);
+  const jn: any = {};
+  for (const n of ['rig', 'torso', 'head', 'legL', 'legR', 'armL', 'armR', 'weapon']) { const x = o.getObjectByName(n); if (x) jn[n] = x; }
+  const kind = monsterKind(key)!;
+  const u: any = { id: 3, x: 0, y: 0, px: 0, py: 0, facing: 0, stunTimer: 0, hp: 100, maxHp: 100, buffs: [], team: 0, alive: true };
+  const ctx: AnimCtx = { fx, clock: 0, dt: 1 / 60, world: { unit: () => undefined } as any, meId: -5, camX: 0, camY: 0, sound: () => {} };
+  const a = newAnim();
+  o.rotation.y = Math.PI / 2;
+  const steps = Math.round(t * 60) + 60;
+  let corpse: any = null;
+  for (let i = 0; i < steps; i++) {
+    ctx.clock = i / 60;
+    if (i === 60) {
+      if (scenario === 'attack') { a.atkAt = ctx.clock; a.impactDone = false; }
+      if (scenario === 'slam') { a.castAt = ctx.clock; a.castSlot = 9; }
+      if (scenario === 'die') corpse = { o, t: 0, joints: jn, mkind: kind, x: 0, y: 0 };
+    }
+    if (scenario === 'slam' && i === 60 + 48) a.blastAt = ctx.clock;
+    if (scenario === 'walk') u.px = u.x - 0.12;
+    if (corpse) { corpse.t += 1 / 60; monsterCorpse(ctx, corpse); }
+    else animateMonster(ctx, kind, o, jn, u, a, i / 60);
+    fx.update(1 / 60, i / 60);
+  }
+  const k = key === 'warden' ? 1.6 : 1;
+  const views: any = { front: [9 * k, 3.4 * k, 1.5 * k], side: [0.5, 3.4 * k, 9 * k] };
+  const v = views[view];
+  cam.position.set(v[0], v[1], v[2]);
+  cam.lookAt(0, 1.6 * k, 0);
+  gl.render(scene, cam);
+  return true;
+};

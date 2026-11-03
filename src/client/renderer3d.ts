@@ -9,6 +9,7 @@ import { Character, character, hasAsset, loadAssets } from './three/assets';
 import { Fx3D } from './three/fx';
 import { Anim, AnimCtx, Corpse, animateHero, buffFx, heroAttack, heroBlink, heroCast, heroCorpse, newAnim, pose, setGround } from './three/hero-anims';
 import { SpellFx } from './three/spell-fx';
+import { MonsterCorpse, animateMonster, monsterCorpse, monsterKind, wardenSlamFx } from './three/monster-anims';
 import type { GameEvent } from '../sim';
 
 /** Ground level per map height (1 = normal, 2 = base plateau, 3 = ward hill), in meters. */
@@ -418,8 +419,10 @@ export class Renderer3D extends Renderer {
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setIndex(idx);
     geo.computeVertexNormals();
-    const water = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x1a3d48, roughness: 0.45, metalness: 0.05, transparent: true, opacity: 0.78, side: THREE.DoubleSide }));
-    water.renderOrder = 0;
+    // Drawn before the ground overlays and without writing depth, so the fog, aim arrows and
+    // spell markings painted on the river bed show on top of the water.
+    const water = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x1a3d48, roughness: 0.45, metalness: 0.05, transparent: true, opacity: 0.78, side: THREE.DoubleSide, depthWrite: false }));
+    water.renderOrder = -1;
     this.scene.add(water);
   }
 
@@ -768,6 +771,7 @@ export class Renderer3D extends Renderer {
         a.impactDone = false;
         const u = w.unit(e.sourceId);
         if (u?.hero) heroAttack(c, u, a);
+        else a.side = -a.side;
       } else if (e.type === 'cast') {
         const a = this.anim(e.unitId);
         const u = w.unit(e.unitId);
@@ -791,6 +795,16 @@ export class Renderer3D extends Renderer {
         } else this.spells.onSpellHit(c, src.hero.defId, t.x, t.y);
       } else if (e.type === 'explosion') {
         this.spells.onExplosion(c, w, this.viewTeam, e.x, e.y, e.radius, e.radius < 2 ? exec : -1);
+      } else if (e.type === 'wardenSlam') {
+        const a = this.anim(e.unitId);
+        const u = w.unit(e.unitId);
+        if (e.phase === 'windup') {
+          a.castAt = this.clock;
+          a.castSlot = 9;
+        } else {
+          a.blastAt = this.clock;
+          if (u && w.canSee(this.viewTeam, u)) wardenSlamFx(c, e.x, e.y, e.radius);
+        }
       } else if (e.type === 'itemActive') {
         const u = w.unit(e.unitId);
         if (!u || !w.canSee(this.viewTeam, u)) continue;
@@ -831,7 +845,8 @@ export class Renderer3D extends Renderer {
         // Reuse the live model as the corpse.
         this.objs.delete('u' + e.unitId);
         this.anims.delete(e.unitId);
-        this.corpses.push({ o: live.o, t: 0, joints: live.joints, kind: live.joints.rig && u.hero ? u.hero.defId : undefined, x: u.x, y: u.y });
+        const mk = live.joints.rig && !u.hero ? monsterKind(live.key) : null;
+        this.corpses.push({ o: live.o, t: 0, joints: live.joints, kind: live.joints.rig && u.hero ? u.hero.defId : undefined, mkind: mk ?? undefined, x: u.x, y: u.y });
       }
     }
   }
@@ -890,6 +905,8 @@ export class Renderer3D extends Renderer {
   private animate(e: Obj, u: Unit, time: number) {
     if (e.char) return this.animateChar(e.char, u);
     if (u.hero && e.joints.rig) return animateHero(this.actx, e.o, e.joints, u, this.anim(u.id), time);
+    const mk = e.joints.rig ? monsterKind(e.key) : null;
+    if (mk) return animateMonster(this.actx, mk, e.o, e.joints, u, this.anim(u.id), time);
     const a = this.anim(u.id);
     const dt = this.dt;
     const speed = Math.hypot(u.x - u.px, u.y - u.py) * 30; // meters per second
@@ -917,8 +934,8 @@ export class Renderer3D extends Renderer {
   private updateCorpses() {
     this.corpses = this.corpses.filter((c) => {
       c.t += this.dt;
-      if (c.kind) {
-        const keep = heroCorpse(this.actx, c);
+      if (c.kind || c.mkind) {
+        const keep = c.mkind ? monsterCorpse(this.actx, c as MonsterCorpse) : heroCorpse(this.actx, c);
         if (!keep) this.scene.remove(c.o);
         return keep;
       }

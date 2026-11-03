@@ -82,7 +82,10 @@ export type SoundName =
   | 'maelstrom'
   | 'treeFall'
   | 'bodyFall'
-  | 'frostNova';
+  | 'frostNova'
+  | 'stoneCrumble'
+  | 'wardenPunch'
+  | 'impStab';
 
 type Recipe = (s: Sfx, v: number) => void;
 
@@ -354,6 +357,23 @@ const RECIPES: Record<SoundName, Recipe> = {
     s.noise(0.5, 0.35 * v, 'highpass', 2500, 6000);
     s.tone('sine', 1400, 600, 0.4, 0.08 * v);
     for (let i = 0; i < 5; i++) s.tone('triangle', 2600 + i * 300, 2400, 0.05, 0.05 * v, 0.05 + i * 0.05);
+  },
+  /** The Warden falling apart: grinding rock and a heavy collapse. */
+  stoneCrumble: (s, v) => {
+    s.tone('sine', 60, 25, 1.2, 0.9 * v);
+    s.noise(1.2, 0.5 * v, 'lowpass', 1800, 120);
+    for (let i = 0; i < 8; i++) s.noise(0.05, 0.18 * v, 'bandpass', 900 + i * 120, 600, 0.1 + i * 0.1);
+  },
+  /** A stone fist landing. */
+  wardenPunch: (s, v) => {
+    s.noise(0.2, 0.25 * v, 'bandpass', 400, 1000);
+    s.tone('sine', 110, 40, 0.3, 0.6 * v, 0.28);
+    s.noise(0.15, 0.3 * v, 'lowpass', 1500, 300, 0.28);
+  },
+  /** A goblin's quick spear jab. */
+  impStab: (s, v) => {
+    s.noise(0.07, 0.22 * v, 'bandpass', 2500, 5000);
+    s.tone('triangle', 600, 300, 0.05, 0.05 * v, 0.1);
   },
   // ---- Brakk
   /** A heavy armored footstep. */

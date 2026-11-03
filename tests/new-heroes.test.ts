@@ -138,7 +138,7 @@ describe('Syl, Grom and Kaela', () => {
     const w = new World({ seed: 8, slots });
     let casts = 0;
     let n = 0;
-    while (w.winner === null && w.time < 45 * 60) {
+    while (w.winner === null && w.time < 60 * 60) {
       w.step();
       // Let the test runner breathe now and then (long synchronous runs time out its heartbeat on CI).
       if (++n % 3000 === 0) await new Promise((r) => setTimeout(r, 0));
