@@ -12,11 +12,11 @@ import { SpellFx } from './three/spell-fx';
 import type { GameEvent } from '../sim';
 
 /** Ground level per map height (1 = normal, 2 = base plateau, 3 = ward hill), in meters. */
-const ELEVATION = [0, 0, 1.1, 2.2];
-/** How deep the river bed is (meters below the banks), and the bridge deck height. */
-const RIVER_DEPTH = 1.1;
+/** Ground height per map level (0 = river bed, 1 = normal, 2 = base plateau, 3 = ward hill). */
+const ELEVATION = [-1.0, 0, 1.1, 2.2];
+/** Bridge deck height and the water surface (shallow: about ankle deep over the river bed). */
 const BRIDGE_DECK = 0.25;
-const WATER_LEVEL = -0.45;
+const WATER_LEVEL = -0.72;
 /** Camera: looking down at this angle from the horizon, with this field of view. */
 const PITCH = (56 * Math.PI) / 180;
 const FOV = 38;
@@ -155,19 +155,6 @@ export class Renderer3D extends Renderer {
         this.elev[vy * (n + 1) + vx] = cnt ? sum / cnt : 0;
       }
     }
-    // The river bed dips below the banks (the water surface sits a little under ground level).
-    const rp = map.riverPath;
-    for (let vy = 0; vy <= n; vy++) {
-      for (let vx = 0; vx <= n; vx++) {
-        const x = vx * map.cell;
-        const y = vy * map.cell;
-        if (Math.abs(x - y) > 40) continue;
-        let d = Infinity;
-        for (let i = 1; i < rp.length; i++) d = Math.min(d, distToSeg(x, y, rp[i - 1], rp[i]));
-        const k = Math.max(0, Math.min(1, (map.riverWidth / 2 + 0.5 - d) / 3));
-        if (k > 0) this.elev[vy * (n + 1) + vx] -= RIVER_DEPTH * k * k * (3 - 2 * k);
-      }
-    }
     this.bridges = map.bridges.map((b) => ({ ...b, c: Math.cos(b.angle), s: Math.sin(b.angle) }));
     const geo = new THREE.PlaneGeometry(map.size, map.size, n, n);
     geo.rotateX(-Math.PI / 2);
@@ -206,6 +193,7 @@ export class Renderer3D extends Renderer {
     this.buildTrees(map);
     this.buildWater(map);
     this.buildBridges(map);
+    this.buildCurbs(map);
     this.buildRocks(map);
     this.buildHouse(map);
     this.fx3 = new Fx3D(this.scene, (x, y) => this.elevationAt(x, y));
@@ -430,7 +418,7 @@ export class Renderer3D extends Renderer {
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setIndex(idx);
     geo.computeVertexNormals();
-    const water = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x23505e, roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.78, side: THREE.DoubleSide }));
+    const water = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x1a3d48, roughness: 0.45, metalness: 0.05, transparent: true, opacity: 0.78, side: THREE.DoubleSide }));
     water.renderOrder = 0;
     this.scene.add(water);
   }
@@ -476,6 +464,38 @@ export class Renderer3D extends Renderer {
       g.rotation.y = -b.angle;
       this.scene.add(g);
     }
+  }
+
+  /** River curbs: a low wall of rough stones along the banks wherever you can't walk down. */
+  private buildCurbs(map: GameMap) {
+    const n = map.grid;
+    const cells: number[] = [];
+    map.cliff.forEach((c, i) => c && cells.push(i));
+    if (!cells.length) return;
+    const geo = new THREE.DodecahedronGeometry(1, 0);
+    const mesh = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ flatShading: true }), cells.length * 2);
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const e = new THREE.Euler();
+    let k = 0;
+    for (const i of cells) {
+      const cx = i % n;
+      const cy = (i - cx) / n;
+      for (let j = 0; j < 2; j++) {
+        const h = Math.abs(Math.sin(i * 12.9898 + j * 78.233) * 43758.5453) % 1;
+        const x = (cx + 0.3 + j * 0.4 + (h - 0.5) * 0.3) * map.cell;
+        const y = (cy + 0.3 + j * 0.4 + (((h * 7) % 1) - 0.5) * 0.3) * map.cell;
+        e.set(h * 3, h * 5, h * 2);
+        q.setFromEuler(e);
+        const sz = 0.75 + h * 0.4;
+        m.compose(new THREE.Vector3(x, this.terrainAt(x, y) - 0.25, y), q, new THREE.Vector3(sz * 1.2, sz * 0.9, sz * 1.2));
+        mesh.setMatrixAt(k, m);
+        mesh.setColorAt(k++, new THREE.Color().setHSL(0.08, 0.08, 0.13 + h * 0.08));
+      }
+    }
+    mesh.receiveShadow = true;
+    mesh.castShadow = true;
+    this.scene.add(mesh);
   }
 
   /** Boulders and stones in the woods and along the river banks. */
@@ -1142,15 +1162,6 @@ function setOpacity(o: THREE.Object3D, a: number) {
 }
 
 export { TEAM_HEX };
-
-/** Distance from (x, y) to the segment a–b. */
-function distToSeg(x: number, y: number, a: { x: number; y: number }, b: { x: number; y: number }) {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const l2 = dx * dx + dy * dy || 1;
-  const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / l2));
-  return Math.hypot(x - a.x - dx * t, y - a.y - dy * t);
-}
 
 /** Height of a tower's top platform (matches the models: the crystal floats 2.35 m above it). */
 function towerTop(tier: string): number {

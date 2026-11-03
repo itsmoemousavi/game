@@ -471,7 +471,10 @@ export class World {
     this.nav = { ...this.map, walkable: new Uint8Array(this.map.walkable) };
     this.rng = new Rng(opts.seed);
     this.time = -(opts.warmup ?? 0);
-    this.vision = new Vision(this.map.grid, this.map.cell, this.map.walkable, this.map.height, this.map.house);
+    // River curbs block walking but not sight.
+    const seeThrough = new Uint8Array(this.map.walkable);
+    this.map.cliff.forEach((c, i) => c && (seeThrough[i] = 1));
+    this.vision = new Vision(this.map.grid, this.map.cell, seeThrough, this.map.height, this.map.house);
     for (const s of this.map.structures) this.spawnStructure(s.team, s.tier, s.lane, s.pos, s.rax);
     this.refreshVulnerability();
     this.rebuildNav();

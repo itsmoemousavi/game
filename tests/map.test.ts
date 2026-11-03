@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { LANE_IDS, MAP_SIZE, World, createMap, findPath, isWalkable, lineClear, mirror, pointAlong, polylineLength } from '../src/sim';
+import { CREEPS, LANE_IDS, MAP_SIZE, World, createMap, findPath, isWalkable, lineClear, mirror, pointAlong, polylineLength } from '../src/sim';
 
 const map = createMap();
+const CREEP = { ...CREEPS.melee, vision: [14, 14] as [number, number] };
 
 describe('map', () => {
   it('is point-symmetric so both teams get the same map', () => {
@@ -107,5 +108,50 @@ describe('map', () => {
       const far = { x: t.x + (best.x - t.x) * k, y: t.y + (best.y - t.y) * k };
       expect(Math.hypot(far.x - t.x, far.y - t.y), `${t.structure!.tier} ${t.structure!.lane} team ${t.team}`).toBeLessThanOrEqual(t.attackRange + t.radius + 0.6);
     }
+  });
+
+  it('the river is low ground behind curbs, with slopes to the runes, the Warden and the lanes', () => {
+    const curbs = map.cliff.reduce((n, c) => n + c, 0);
+    expect(curbs).toBeGreaterThan(100); // most of the bank is a curb
+    for (let i = 0; i < map.cliff.length; i++) if (map.cliff[i]) expect(map.walkable[i]).toBe(0);
+    const cellOf = (p: { x: number; y: number }) => Math.floor(p.y / map.cell) * map.grid + Math.floor(p.x / map.cell);
+    expect(map.height[cellOf(map.runeSpots[0])]).toBe(0);
+    // Both fountains can walk to both rune spots and to the Warden's door, and not by a long detour.
+    const door = { x: map.house.x + map.house.door.x * (map.house.outer + 2), y: map.house.y + map.house.door.y * (map.house.outer + 2) };
+    for (const f of map.fountains) {
+      for (const goal of [...map.runeSpots, door]) {
+        const path = findPath(map, f, goal, 0.7);
+        expect(path).not.toBeNull();
+        let len = 0;
+        let prev = f;
+        for (const p of path!) {
+          len += Math.hypot(p.x - prev.x, p.y - prev.y);
+          prev = p;
+        }
+        expect(len).toBeLessThan(Math.hypot(goal.x - f.x, goal.y - f.y) * 1.6);
+      }
+    }
+  });
+
+  it('from a bank you see down into the river, but not up onto the bank from the water', () => {
+    const w = new World({ seed: 3, slots: [] });
+    const r = map.runeSpots[0];
+    // A bank point beside the river near the rune: step away from the river centre until on level 1.
+    const nx = Math.SQRT1_2;
+    let bank = { x: r.x, y: r.y };
+    for (let d = 0; d < 20; d += 0.5) {
+      const p = { x: r.x - nx * d, y: r.y + nx * d };
+      const c = Math.floor(p.y / map.cell) * map.grid + Math.floor(p.x / map.cell);
+      if (map.height[c] === 1 && map.walkable[c]) {
+        bank = p;
+        break;
+      }
+    }
+    expect(bank).not.toEqual(r);
+    const a = w.spawnUnit('creep', 0, bank, { ...CREEP });
+    const b = w.spawnUnit('creep', 1, r, { ...CREEP });
+    w.vision.update(w);
+    expect(w.canSee(0, b)).toBe(true); // bank → river
+    expect(w.canSee(1, a)).toBe(false); // river → bank
   });
 });

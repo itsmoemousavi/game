@@ -22,7 +22,7 @@ export interface GameMap {
   /** 1 = walkable, 0 = wall. Indexed [cy * grid + cx]. */
   walkable: Uint8Array;
   /**
-   * Ground level per cell: 1 = normal, 2 = base plateau, 3 = ward hill. You can only see
+   * Ground level per cell: 0 = river, 1 = normal, 2 = base plateau, 3 = ward hill. You can only see
    * ground at your level or lower, and trees block sight unless you stand above their tops.
    */
   height: Uint8Array;
@@ -38,10 +38,12 @@ export interface GameMap {
   /** The river's winding centre line (for drawing), from corner to corner. */
   riverPath: Vec2[];
   riverWidth: number;
-  /** Where roads cross the river (drawn as bridges; the ground there is walkable). */
+  /** Bridges over the river (none at the moment: lanes slope down into the water instead). */
   bridges: Bridge[];
   /** Every tree: blocks walking and sight in its cell. */
   trees: Tree[];
+  /** River curbs: cells you can't walk over but can see across (1 = curb). */
+  cliff: Uint8Array;
   shrines: [Vec2, Vec2];
   fountains: [Vec2, Vec2];
   structures: StructureSpawn[];
@@ -102,6 +104,8 @@ const sc = (p: Vec2): Vec2 => ({ x: p.x * S, y: p.y * S });
 
 const RIVER: [Vec2, Vec2] = [sc({ x: 20, y: 20 }), sc({ x: 180, y: 180 })];
 const RIVER_WIDTH = 16;
+/** Slopes down to the water this far around each rune spot. */
+const RUNE_RAMP = 8.5;
 /** How far the river winds to either side of the diagonal (meters). */
 const RIVER_BEND = 6 * S;
 /**
@@ -384,6 +388,42 @@ export function createMap(): GameMap {
     }
   }
 
+  // The river is low ground (level 0) between raised banks. Along most of its length the
+  // bank is a curb you can't walk over; slopes lead down where lanes and trails reach the
+  // water, beside the rune spots and at the Warden's house and the pit across from it.
+  const cliff = new Uint8Array(GRID * GRID);
+  const ramps: { a: Vec2; b: Vec2; w: number }[] = [];
+  for (const id of LANE_IDS) for (let i = 1; i < LANES[id].length; i++) ramps.push({ a: LANES[id][i - 1], b: LANES[id][i], w: LANE_WIDTH + 2 });
+  for (const [a, b] of JUNGLE_PATHS) ramps.push({ a, b, w: JUNGLE_WIDTH + 2 });
+  for (const path of FOREST_PATHS) for (let i = 1; i < path.length; i++) ramps.push({ a: path[i - 1], b: path[i], w: FOREST_PATH_WIDTH + 3 });
+  const onRamp = (x: number, y: number) =>
+    ramps.some((r) => distToSegment(x, y, r.a, r.b) <= r.w / 2) ||
+    Math.hypot(x - RUNE_SPOT.x, y - RUNE_SPOT.y) <= RUNE_RAMP ||
+    Math.hypot(x - HOUSE.x, y - HOUSE.y) <= HOUSE_CLEARING + 1;
+  const half = RIVER_WIDTH / 2;
+  for (let cy = 0; cy < GRID; cy++) {
+    for (let cx = 0; cx < GRID; cx++) {
+      const x = (cx + 0.5) * CELL;
+      const y = (cy + 0.5) * CELL;
+      if (Math.abs(x - y) > 40) continue;
+      let d = Infinity;
+      for (let i = 1; i < RIVER_PATH.length; i++) d = Math.min(d, distToSegment(x, y, RIVER_PATH[i - 1], RIVER_PATH[i]));
+      if (d > half + 0.6) continue;
+      const i = cy * GRID + cx;
+      const ramp = onRamp(x, y) || onRamp(MAP_SIZE - x, MAP_SIZE - y);
+      if (d <= half - 1.6 || ramp) {
+        if (Math.hypot(x - HOUSE.x, y - HOUSE.y) > HOUSE_CLEARING && Math.hypot(MAP_SIZE - x - HOUSE.x, MAP_SIZE - y - HOUSE.y) > HOUSE_CLEARING) height[i] = 0;
+        if (ramp && d > half) continue; // the top of a slope keeps whatever is there
+        if (d <= half) walkable[i] = 1;
+      } else {
+        cliff[i] = 1;
+        walkable[i] = 0;
+      }
+    }
+  }
+  // No trees on the curbs.
+  const keptTrees = trees.filter((t) => !cliff[Math.floor(t.y / CELL) * GRID + Math.floor(t.x / CELL)]);
+
   // Anything walkable that can't be reached from the bases (a pocket inside a thicket)
   // is filled in, so a blink can never land somewhere you can't walk out of.
   sealPockets(walkable, FOUNTAIN0);
@@ -401,8 +441,9 @@ export function createMap(): GameMap {
     river: RIVER,
     riverPath: RIVER_PATH,
     riverWidth: RIVER_WIDTH,
-    bridges: findBridges(),
-    trees,
+    bridges: [],
+    trees: keptTrees,
+    cliff,
     shrines,
     fountains: [FOUNTAIN0, mirror(FOUNTAIN0)],
     structures,
@@ -595,30 +636,4 @@ function sealPockets(walkable: Uint8Array, start: Vec2) {
     }
   }
   for (let i = 0; i < walkable.length; i++) if (walkable[i] && !seen[i]) walkable[i] = 0;
-}
-
-/** Where each lane crosses the river: a bridge along the road. */
-function findBridges(): Bridge[] {
-  const out: Bridge[] = [];
-  for (const id of LANE_IDS) {
-    const p = LANES[id];
-    for (let i = 1; i < p.length; i++) {
-      const a = p[i - 1];
-      const b = p[i];
-      for (let j = 1; j < RIVER_PATH.length; j++) {
-        const c = RIVER_PATH[j - 1];
-        const d = RIVER_PATH[j];
-        const den = (b.x - a.x) * (d.y - c.y) - (b.y - a.y) * (d.x - c.x);
-        if (Math.abs(den) < 1e-9) continue;
-        const t = ((c.x - a.x) * (d.y - c.y) - (c.y - a.y) * (d.x - c.x)) / den;
-        const u = ((c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x)) / den;
-        if (t < 0 || t > 1 || u < 0 || u > 1) continue;
-        const angle = Math.atan2(b.y - a.y, b.x - a.x);
-        const ra = Math.atan2(d.y - c.y, d.x - c.x);
-        const cross = Math.abs(Math.sin(angle - ra)) || 1;
-        out.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, angle, length: RIVER_WIDTH / cross + 4, width: 9 });
-      }
-    }
-  }
-  return out;
 }

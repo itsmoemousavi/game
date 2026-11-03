@@ -57,22 +57,25 @@ describe('wards', () => {
     o.hero!.gold = 1000;
     w.applyCommand({ type: 'buy', unitId: o.id, itemId: 'observerWard' });
     const slot = o.hero!.items.findIndex((s) => s?.id === 'observerWard');
-    place(o, 192, 192); // on the river near the enemy jungle junction
-    w.applyCommand({ type: 'placeWard', unitId: o.id, slot, x: 196, y: 196 });
+    const r0 = onRiver(w.map, 192);
+    const r1 = onRiver(w.map, 192, 5);
+    const r2 = onRiver(w.map, 192, 16);
+    place(o, r0.x, r0.y); // on the river near the enemy jungle junction
+    w.applyCommand({ type: 'placeWard', unitId: o.id, slot, x: r1.x, y: r1.y });
     const ward = w.units.find((u) => u.ward)!;
     expect(ward.ward!.kind).toBe('observer');
     place(o, 20, 186); // walk away: the ward keeps watching
     const foe = hero(1, 'vexa');
-    place(foe, 206, 206); // further down the river, in the ward's sight
+    place(foe, r2.x, r2.y); // further down the river, in the ward's sight
     run(w, 0.2);
     expect(w.canSee(0, foe)).toBe(true);
     expect(w.canSee(1, ward)).toBe(false); // enemy can't see the ward...
     foe.hero!.gold = 1000;
     place(foe, 283, 17); // at their fountain shop
     w.applyCommand({ type: 'buy', unitId: foe.id, itemId: 'sentryWard' });
-    place(foe, 200, 200);
+    place(foe, r1.x + 2, r1.y + 2);
     const s = foe.hero!.items.findIndex((x) => x?.id === 'sentryWard');
-    w.applyCommand({ type: 'placeWard', unitId: foe.id, slot: s, x: 201, y: 201 });
+    w.applyCommand({ type: 'placeWard', unitId: foe.id, slot: s, x: r1.x + 1, y: r1.y + 1 });
     run(w, 0.2);
     expect(w.canSee(1, ward)).toBe(true); // ...until a sentry reveals it
   });

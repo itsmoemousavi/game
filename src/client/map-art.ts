@@ -153,6 +153,51 @@ export function bakeMap(map: GameMap): HTMLCanvasElement {
     g.stroke();
   }
 
+  // 5b. Slopes and curbs. Where the bank is a slope (river cells reaching the bank), sandy
+  // gravel runs down to the water; where it's a curb, a band of grey stones.
+  {
+    const n = map.grid;
+    const cs = map.cell * px;
+    for (let cy = 0; cy < n; cy++) {
+      for (let cx = 0; cx < n; cx++) {
+        const i = cy * n + cx;
+        if (map.cliff[i]) {
+          const v = hash(cx, cy, 41);
+          const l = 74 + v * 30;
+          g.fillStyle = `rgb(${l},${l - 4},${l - 10})`;
+          g.beginPath();
+          g.ellipse((cx + 0.5) * cs, (cy + 0.5) * cs, cs * 0.62, cs * 0.55, v * 3, 0, Math.PI * 2);
+          g.fill();
+        }
+      }
+    }
+    // Slopes: river-level cells that touch normal ground get a sandy fill.
+    for (let cy = 1; cy < n - 1; cy++) {
+      for (let cx = 1; cx < n - 1; cx++) {
+        const i = cy * n + cx;
+        if (map.height[i] !== 0 || !map.walkable[i]) continue;
+        const near = [i - 1, i + 1, i - n, i + n].some((k) => map.height[k] >= 1 && !map.cliff[k]);
+        if (!near) continue;
+        const grad = g.createRadialGradient((cx + 0.5) * cs, (cy + 0.5) * cs, 0, (cx + 0.5) * cs, (cy + 0.5) * cs, cs * 1.4);
+        grad.addColorStop(0, 'rgba(120,104,74,0.75)');
+        grad.addColorStop(1, 'rgba(120,104,74,0)');
+        g.fillStyle = grad;
+        g.fillRect((cx - 1) * cs, (cy - 1) * cs, cs * 3, cs * 3);
+      }
+    }
+    // Lanes wade across: a gravel ford where each road meets the water.
+    g.strokeStyle = 'rgba(112,98,72,0.42)';
+    g.lineWidth = 8 * px;
+    for (const r of roads) {
+      path(r);
+      g.stroke();
+    }
+    g.strokeStyle = 'rgba(40,80,92,0.35)';
+    g.lineWidth = rw * 0.5 * px;
+    path(map.riverPath);
+    g.stroke();
+  }
+
   // 6. Bridges (also built in 3D): planks across the river on stone footings.
   for (const b of map.bridges) {
     g.save();
