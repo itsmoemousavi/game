@@ -102,3 +102,16 @@ const fx = new Fx3D(scene, () => 0);
   gl.render(scene, cam);
 };
 (window as any).ready = true;
+/** Show any model by key (e.g. 'structure:tower2:0'), seen from the given distance. */
+(window as any).showModel = (key: string, dist = 22, h = 6) => {
+  for (const c of [...scene.children]) if (c.userData.hero) scene.remove(c);
+  const o = model(key);
+  o.userData.hero = true;
+  scene.add(o);
+  cam.position.set(dist * 0.75, h + dist * 0.45, dist * 0.65);
+  cam.lookAt(0, h * 0.6, 0);
+  gl.render(scene, cam);
+  let meshes = 0;
+  o.traverse((c) => { if ((c as THREE.Mesh).isMesh) meshes++; });
+  return meshes;
+};

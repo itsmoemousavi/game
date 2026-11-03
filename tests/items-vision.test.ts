@@ -17,6 +17,7 @@ import {
   isWalkable,
   lineClear,
 } from '../src/sim';
+import { onRiver } from './helpers';
 
 function humans() {
   const slots: PlayerSlot[] = [];
@@ -164,8 +165,10 @@ describe('fog of war & day/night', () => {
     const me = hero(0, 'vexa');
     const foe = hero(1, 'brakk');
     // Along the open river, 14 m apart, away from towers: inside day vision (17), outside night vision (10).
-    place(me, 40, 40);
-    place(foe, 50, 50);
+    const a = onRiver(w.map, 40);
+    const b = onRiver(w.map, 40, 14);
+    place(me, a.x, a.y);
+    place(foe, b.x, b.y);
     run(w, 0.2);
     expect(w.canSee(0, foe)).toBe(true);
     w.time = DAY_SECONDS + 1;

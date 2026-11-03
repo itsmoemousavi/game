@@ -56,6 +56,13 @@ export class SpellFx {
       if (s.kind === 'orin') fx.particle(p3(x, y, 1.6), Math.random() < 0.5 ? 0xffa040 : 0xff5a1a, 0.45, 0.25, { grow: -0.5 });
       else if (s.kind === 'kaela') fx.particle(p3(x, y, 1.6), 0x9ff0ff, 0.25, 0.35, { gravity: 6, opacity: 0.8, vel: new THREE.Vector3(0, 0.5, 0) });
       else if (s.kind === 'vexa' && s.crit) fx.particle(p3(x, y, 1.6), 0x6dff9e, 0.4, 0.25);
+      else if (s.kind === 'tower') {
+        const src = w.unit(p.sourceId);
+        const t = w.unit(p.targetId);
+        const left = t ? Math.hypot(t.x - x, t.y - y) : 0;
+        const tall = src?.structure ? 1.4 + Math.min(1, left / 11) * 7.5 : 1.6;
+        fx.particle(p3(x, y, tall), p.team === 1 ? 0xff7a4a : 0x8fd3ff, 0.55, 0.25, { grow: -0.5 });
+      }
     }
     for (const [id, s] of this.shots) {
       if (live.has(id)) continue;
@@ -77,7 +84,8 @@ export class SpellFx {
         if (s.crit) fx.flashAt(at, 2.5, 0x6dff9e, 0.25);
         if (s.mine) c.sound('arrowHit', x, y, 0.45);
       } else if (s.kind === 'tower') {
-        fx.flashAt(at, 1.6, 0xfff1c0, 0.18);
+        fx.flashAt(at, 2.4, 0xfff1c0, 0.2);
+        fx.burst(at, 6, 0xfff1c0, 4, 0.22, 0.3, 6);
       }
     }
 

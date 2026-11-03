@@ -1,6 +1,7 @@
-import { GameEvent, groundItemExpiry, isHouseWallAt, GameMap, HEROES, ITEMS, canPickUp, LANE_IDS, PING_DURATION, PingKind, RUNE_INFO, Side, Team, Unit, WARD_CAST_RANGE, WARDEN_SLAM, World, isInvisible, isNight } from '../sim';
+import { GameEvent, groundItemExpiry, GameMap, HEROES, ITEMS, canPickUp, PING_DURATION, PingKind, RUNE_INFO, Side, Team, Unit, WARD_CAST_RANGE, WARDEN_SLAM, World, isInvisible, isNight } from '../sim';
 import type { Aim } from './input';
 import { itemImage } from './icons';
+import { bakeMap } from './map-art';
 
 /**
  * 2D top-down renderer. It only READS the simulation; swapping it for a 3D renderer
@@ -9,7 +10,6 @@ import { itemImage } from './icons';
  */
 export const TEAM_COLORS: Record<Side, string> = { 0: '#3d8bfd', 1: '#e5484d', 2: '#b08a55' };
 const TEAM_DARK: Record<Side, string> = { 0: '#1d4f9e', 1: '#8f2226', 2: '#6b5232' };
-const PX_PER_UNIT_BAKED = 6;
 export const PING_STYLE: Record<PingKind, { color: string; icon: string; label: string }> = {
   attack: { color: '#ef4444', icon: '⚔', label: 'Attack!' },
   defend: { color: '#3b82f6', icon: '⛨', label: 'Defend!' },
@@ -1132,150 +1132,3 @@ export class Renderer {
   }
 }
 
-/** Pre-render static terrain once to an offscreen canvas. */
-function bakeMap(map: GameMap): HTMLCanvasElement {
-  const c = document.createElement('canvas');
-  const px = PX_PER_UNIT_BAKED;
-  c.width = c.height = map.size * px;
-  const g = c.getContext('2d')!;
-  // Team territory tint (diagonal split).
-  g.fillStyle = '#25321f';
-  g.fillRect(0, 0, c.width, c.height);
-  g.fillStyle = 'rgba(61,139,253,0.06)';
-  g.beginPath();
-  g.moveTo(0, 0);
-  g.lineTo(0, c.height);
-  g.lineTo(c.width, c.height);
-  g.fill();
-  g.fillStyle = 'rgba(229,72,77,0.06)';
-  g.beginPath();
-  g.moveTo(0, 0);
-  g.lineTo(c.width, 0);
-  g.lineTo(c.width, c.height);
-  g.fill();
-
-  // River.
-  g.strokeStyle = '#2b5f7c';
-  g.lineCap = 'round';
-  g.lineWidth = 13 * px;
-  g.beginPath();
-  g.moveTo(map.river[0].x * px, map.river[0].y * px);
-  g.lineTo(map.river[1].x * px, map.river[1].y * px);
-  g.stroke();
-
-  // Lanes.
-  g.strokeStyle = '#6b5a3e';
-  g.lineJoin = 'round';
-  g.lineWidth = 7 * px;
-  for (const id of LANE_IDS) {
-    g.beginPath();
-    map.lanes[id].forEach((p, i) => (i ? g.lineTo(p.x * px, p.y * px) : g.moveTo(p.x * px, p.y * px)));
-    g.stroke();
-  }
-
-  // Walls (the maze): dark forest with deterministic "tree" speckles.
-  const cs = map.cell * px;
-  for (let cy = 0; cy < map.grid; cy++) {
-    for (let cx = 0; cx < map.grid; cx++) {
-      if (map.walkable[cy * map.grid + cx]) continue;
-      if (isHouseWallAt(map.house, (cx + 0.5) * map.cell, (cy + 0.5) * map.cell)) continue; // drawn as stone below
-      g.fillStyle = '#0f1a10';
-      g.fillRect(cx * cs, cy * cs, cs + 0.5, cs + 0.5);
-      const hsh = ((cx * 73856093) ^ (cy * 19349663)) >>> 0;
-      if (hsh % 3 === 0) {
-        g.fillStyle = hsh % 2 ? '#1a2e18' : '#16261a';
-        g.beginPath();
-        g.arc(cx * cs + cs / 2, cy * cs + cs / 2, cs * 0.6, 0, Math.PI * 2);
-        g.fill();
-      }
-    }
-  }
-  // The Warden's house: a flagstone floor inside a round stone wall with one doorway.
-  {
-    const h = map.house;
-    const mid = (h.inner + h.outer) / 2;
-    const doorAng = Math.atan2(h.door.y, h.door.x);
-    const gap = Math.asin(Math.min(1, h.doorHalf / mid));
-    g.fillStyle = '#3b3a37';
-    g.beginPath();
-    g.arc(h.x * px, h.y * px, mid * px, 0, Math.PI * 2);
-    g.fill();
-    g.strokeStyle = 'rgba(0,0,0,0.25)';
-    g.lineWidth = 0.12 * px;
-    for (let r = 2.2; r < h.inner; r += 2.2) {
-      g.beginPath();
-      g.arc(h.x * px, h.y * px, r * px, 0, Math.PI * 2);
-      g.stroke();
-    }
-    for (let a = 0; a < 12; a++) {
-      const t = (a / 12) * Math.PI * 2;
-      g.beginPath();
-      g.moveTo((h.x + Math.cos(t) * 2.2) * px, (h.y + Math.sin(t) * 2.2) * px);
-      g.lineTo((h.x + Math.cos(t) * h.inner) * px, (h.y + Math.sin(t) * h.inner) * px);
-      g.stroke();
-    }
-    g.lineCap = 'butt';
-    g.strokeStyle = '#77736b';
-    g.lineWidth = (h.outer - h.inner) * px;
-    g.beginPath();
-    g.arc(h.x * px, h.y * px, mid * px, doorAng + gap, doorAng - gap + Math.PI * 2);
-    g.stroke();
-    g.strokeStyle = '#a19c91';
-    g.lineWidth = 0.35 * px;
-    for (const r of [h.inner + 0.2, h.outer - 0.2]) {
-      g.beginPath();
-      g.arc(h.x * px, h.y * px, r * px, doorAng + Math.asin(Math.min(1, h.doorHalf / r)), doorAng - Math.asin(Math.min(1, h.doorHalf / r)) + Math.PI * 2);
-      g.stroke();
-    }
-    g.lineCap = 'round';
-  }
-  // Forest paths: faint trails so the escape routes read on the map.
-  g.strokeStyle = 'rgba(120,100,70,0.35)';
-  g.lineWidth = 1.6 * px;
-  g.setLineDash([2 * px, 1.5 * px]);
-  for (const path of map.forestPaths) {
-    g.beginPath();
-    path.forEach((p, i) => (i ? g.lineTo(p.x * px, p.y * px) : g.moveTo(p.x * px, p.y * px)));
-    g.stroke();
-  }
-  g.setLineDash([]);
-
-  // High ground: lighter ground on plateaus / hills (drawn as one mask, so no seams),
-  // with a dark cliff edge where the ground drops to a lower level.
-  const n = map.grid;
-  for (const level of [2, 3]) {
-    const mask = document.createElement('canvas');
-    mask.width = mask.height = c.width;
-    const mg = mask.getContext('2d')!;
-    mg.fillStyle = level >= 3 ? 'rgb(235,225,180)' : 'rgb(220,210,190)';
-    for (let cy = 0; cy < n; cy++) {
-      for (let cx = 0; cx < n; cx++) {
-        if (map.height[cy * n + cx] === level && map.walkable[cy * n + cx]) mg.fillRect(cx * cs, cy * cs, cs + 1, cs + 1);
-      }
-    }
-    g.globalAlpha = level >= 3 ? 0.22 : 0.1;
-    g.drawImage(mask, 0, 0);
-    g.globalAlpha = 1;
-  }
-  for (let cy = 0; cy < n; cy++) {
-    for (let cx = 0; cx < n; cx++) {
-      const hgt = map.height[cy * n + cx];
-      if (hgt <= 1) continue;
-      g.fillStyle = 'rgba(0,0,0,0.45)';
-      const edge = Math.max(1.5, cs * 0.18);
-      const lower = (x: number, y: number) => x >= 0 && y >= 0 && x < n && y < n && map.height[y * n + x] < hgt;
-      if (lower(cx, cy + 1)) g.fillRect(cx * cs, (cy + 1) * cs - edge, cs, edge);
-      if (lower(cx + 1, cy)) g.fillRect((cx + 1) * cs - edge, cy * cs, edge, cs);
-      if (lower(cx, cy - 1)) g.fillRect(cx * cs, cy * cs, cs, edge * 0.6);
-      if (lower(cx - 1, cy)) g.fillRect(cx * cs, cy * cs, edge * 0.6, cs);
-    }
-  }
-  for (const h of map.hills) {
-    g.strokeStyle = 'rgba(255,240,190,0.35)';
-    g.lineWidth = 2;
-    g.beginPath();
-    g.arc(h.x * px, h.y * px, 3.2 * px, 0, Math.PI * 2);
-    g.stroke();
-  }
-  return c;
-}

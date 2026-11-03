@@ -403,6 +403,48 @@ export class Fx3D {
     });
   }
 
+  /**
+   * Tower shield (glyph): a shimmering golden dome over a building, `r` wide and `h` tall,
+   * kept while called each frame; strength 0..1 fades it in and out.
+   */
+  shield(id: string, x: number, y: number, r: number, h: number, strength: number) {
+    this.keep(id, x, y, strength, () => {
+      const o = new THREE.Group();
+      const add = THREE.AdditiveBlending;
+      const dome = new THREE.Mesh(this.domeGeo, new THREE.MeshBasicMaterial({ color: 0xffc94a, transparent: true, opacity: 0.16, blending: add, depthWrite: false, side: THREE.DoubleSide }));
+      const lattice = new THREE.Mesh(this.latticeGeo, new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.35, blending: add, depthWrite: false, wireframe: true }));
+      const ring = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({ color: 0xffd36a, transparent: true, opacity: 0.8, blending: add, depthWrite: false, side: THREE.DoubleSide }));
+      ring.position.y = 0.15;
+      for (const m of [dome, lattice]) m.scale.set(r, h, r);
+      ring.scale.setScalar(r);
+      const glowS = this.sprite(0xffcf5a, 0.5, true);
+      glowS.position.y = h * 0.5;
+      glowS.scale.setScalar(r * 2.6);
+      o.add(dome, lattice, ring, glowS);
+      let moteT = 0;
+      return {
+        o,
+        update: (dt, time, s) => {
+          const pulse = 0.8 + Math.sin(time * 5) * 0.2;
+          (dome.material as THREE.MeshBasicMaterial).opacity = 0.16 * s * pulse;
+          (lattice.material as THREE.MeshBasicMaterial).opacity = 0.32 * s * (0.7 + Math.sin(time * 3 + 1) * 0.3);
+          (ring.material as THREE.MeshBasicMaterial).opacity = 0.8 * s;
+          (glowS.material as THREE.SpriteMaterial).opacity = 0.35 * s * pulse;
+          lattice.rotation.y = time * 0.4;
+          moteT += dt;
+          if (moteT > 0.12 && s > 0.3) {
+            moteT = 0;
+            const a = Math.random() * Math.PI * 2;
+            const p = o.position.clone().add(new THREE.Vector3(Math.cos(a) * r * 0.95, 0.3, Math.sin(a) * r * 0.95));
+            this.particle(p, 0xffd36a, 0.35, 1.2, { vel: new THREE.Vector3(0, 2.2, 0) });
+          }
+        },
+      };
+    });
+  }
+  private domeGeo = new THREE.SphereGeometry(1, 28, 12, 0, Math.PI * 2, 0, Math.PI / 2);
+  private latticeGeo = new THREE.IcosahedronGeometry(1, 2);
+
   /** Advance everything; call once per frame. */
   update(dt: number, time: number) {
     this.live = this.live.filter((l) => {

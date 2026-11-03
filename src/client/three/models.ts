@@ -225,61 +225,143 @@ function warden(): THREE.Object3D {
 
 // ------------------------------------------------------------------ buildings
 
+/**
+ * Buildings in the darker painted style: weathered stone with carved bands, iron braziers
+ * holding a team crystal (icy blue / ember red), cloth banners in the team colour. Tower tiers
+ * grow taller and more decorated, so you can tell them apart at a glance.
+ */
 function structure(tier: StructureTier, team: 0 | 1, rax?: 'melee' | 'ranged'): THREE.Object3D {
   const tc = TEAM_HEX[team];
-  const stone = M(team === 0 ? 0x9aa3b5 : 0xa89a96);
-  const stone2 = M(team === 0 ? 0x6b7487 : 0x7a6a66);
-  const trim = M(tc);
-  const crystal = glow(team === 0 ? 0x7cc0ff : 0xff8a8a, 2.4);
+  const cloth = M(team === 0 ? 0x1f4f9e : 0x9e1f24);
+  const clothDark = M(team === 0 ? 0x16386e : 0x6e1619);
+  const stone = M(0x8b857a);
+  const stone2 = M(0x6a655c);
+  const stoneDark = M(0x4c4842);
+  const iron = M(0x3a3d42, { metalness: 0.7, roughness: 0.45 });
+  const gold = M(0xb08a3a, { metalness: 0.65, roughness: 0.35 });
+  const wood = M(0x4a3524);
+  const roof = M(0x3a3f47);
+  const crystal = glow(team === 0 ? 0x8fd3ff : 0xff7a4a, 2.6);
   const g = grp();
+  /** A hanging banner with a gold rod, facing out from the centre at angle a. */
+  const banner = (a: number, r: number, y: number, h: number, w = 0.9) => {
+    const b = add(g, grp(), Math.cos(a) * r, y, Math.sin(a) * r);
+    b.rotation.y = -a + Math.PI / 2;
+    add(b, rot(mesh(cyl(0.04, 0.04, w + 0.3, 5), gold), 0, 0, Math.PI / 2), 0, 0, 0);
+    add(b, mesh(box(w, h, 0.05), cloth), 0, -h / 2, 0.02);
+    add(b, mesh(box(w, 0.08, 0.06), gold), 0, -0.25, 0.03);
+    add(b, rot(mesh(cone(w * 0.36, 0.35, 3), clothDark), Math.PI, 0, 0), 0, -h - 0.12, 0.02).scale.set(1.4, 1, 0.15);
+    add(b, mesh(new THREE.OctahedronGeometry(0.13), gold), 0, -h * 0.45, 0.06);
+  };
   if (tier === 'tower1' || tier === 'tower2' || tier === 'tower3' || tier === 'shrineTower') {
-    const h = tier === 'tower1' ? 5 : tier === 'tower2' ? 5.5 : tier === 'tower3' ? 6 : 6.4;
-    add(g, mesh(cyl(1.9, 2.2, 0.8, 8), stone2), 0, 0.4, 0);
-    add(g, mesh(cyl(1.15, 1.55, h, 8), stone), 0, 0.8 + h / 2, 0);
-    for (let i = 0; i < 3; i++) add(g, mesh(cyl(1.6 - i * 0.05, 1.6 - i * 0.05, 0.18, 8), trim), 0, 1.6 + i * (h / 3), 0);
-    const top = 0.8 + h;
-    add(g, mesh(cyl(1.7, 1.3, 0.5, 8), stone2), 0, top + 0.25, 0);
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2;
-      add(g, mesh(box(0.35, 0.5, 0.35), stone2), Math.cos(a) * 1.5, top + 0.75, Math.sin(a) * 1.5);
-    }
-    add(g, mesh(new THREE.OctahedronGeometry(0.75), crystal), 0, top + 1.6, 0).scale.set(0.8, 1.5, 0.8);
-  } else if (tier === 'barracks' && rax === 'ranged') {
-    // Ranged barracks: a round archery hall with a dome.
-    add(g, mesh(cyl(2.6, 2.9, 0.5, 10), stone2), 0, 0.25, 0);
-    add(g, mesh(cyl(2.2, 2.3, 2.4, 10), stone), 0, 1.7, 0);
-    add(g, mesh(new THREE.SphereGeometry(2.3, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), trim), 0, 2.9, 0);
-    add(g, mesh(new THREE.OctahedronGeometry(0.35), crystal), 0, 5.4, 0);
-    add(g, mesh(box(1.0, 1.5, 0.2), M(0x3a2a1a)), 0, 1.25, 2.25);
+    const lvl = tier === 'tower1' ? 0 : tier === 'tower2' ? 1 : tier === 'tower3' ? 2 : 3;
+    const h = 4.8 + lvl * 0.6;
+    // Stepped plinth.
+    add(g, mesh(cyl(2.25, 2.45, 0.5, 8), stoneDark), 0, 0.25, 0);
+    add(g, mesh(cyl(1.95, 2.15, 0.45, 8), stone2), 0, 0.72, 0);
+    // Tapered shaft with corner buttresses and carved bands.
+    add(g, mesh(cyl(1.15, 1.5, h, 8), stone), 0, 0.95 + h / 2, 0);
     for (let i = 0; i < 4; i++) {
       const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
-      add(g, rot(mesh(box(0.08, 1.3, 0.08), M(0x5a3d26)), 0.3, a, 0), Math.cos(a) * 2.1, 3.6, Math.sin(a) * 2.1);
+      add(g, rot(mesh(box(0.45, h * 0.75, 0.55), stone2), 0.08, -a, 0), Math.cos(a) * 1.35, 0.95 + h * 0.37, Math.sin(a) * 1.35).lookAt(0, 0.95 + h * 0.37, 0);
     }
+    for (let i = 0; i <= lvl; i++) add(g, mesh(cyl(1.42 - i * 0.04, 1.42 - i * 0.04, 0.2, 8), stoneDark), 0, 1.6 + (i * h) / (lvl + 2), 0);
+    add(g, mesh(cyl(1.3, 1.3, 0.16, 8), gold), 0, 0.95 + h - 0.6, 0);
+    // Arrow slits.
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2;
+      add(g, rot(mesh(box(0.14, 0.7, 0.1), M(0x1a1714)), 0, -a, 0), Math.cos(a) * 1.28, 0.95 + h * 0.6, Math.sin(a) * 1.28);
+    }
+    // Crenellated top platform.
+    const top = 0.95 + h;
+    add(g, mesh(cyl(1.75, 1.3, 0.55, 8), stone2), 0, top + 0.27, 0);
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      add(g, mesh(box(0.42, 0.55, 0.42), stone), Math.cos(a) * 1.55, top + 0.82, Math.sin(a) * 1.55);
+    }
+    // Iron brazier on legs, crystal floating in it.
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2;
+      add(g, rot(mesh(cyl(0.06, 0.08, 1.1, 4), iron), Math.sin(a) * 0.35, 0, -Math.cos(a) * 0.35), Math.cos(a) * 0.5, top + 0.95, Math.sin(a) * 0.5);
+    }
+    add(g, mesh(cyl(0.8, 0.45, 0.4, 8), iron), 0, top + 1.5, 0);
+    add(g, mesh(new THREE.OctahedronGeometry(0.6), crystal), 0, top + 2.35, 0).scale.set(0.75, 1.45, 0.75);
+    // Banners: two on lower tiers, four on the outer gate and shrine towers; spikes on high tiers.
+    const nb = lvl >= 2 ? 4 : 2;
+    for (let i = 0; i < nb; i++) banner((i / nb) * Math.PI * 2 + Math.PI / 4, 1.62, top - 0.1, 1.6 + lvl * 0.2);
+    if (lvl >= 2) for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
+      add(g, mesh(cone(0.1, 0.5, 4), iron), Math.cos(a) * 1.75, top + 1.25, Math.sin(a) * 1.75);
+    }
+    if (lvl === 3) add(g, mesh(cyl(1.8, 1.8, 0.12, 8), gold), 0, top + 0.56, 0);
+  } else if (tier === 'barracks' && rax === 'ranged') {
+    // Archers' hall: a round stone keep with a slate cone roof, banners and target dummies.
+    add(g, mesh(cyl(2.7, 2.95, 0.5, 10), stoneDark), 0, 0.25, 0);
+    add(g, mesh(cyl(2.25, 2.4, 2.8, 10), stone), 0, 1.9, 0);
+    add(g, mesh(cyl(2.35, 2.35, 0.2, 10), stone2), 0, 1.2, 0);
+    add(g, mesh(cyl(2.55, 2.45, 0.3, 10), stone2), 0, 3.4, 0);
+    add(g, mesh(cone(2.9, 2.6, 10), roof), 0, 4.85, 0);
+    add(g, mesh(cyl(0.05, 0.05, 1.4, 4), iron), 0, 6.6, 0);
+    add(g, rot(mesh(box(0.9, 0.5, 0.04), cloth), 0, 0, 0), 0.45, 7.0, 0);
+    add(g, mesh(box(1.1, 1.7, 0.25), wood), 0, 1.35, 2.3);
+    add(g, mesh(box(1.3, 0.15, 0.3), stone2), 0, 2.25, 2.32);
+    for (const a of [Math.PI * 0.25, Math.PI * 0.75]) banner(a + Math.PI / 2, 2.45, 3.1, 1.5);
+    for (const sx of [-1, 1]) {
+      const t = add(g, grp(), sx * 3.3, 0, 1.8);
+      add(t, mesh(cyl(0.06, 0.06, 1.4, 4), wood), 0, 0.7, 0);
+      add(t, rot(mesh(cyl(0.45, 0.45, 0.12, 12), M(0xd6c7a1)), Math.PI / 2, 0, 0), 0, 1.35, 0);
+      add(t, rot(mesh(cyl(0.22, 0.22, 0.13, 12), cloth), Math.PI / 2, 0, 0), 0, 1.35, 0.01);
+    }
+    add(g, mesh(new THREE.OctahedronGeometry(0.3), crystal), 0, 2.6, 2.4);
   } else if (tier === 'barracks') {
-    add(g, mesh(box(5, 0.6, 4.4), stone2), 0, 0.3, 0);
-    add(g, mesh(box(4.4, 2.8, 3.8), stone), 0, 2, 0);
-    add(g, rot(mesh(cone(3.6, 2.2, 4), trim), 0, Math.PI / 4, 0), 0, 4.5, 0).scale.set(1, 1, 0.85);
-    add(g, mesh(box(1.2, 1.8, 0.2), M(0x3a2a1a)), 0, 1.5, 1.95);
-    for (const s of [-1, 1]) {
-      add(g, mesh(cyl(0.06, 0.06, 2.6, 4), M(0x5a3d26)), s * 1.6, 4.4, 1.6);
-      add(g, mesh(box(0.7, 0.9, 0.04), trim), s * 1.6 + 0.37, 5.1, 1.6);
+    // Soldiers' hall: a long stone hall with buttresses, a slate roof, a big door and banners.
+    add(g, mesh(box(5.2, 0.5, 4.6), stoneDark), 0, 0.25, 0);
+    add(g, mesh(box(4.6, 2.9, 4.0), stone), 0, 1.95, 0);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) add(g, mesh(box(0.55, 3.0, 0.55), stone2), sx * 2.35, 1.8, sz * 2.05);
+    // Pitched slate roof: a square beam turned on its edge, half of it sunk into the walls.
+    add(g, rot(mesh(box(4.9, 3.1, 3.1), roof), Math.PI / 4, 0, 0), 0, 3.4, 0).scale.set(1, 0.8, 1);
+    add(g, rot(mesh(box(4.6, 2.7, 2.7), stone), Math.PI / 4, 0, 0), 0, 3.38, 0).scale.set(1, 0.8, 1);
+    add(g, mesh(box(5.0, 0.22, 0.22), stoneDark), 0, 5.15, 0);
+    add(g, mesh(box(1.4, 2.0, 0.25), wood), 0, 1.5, 2.05);
+    add(g, rot(mesh(cyl(0.7, 0.7, 0.25, 10, ), wood), Math.PI / 2, 0, 0), 0, 2.5, 2.05).scale.set(1, 1, 0.5);
+    for (const sx of [-1, 1]) {
+      const b = add(g, grp(), sx * 1.55, 3.25, 2.15);
+      add(b, rot(mesh(cyl(0.04, 0.04, 1.0, 5), gold), 0, 0, Math.PI / 2), 0, 0, 0);
+      add(b, mesh(box(0.8, 1.8, 0.05), cloth), 0, -0.9, 0.02);
+      add(b, mesh(new THREE.OctahedronGeometry(0.14), gold), 0, -0.8, 0.06);
     }
+    // Shield emblem over the door.
+    add(g, mesh(box(0.8, 0.9, 0.1), gold), 0, 3.05, 2.06);
+    add(g, mesh(box(0.6, 0.7, 0.12), cloth), 0, 3.05, 2.07);
   } else if (tier === 'shrine') {
-    add(g, mesh(cyl(4.4, 4.9, 0.9, 10), stone2), 0, 0.45, 0);
-    add(g, mesh(cyl(3.5, 4.0, 0.8, 10), stone), 0, 1.3, 0);
+    // The Shrine: a stepped stone dais, a ring of pillars with braziers, a great floating crystal.
+    add(g, mesh(cyl(5.0, 5.4, 0.7, 12), stoneDark), 0, 0.35, 0);
+    add(g, mesh(cyl(4.2, 4.6, 0.6, 12), stone2), 0, 1.0, 0);
+    add(g, mesh(cyl(3.2, 3.6, 0.5, 12), stone), 0, 1.5, 0);
+    add(g, mesh(new THREE.TorusGeometry(2.6, 0.12, 6, 32), glow(tc, 1.6)), 0, 1.78, 0).rotation.x = Math.PI / 2;
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * Math.PI * 2;
-      add(g, mesh(cyl(0.3, 0.38, 3.6, 6), stone), Math.cos(a) * 3.2, 3.5, Math.sin(a) * 3.2);
-      add(g, mesh(sph(0.3, 0), crystal), Math.cos(a) * 3.2, 5.5, Math.sin(a) * 3.2);
+      const x = Math.cos(a) * 3.8;
+      const z = Math.sin(a) * 3.8;
+      add(g, mesh(cyl(0.3, 0.4, 3.8, 6), stone), x, 3.0, z);
+      add(g, mesh(cyl(0.45, 0.45, 0.25, 6), stone2), x, 4.95, z);
+      add(g, mesh(cyl(0.35, 0.2, 0.3, 6), iron), x, 5.25, z);
+      add(g, mesh(sph(0.22, 0), crystal), x, 5.5, z);
     }
-    add(g, mesh(new THREE.TorusGeometry(2.2, 0.15, 6, 24), trim), 0, 1.8, 0).rotation.x = Math.PI / 2;
-    add(g, mesh(new THREE.OctahedronGeometry(1.5), crystal), 0, 5.5, 0).scale.set(0.8, 1.9, 0.8);
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2;
+      add(g, rot(mesh(box(0.25, 2.6, 0.25), gold), 0.3 * Math.cos(a), 0, 0.3 * Math.sin(a)), Math.cos(a) * 0.9, 3.0, Math.sin(a) * 0.9);
+    }
+    add(g, mesh(new THREE.OctahedronGeometry(1.5), crystal), 0, 5.6, 0).scale.set(0.75, 1.9, 0.75);
+    for (let i = 0; i < 6; i++) banner((i / 6) * Math.PI * 2 + Math.PI / 6, 4.75, 1.3, 0.9, 0.8);
   } else {
-    // fountain
-    add(g, mesh(cyl(3.2, 3.4, 0.6, 12), stone2), 0, 0.3, 0);
-    add(g, mesh(cyl(2.7, 2.7, 0.2, 12), glow(team === 0 ? 0x4fa3ff : 0xff6b6b, 1.2)), 0, 0.62, 0);
-    add(g, mesh(cyl(0.5, 0.7, 2.2, 8), stone), 0, 1.6, 0);
-    add(g, mesh(new THREE.OctahedronGeometry(0.7), crystal), 0, 3.3, 0);
+    // Fountain: a round stone basin of glowing water around a crystal on a pillar.
+    add(g, mesh(cyl(3.3, 3.5, 0.7, 14), stone2), 0, 0.35, 0);
+    add(g, mesh(cyl(3.0, 3.0, 0.1, 14), stoneDark), 0, 0.72, 0);
+    add(g, mesh(cyl(2.8, 2.8, 0.12, 14), glow(team === 0 ? 0x3a8fe0 : 0xe05a3a, 1.1)), 0, 0.68, 0);
+    add(g, mesh(cyl(0.55, 0.8, 2.4, 8), stone), 0, 1.6, 0);
+    add(g, mesh(cyl(0.9, 0.6, 0.35, 8), iron), 0, 2.9, 0);
+    add(g, mesh(new THREE.OctahedronGeometry(0.75), crystal), 0, 3.7, 0).scale.set(0.8, 1.4, 0.8);
   }
   return g;
 }
@@ -341,7 +423,10 @@ function shot(kind: string): THREE.Object3D {
   } else if (kind === 'spell') {
     add(g, mesh(sph(0.4, 1), glow(0xffb347, 3)), 0, 0, 0);
   } else {
-    add(g, mesh(sph(0.2, 0), glow(kind === 'shot0' ? 0xbfe0ff : 0xffc9c9, 2.5)), 0, 0, 0);
+    // Tower bolt: a spinning crystal shard in the team's colour with a soft halo.
+    const c = kind === 'shot0' ? 0x8fd3ff : 0xff7a4a;
+    add(g, mesh(new THREE.OctahedronGeometry(0.28), glow(c, 3)), 0, 0, 0).scale.set(0.7, 0.7, 1.8);
+    add(g, mesh(sph(0.5, 1), glow(c, 1.3, 0.35)), 0, 0, -0.1);
   }
   return g;
 }

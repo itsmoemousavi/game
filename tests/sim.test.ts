@@ -65,8 +65,9 @@ describe('simulation', () => {
 
   it('an all-bot match is won by destroying a shrine, bots use abilities and never get stuck', async () => {
     const w = newWorld();
-    // Stuck detector: a living hero that has had a move order for 10 s straight must have moved.
-    const streak = new Map<number, { x: number; y: number; t: number }>();
+    // Stuck detector: a living hero that has had a move order for 10 s straight must have got
+    // somewhere (more than 4 m from where it started at some point; turning back is fine).
+    const streak = new Map<number, { x: number; y: number; t: number; far: number }>();
     let casts = 0;
     let n = 0;
     while (w.winner === null && w.time < 75 * 60) {
@@ -80,10 +81,13 @@ describe('simulation', () => {
         if (!moving) {
           streak.delete(h.id);
         } else if (!s) {
-          streak.set(h.id, { x: h.x, y: h.y, t: w.time });
-        } else if (w.time - s.t >= 10) {
-          expect(Math.hypot(h.x - s.x, h.y - s.y), `hero ${h.hero!.defId}${h.team} stuck at ${h.x},${h.y} t=${w.time}`).toBeGreaterThan(2);
-          streak.set(h.id, { x: h.x, y: h.y, t: w.time });
+          streak.set(h.id, { x: h.x, y: h.y, t: w.time, far: 0 });
+        } else {
+          s.far = Math.max(s.far, Math.hypot(h.x - s.x, h.y - s.y));
+          if (w.time - s.t >= 10) {
+            expect(s.far, `hero ${h.hero!.defId}${h.team} stuck at ${h.x},${h.y} t=${w.time}`).toBeGreaterThan(4);
+            streak.set(h.id, { x: h.x, y: h.y, t: w.time, far: 0 });
+          }
         }
       }
     }

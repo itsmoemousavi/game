@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GLYPH_DURATION, HERO_IDS, LANE_IDS, PlayerSlot, RUNE_FIRST, TICK_RATE, Team, Unit, World, buybackCost } from '../src/sim';
+import { onRiver } from './helpers';
 
 function humans() {
   const slots: PlayerSlot[] = [];
@@ -106,8 +107,10 @@ describe('power-ups', () => {
     const { w, hero } = humans();
     const v = hero(0, 'vexa');
     const foe = hero(1, 'brakk');
-    place(v, 40, 40);
-    place(foe, 46, 46); // just outside Vexa's attack range, inside her vision
+    const a = onRiver(w.map, 40);
+    const c = onRiver(w.map, 40, 8.5);
+    place(v, a.x, a.y);
+    place(foe, c.x, c.y); // just outside Vexa's attack range, inside her vision
     w.addBuff(v, { key: 'rune', t: 20, invisible: true });
     run(w, 0.2);
     expect(w.canSee(1, v)).toBe(false);
@@ -164,8 +167,9 @@ describe('walk + attack (multi-touch)', () => {
     const { w, hero } = humans();
     const b = hero(1, 'brakk');
     const foe = hero(0, 'vexa');
-    place(b, 40, 40);
-    place(foe, 40, 43);
+    const a = onRiver(w.map, 40);
+    place(b, a.x, a.y);
+    place(foe, a.x, a.y + 3);
     foe.maxHp = foe.hp = 1e5;
     run(w, 0.2);
     const y = b.y;
@@ -189,11 +193,13 @@ describe('visibility & auto attack', () => {
     const { w, hero } = humans();
     const v = hero(1, 'vexa');
     const b = hero(0, 'brakk');
-    place(b, 40, 40);
-    place(v, 49, 49); // in Brakk's vision...
+    const a = onRiver(w.map, 40);
+    const c = onRiver(w.map, 40, 12.7);
+    place(b, a.x, a.y);
+    place(v, c.x, c.y); // in Brakk's vision...
     run(w, 0.2);
     w.time = 181; // ...but at night (10 m vision) she'd be hidden at 12.7 m
-    place(v, 49, 49);
+    place(v, c.x, c.y);
     run(w, 0.2);
     expect(w.canSee(0, v)).toBe(false);
     v.visionNight = 20; // (test) Vexa can see Brakk; Brakk can't see her

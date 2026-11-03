@@ -35,6 +35,13 @@ export interface GameMap {
   /** Creep routes per team: lane polyline from own base, ending at the enemy shrine. */
   teamLanes: [Record<LaneId, Vec2[]>, Record<LaneId, Vec2[]>];
   river: [Vec2, Vec2];
+  /** The river's winding centre line (for drawing), from corner to corner. */
+  riverPath: Vec2[];
+  riverWidth: number;
+  /** Where roads cross the river (drawn as bridges; the ground there is walkable). */
+  bridges: Bridge[];
+  /** Every tree: blocks walking and sight in its cell. */
+  trees: Tree[];
   shrines: [Vec2, Vec2];
   fountains: [Vec2, Vec2];
   structures: StructureSpawn[];
@@ -46,6 +53,23 @@ export interface GameMap {
   bossPit: Vec2;
   /** The Warden's walled house around the boss pit (one doorway facing the map centre). */
   house: House;
+}
+
+export interface Tree {
+  x: number;
+  y: number;
+  /** Size factor (about 0.8–1.4). */
+  s: number;
+  kind: 'pine' | 'oak' | 'dead';
+}
+
+export interface Bridge {
+  x: number;
+  y: number;
+  /** Direction of the road (radians, map coordinates). */
+  angle: number;
+  length: number;
+  width: number;
 }
 
 export interface House {
@@ -75,6 +99,23 @@ const mirrorLane = (l: LaneId): LaneId => (l === 'top' ? 'bot' : l === 'bot' ? '
  */
 const S = MAP_SIZE / 200;
 const sc = (p: Vec2): Vec2 => ({ x: p.x * S, y: p.y * S });
+
+const RIVER: [Vec2, Vec2] = [sc({ x: 20, y: 20 }), sc({ x: 180, y: 180 })];
+const RIVER_WIDTH = 16;
+/** How far the river winds to either side of the diagonal (meters). */
+const RIVER_BEND = 6 * S;
+/**
+ * Point on the river at t (−1 = top-left corner, 0 = map centre, 1 = bottom-right corner).
+ * The bend is an odd function of t, so the river is point-symmetric like the rest of the map,
+ * and it is straight at the centre (mid bridge) and at the Warden's house (t = ±0.5).
+ */
+function riverAt(t: number): Vec2 {
+  const c = MAP_SIZE / 2;
+  const o = RIVER_BEND * Math.sin(2 * Math.PI * t);
+  const k = Math.SQRT1_2;
+  return { x: c + c * t + o * k, y: c + c * t - o * k };
+}
+const RIVER_PATH: Vec2[] = Array.from({ length: 121 }, (_, i) => riverAt(-1.05 + (2.1 * i) / 120));
 
 const LANE_WIDTH = 13;
 const JUNGLE_WIDTH = 10;
@@ -141,7 +182,7 @@ const HILLS_200: Vec2[] = [
   { x: 87, y: 127 },
 ];
 const HILLS = HILLS_200.map(sc);
-const HILL_RADIUS = 3.6;
+const HILL_RADIUS = 5;
 
 const JUNGLE_PATHS_200: [Vec2, Vec2][] = [
   [{ x: 18, y: 112 }, { x: 52, y: 104 }],
@@ -156,9 +197,9 @@ const JUNGLE_PATHS_200: [Vec2, Vec2][] = [
 ];
 const JUNGLE_PATHS = JUNGLE_PATHS_200.map(([a, b]) => [sc(a), sc(b)] as [Vec2, Vec2]);
 /** Power-up spots: river junctions where jungle paths meet (mirror images of each other). */
-const RUNE_SPOT: Vec2 = sc({ x: 68, y: 68 });
+const RUNE_SPOT: Vec2 = riverAt((68 * S - MAP_SIZE / 2) / (MAP_SIZE / 2));
 /** Boss pit on the river (the river line y = x is equally far from both bases). */
-const BOSS_PIT: Vec2 = sc({ x: 150, y: 150 });
+const BOSS_PIT: Vec2 = sc({ x: 150, y: 150 }); // on the river (its bend is zero here)
 
 /**
  * The Warden's house: a round walled room on the river between the bottom and middle lanes.
@@ -171,7 +212,6 @@ const HOUSE: House = (() => {
 /** Open ground around the house, so you can walk all the way round it. */
 const HOUSE_CLEARING = 12;
 
-const RIVER: [Vec2, Vec2] = [sc({ x: 20, y: 20 }), sc({ x: 180, y: 180 })];
 
 /**
  * Tier-1 towers stand this far along the way from the base gate to the river (close to it)
@@ -211,8 +251,8 @@ export function createMap(): GameMap {
     const p = LANES[id];
     for (let i = 1; i < p.length; i++) carveSeg(p[i - 1], p[i], LANE_WIDTH);
   }
-  carveSeg(RIVER[0], RIVER[1], 17);
-  carveCircle(BOSS_PIT, 7 * S);
+  for (let i = 1; i < RIVER_PATH.length; i++) carveSeg(RIVER_PATH[i - 1], RIVER_PATH[i], RIVER_WIDTH);
+  carveCircle(BOSS_PIT, HOUSE_CLEARING); // the house (walls added below) and, mirrored, an open pit
   carveCircle(RUNE_SPOT, 4.5 * S);
   carveCircle(BASE0, BASE_RADIUS);
   for (const room of JUNGLE_ROOMS) carveCircle(room.c, room.r);
@@ -300,6 +340,11 @@ export function createMap(): GameMap {
   }));
   structures.push(...mirrored);
 
+  // Forest. Everything not carved out above is woodland: dense thickets (solid), open
+  // woods with gaps you can walk through, and glades with a few trees. Generated for team 0's
+  // half and mirrored, so both sides are identical.
+  const trees = plantForest(walkable);
+
   // Solid border.
   for (let i = 0; i < GRID; i++) {
     for (const [cx, cy] of [
@@ -339,6 +384,10 @@ export function createMap(): GameMap {
     }
   }
 
+  // Anything walkable that can't be reached from the bases (a pocket inside a thicket)
+  // is filled in, so a blink can never land somewhere you can't walk out of.
+  sealPockets(walkable, FOUNTAIN0);
+
   return {
     size: MAP_SIZE,
     cell: CELL,
@@ -350,6 +399,10 @@ export function createMap(): GameMap {
     lanes: LANES,
     teamLanes,
     river: RIVER,
+    riverPath: RIVER_PATH,
+    riverWidth: RIVER_WIDTH,
+    bridges: findBridges(),
+    trees,
     shrines,
     fountains: [FOUNTAIN0, mirror(FOUNTAIN0)],
     structures,
@@ -422,4 +475,150 @@ export function isHouseWallAt(h: House, x: number, y: number): boolean {
   const along = dx * h.door.x + dy * h.door.y;
   const across = Math.abs(-dx * h.door.y + dy * h.door.x);
   return !(along > 0 && across < h.doorHalf);
+}
+
+// ---------------------------------------------------------------- forest
+
+/** Deterministic hash of a cell to [0, 1). */
+function hash01(x: number, y: number, k = 0): number {
+  let h = (x * 374761393 + y * 668265263 + k * 2246822519) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+/** Smooth value noise in [0, 1] (bilinear between hashed lattice points). */
+function noise(x: number, y: number, k = 0): number {
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const fx = x - x0;
+  const fy = y - y0;
+  const sx = fx * fx * (3 - 2 * fx);
+  const sy = fy * fy * (3 - 2 * fy);
+  const a = hash01(x0, y0, k);
+  const b = hash01(x0 + 1, y0, k);
+  const c = hash01(x0, y0 + 1, k);
+  const d = hash01(x0 + 1, y0 + 1, k);
+  return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+}
+
+/** The Warden's house and its clearing (and the matching open pit) are laid out by hand. */
+const nearHouse = (x: number, y: number) => Math.hypot(x - HOUSE.x, y - HOUSE.y) <= HOUSE_CLEARING || Math.hypot(MAP_SIZE - x - HOUSE.x, MAP_SIZE - y - HOUSE.y) <= HOUSE_CLEARING;
+
+/** Thicket (solid) belt around each base: you only get in along the lanes. */
+const BASE_WALL = BASE_PLATEAU + 9;
+/** Outside the side lanes (between them and the map edge) is solid forest. */
+const BORDER_THICKET = 19;
+
+/**
+ * Turn every not-yet-walkable cell into forest: thickets stay solid (a tree in every cell),
+ * woods get scattered trees with walkable gaps, glades get a few. Returns the trees.
+ */
+function plantForest(walkable: Uint8Array): Tree[] {
+  const carved = new Uint8Array(walkable);
+  const isTree = new Uint8Array(GRID * GRID);
+  const trees: Tree[] = [];
+  const tree = (cx: number, cy: number) => {
+    walkable[cy * GRID + cx] = 0;
+    isTree[cy * GRID + cx] = 1;
+    const h = hash01(cx, cy, 7);
+    const x = (cx + 0.5) * CELL + (h - 0.5) * 0.8;
+    const y = (cy + 0.5) * CELL + (hash01(cx, cy, 8) - 0.5) * 0.8;
+    const kn = noise(x / 40, y / 40, 3);
+    const kind: Tree['kind'] = hash01(cx, cy, 9) < 0.04 ? 'dead' : kn > 0.45 ? 'pine' : 'oak';
+    return { x, y, s: 0.8 + hash01(cx, cy, 10) * 0.6, kind };
+  };
+  const half: Tree[] = [];
+  for (let cy = 0; cy < GRID; cy++) {
+    for (let cx = 0; cx < GRID; cx++) {
+      // Team 0's half is below the diagonal (y > x); the other half is its mirror image.
+      if (cy <= cx) continue;
+      if (carved[cy * GRID + cx]) continue;
+      const x = (cx + 0.5) * CELL;
+      const y = (cy + 0.5) * CELL;
+      if (nearHouse(x, y)) continue;
+      const edge = Math.min(x, y, MAP_SIZE - x, MAP_SIZE - y);
+      const nearBase = Math.hypot(x - BASE0.x, y - BASE0.y) < BASE_WALL;
+      const d = noise(x / 26, y / 26) * 0.75 + noise(x / 9, y / 9, 1) * 0.25;
+      let p: number;
+      if (edge < BORDER_THICKET || nearBase || d > 0.52) p = 1; // thicket
+      else if (d > 0.3) p = 0.55; // woods
+      else p = 0.14; // glade
+      if (p < 1) {
+        // Keep a gap of at least one free cell between trees outside the thickets.
+        let crowded = false;
+        for (let oy = -1; oy <= 1 && !crowded; oy++) {
+          for (let ox = -1; ox <= 1; ox++) {
+            const n = (cy + oy) * GRID + (cx + ox);
+            if ((ox || oy) && n >= 0 && n < GRID * GRID && isTree[n]) crowded = true;
+          }
+        }
+        if (crowded || hash01(cx, cy, 2) >= p) {
+          walkable[cy * GRID + cx] = 1;
+          continue;
+        }
+      }
+      half.push(tree(cx, cy));
+    }
+  }
+  // Mirror onto the other half.
+  for (let cy = 0; cy < GRID; cy++) {
+    for (let cx = 0; cx < GRID; cx++) {
+      if (cy >= cx) continue;
+      const mx = GRID - 1 - cx;
+      const my = GRID - 1 - cy;
+      if (carved[cy * GRID + cx] || nearHouse((cx + 0.5) * CELL, (cy + 0.5) * CELL)) continue;
+      walkable[cy * GRID + cx] = walkable[my * GRID + mx];
+    }
+  }
+  // The diagonal itself (river) is carved; any leftover diagonal cell stays as it was.
+  for (const t of half) trees.push(t, { ...t, x: MAP_SIZE - t.x, y: MAP_SIZE - t.y });
+  return trees;
+}
+
+/** Fill walkable cells that can't be reached from `start` (pockets inside thickets). */
+function sealPockets(walkable: Uint8Array, start: Vec2) {
+  const seen = new Uint8Array(GRID * GRID);
+  const s0 = Math.floor(start.y / CELL) * GRID + Math.floor(start.x / CELL);
+  const stack = [s0];
+  seen[s0] = 1;
+  while (stack.length) {
+    const c = stack.pop()!;
+    const cx = c % GRID;
+    const cy = (c - cx) / GRID;
+    for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = cx + ox;
+      const ny = cy + oy;
+      if (nx < 0 || ny < 0 || nx >= GRID || ny >= GRID) continue;
+      const n = ny * GRID + nx;
+      if (seen[n] || !walkable[n]) continue;
+      seen[n] = 1;
+      stack.push(n);
+    }
+  }
+  for (let i = 0; i < walkable.length; i++) if (walkable[i] && !seen[i]) walkable[i] = 0;
+}
+
+/** Where each lane crosses the river: a bridge along the road. */
+function findBridges(): Bridge[] {
+  const out: Bridge[] = [];
+  for (const id of LANE_IDS) {
+    const p = LANES[id];
+    for (let i = 1; i < p.length; i++) {
+      const a = p[i - 1];
+      const b = p[i];
+      for (let j = 1; j < RIVER_PATH.length; j++) {
+        const c = RIVER_PATH[j - 1];
+        const d = RIVER_PATH[j];
+        const den = (b.x - a.x) * (d.y - c.y) - (b.y - a.y) * (d.x - c.x);
+        if (Math.abs(den) < 1e-9) continue;
+        const t = ((c.x - a.x) * (d.y - c.y) - (c.y - a.y) * (d.x - c.x)) / den;
+        const u = ((c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x)) / den;
+        if (t < 0 || t > 1 || u < 0 || u > 1) continue;
+        const angle = Math.atan2(b.y - a.y, b.x - a.x);
+        const ra = Math.atan2(d.y - c.y, d.x - c.x);
+        const cross = Math.abs(Math.sin(angle - ra)) || 1;
+        out.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, angle, length: RIVER_WIDTH / cross + 4, width: 9 });
+      }
+    }
+  }
+  return out;
 }

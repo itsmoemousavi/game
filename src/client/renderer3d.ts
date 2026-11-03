@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { GameMap, HEROES, TELEPORT, Team, Unit, World, isHouseWallAt, isInvisible, isNight } from '../sim';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { GLYPH_DURATION, GameMap, HEROES, TELEPORT, Team, Unit, World, isInvisible, isNight } from '../sim';
 import type { Aim } from './input';
 import { Renderer, TEAM_COLORS } from './renderer';
 import { JOINTS, Joint, TEAM_HEX, model } from './three/models';
@@ -12,6 +13,10 @@ import type { GameEvent } from '../sim';
 
 /** Ground level per map height (1 = normal, 2 = base plateau, 3 = ward hill), in meters. */
 const ELEVATION = [0, 0, 1.1, 2.2];
+/** How deep the river bed is (meters below the banks), and the bridge deck height. */
+const RIVER_DEPTH = 1.1;
+const BRIDGE_DECK = 0.25;
+const WATER_LEVEL = -0.45;
 /** Camera: looking down at this angle from the horizon, with this field of view. */
 const PITCH = (56 * Math.PI) / 180;
 const FOV = 38;
@@ -62,7 +67,7 @@ export class Renderer3D extends Renderer {
   private lastTreeShade = 0;
   private fxY = 0;
   private overlay: CanvasRenderingContext2D;
-  private trees: { crowns: THREE.InstancedMesh; cells: Int32Array; colors: THREE.Color[] } | null = null;
+  private trees: { meshes: THREE.InstancedMesh[]; entries: { mesh: number; k: number; cell: number; color: THREE.Color }[] } | null = null;
   private objs = new Map<string, Obj>();
   /** Per-unit animation clocks (walk cycle, attack swing, cast). */
   private anims = new Map<number, Anim>();
@@ -82,6 +87,7 @@ export class Renderer3D extends Renderer {
   /** Where each hero started channelling a teleport (for the departure flash). */
   private tpFrom = new Map<number, { x: number; y: number }>();
   private world: World | null = null;
+  private bridges: (GameMap['bridges'][number] & { c: number; s: number })[] = [];
   private spells!: SpellFx;
   /** Team whose view is drawn (set each frame; effects follow its vision). */
   private viewTeam: Team = 0 as Team;
@@ -149,11 +155,25 @@ export class Renderer3D extends Renderer {
         this.elev[vy * (n + 1) + vx] = cnt ? sum / cnt : 0;
       }
     }
+    // The river bed dips below the banks (the water surface sits a little under ground level).
+    const rp = map.riverPath;
+    for (let vy = 0; vy <= n; vy++) {
+      for (let vx = 0; vx <= n; vx++) {
+        const x = vx * map.cell;
+        const y = vy * map.cell;
+        if (Math.abs(x - y) > 40) continue;
+        let d = Infinity;
+        for (let i = 1; i < rp.length; i++) d = Math.min(d, distToSeg(x, y, rp[i - 1], rp[i]));
+        const k = Math.max(0, Math.min(1, (map.riverWidth / 2 + 0.5 - d) / 3));
+        if (k > 0) this.elev[vy * (n + 1) + vx] -= RIVER_DEPTH * k * k * (3 - 2 * k);
+      }
+    }
+    this.bridges = map.bridges.map((b) => ({ ...b, c: Math.cos(b.angle), s: Math.sin(b.angle) }));
     const geo = new THREE.PlaneGeometry(map.size, map.size, n, n);
     geo.rotateX(-Math.PI / 2);
     geo.translate(map.size / 2, 0, map.size / 2);
     const pos = geo.attributes.position;
-    for (let i = 0; i < pos.count; i++) pos.setY(i, this.elevationAt(pos.getX(i), pos.getZ(i)));
+    for (let i = 0; i < pos.count; i++) pos.setY(i, this.terrainAt(pos.getX(i), pos.getZ(i)));
     geo.computeVertexNormals();
     const groundTex = new THREE.CanvasTexture(this.mapImage);
     groundTex.colorSpace = THREE.SRGBColorSpace;
@@ -184,6 +204,9 @@ export class Renderer3D extends Renderer {
     this.scene.add(fx);
 
     this.buildTrees(map);
+    this.buildWater(map);
+    this.buildBridges(map);
+    this.buildRocks(map);
     this.buildHouse(map);
     this.fx3 = new Fx3D(this.scene, (x, y) => this.elevationAt(x, y));
     this.spells = new SpellFx((x, y) => this.elevationAt(x, y));
@@ -254,6 +277,20 @@ export class Renderer3D extends Renderer {
 
   /** Ground height at a world point (matches the terrain mesh). */
   elevationAt(x: number, y: number): number {
+    const t = this.terrainAt(x, y);
+    // On a bridge deck: stand on the planks, not in the river.
+    for (const b of this.bridges) {
+      const dx = x - b.x;
+      const dy = y - b.y;
+      const along = dx * b.c + dy * b.s;
+      const across = -dx * b.s + dy * b.c;
+      if (Math.abs(along) < b.length / 2 && Math.abs(across) < b.width / 2) return Math.max(t, BRIDGE_DECK);
+    }
+    return t;
+  }
+
+  /** Height of the terrain mesh itself (river bed included, bridges not). */
+  private terrainAt(x: number, y: number): number {
     const n = this.grid;
     const cell = this.mapSize / n;
     const fx = Math.max(0, Math.min(n - 0.001, x / cell));
@@ -305,47 +342,176 @@ export class Renderer3D extends Renderer {
     this.scene.add(blocks);
   }
 
+  /**
+   * The forest: one 3D tree per tree in the map (pines, broad oaks and a few dead trees),
+   * drawn as instanced meshes (a handful of draw calls for thousands of trees).
+   */
   private buildTrees(map: GameMap) {
     const n = map.grid;
-    const cells: number[] = [];
-    for (let i = 0; i < n * n; i++) {
-      if (map.walkable[i] || isHouseWallAt(map.house, ((i % n) + 0.5) * map.cell, (Math.floor(i / n) + 0.5) * map.cell)) continue;
-      cells.push(i);
-    }
-    const count = cells.length;
-    const trunkGeo = new THREE.CylinderGeometry(0.16, 0.24, 1.4, 5);
-    trunkGeo.translate(0, 0.7, 0);
-    const crownGeo = new THREE.ConeGeometry(1.35, 3.4, 6);
-    crownGeo.translate(0, 2.9, 0);
-    const trunks = new THREE.InstancedMesh(trunkGeo, new THREE.MeshLambertMaterial({ color: 0x4a3524 }), count);
-    const crowns = new THREE.InstancedMesh(crownGeo, new THREE.MeshLambertMaterial({ flatShading: true }), count);
+    const kinds = ['pine', 'oak', 'dead'] as const;
+    const list = kinds.map((k) => map.trees.filter((t) => t.kind === k));
+    const merge = (parts: THREE.BufferGeometry[]) => {
+      const flat = parts.map((p) => (p.index ? p.toNonIndexed() : p));
+      for (const f of flat) for (const k of Object.keys(f.attributes)) if (k !== 'position' && k !== 'normal') f.deleteAttribute(k);
+      return mergeGeometries(flat)!;
+    };
+    // Pine: three stacked cones on a short trunk.
+    const pine = merge([0, 1, 2].map((i) => new THREE.ConeGeometry(1.7 - i * 0.42, 2.3 - i * 0.3, 7).translate(0, 2.2 + i * 1.25, 0)));
+    // Oak: a cluster of rounded clumps on a taller trunk.
+    const oak = merge([
+      new THREE.IcosahedronGeometry(1.5, 0).translate(0, 3.6, 0),
+      new THREE.IcosahedronGeometry(1.1, 0).translate(0.9, 3.1, 0.3),
+      new THREE.IcosahedronGeometry(1.0, 0).translate(-0.8, 3.2, -0.4),
+      new THREE.IcosahedronGeometry(0.9, 0).translate(0.1, 4.5, -0.2),
+    ]);
+    // Dead tree: bare branches.
+    const dead = merge([
+      new THREE.CylinderGeometry(0.05, 0.12, 1.6, 4).rotateZ(0.7).translate(0.55, 2.6, 0),
+      new THREE.CylinderGeometry(0.05, 0.1, 1.3, 4).rotateZ(-0.8).translate(-0.45, 2.9, 0.1),
+      new THREE.CylinderGeometry(0.04, 0.08, 1.1, 4).rotateX(0.7).translate(0, 3.3, 0.35),
+    ]);
+    const trunkGeo = new THREE.CylinderGeometry(0.14, 0.26, 2.6, 5).translate(0, 1.3, 0);
+    const crownMat = new THREE.MeshLambertMaterial({ flatShading: true });
+    const geos = [pine, oak, dead];
+    const palettes = [
+      [0x1f3d24, 0x264a2a, 0x1b3520, 0x2c5230],
+      [0x3b5226, 0x46602c, 0x354a22, 0x52662f],
+      [0x5a4a3a, 0x4f4234, 0x62513e, 0x564636],
+    ];
+    const trunks = new THREE.InstancedMesh(trunkGeo, new THREE.MeshLambertMaterial({ color: 0x3e2d1f }), map.trees.length);
+    const meshes: THREE.InstancedMesh[] = [];
+    const entries: { mesh: number; k: number; cell: number; color: THREE.Color }[] = [];
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
-    const s = new THREE.Vector3();
+    const sc = new THREE.Vector3();
     const p = new THREE.Vector3();
-    const colors: THREE.Color[] = [];
-    const palette = [0x2f5a2a, 0x386b2f, 0x2a4f2c, 0x3f7234, 0x274a26];
-    cells.forEach((i, k) => {
-      const cx = i % n;
-      const cy = Math.floor(i / n);
-      const h = ((cx * 73856093) ^ (cy * 19349663)) >>> 0;
-      const jx = ((h % 100) / 100 - 0.5) * 0.9;
-      const jy = (((h >> 8) % 100) / 100 - 0.5) * 0.9;
-      const x = (cx + 0.5) * map.cell + jx;
-      const y = (cy + 0.5) * map.cell + jy;
-      const sc = 0.8 + ((h >> 16) % 50) / 100;
-      p.set(x, this.elevationAt(x, y), y);
-      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), (h % 628) / 100);
-      s.set(sc, sc * (0.9 + ((h >> 4) % 30) / 100), sc);
-      m.compose(p, q, s);
-      trunks.setMatrixAt(k, m);
-      crowns.setMatrixAt(k, m);
-      const c = new THREE.Color(palette[h % palette.length]);
-      colors.push(c);
-      crowns.setColorAt(k, c);
+    const up = new THREE.Vector3(0, 1, 0);
+    let ti = 0;
+    list.forEach((trees, kind) => {
+      const mesh = new THREE.InstancedMesh(geos[kind], kind === 2 ? new THREE.MeshLambertMaterial({ flatShading: true }) : crownMat, Math.max(1, trees.length));
+      mesh.count = trees.length;
+      meshes.push(mesh);
+      trees.forEach((t, k) => {
+        const h = Math.abs(Math.sin(t.x * 12.9898 + t.y * 78.233)) * 1000;
+        p.set(t.x, this.terrainAt(t.x, t.y) - 0.1, t.y);
+        q.setFromAxisAngle(up, h % 6.28);
+        const tall = 0.85 + ((h * 7) % 1) * 0.35;
+        sc.set(t.s, t.s * tall, t.s);
+        m.compose(p, q, sc);
+        mesh.setMatrixAt(k, m);
+        trunks.setMatrixAt(ti++, m);
+        const pal = palettes[kind];
+        const color = new THREE.Color(pal[Math.floor(h) % pal.length]);
+        mesh.setColorAt(k, color);
+        const cell = Math.floor(t.y / map.cell) * n + Math.floor(t.x / map.cell);
+        entries.push({ mesh: kind, k, cell, color });
+      });
     });
-    this.scene.add(trunks, crowns);
-    this.trees = { crowns, cells: Int32Array.from(cells), colors };
+    this.scene.add(trunks, ...meshes);
+    this.trees = { meshes, entries };
+  }
+
+  /** Water surface along the river: a ribbon a little below the banks. */
+  private buildWater(map: GameMap) {
+    const rp = map.riverPath;
+    const half = map.riverWidth / 2 + 1.5;
+    const pos: number[] = [];
+    const idx: number[] = [];
+    rp.forEach((p, i) => {
+      const a = rp[Math.max(0, i - 1)];
+      const b = rp[Math.min(rp.length - 1, i + 1)];
+      const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      const nx = -(b.y - a.y) / l;
+      const ny = (b.x - a.x) / l;
+      pos.push(p.x + nx * half, WATER_LEVEL, p.y + ny * half, p.x - nx * half, WATER_LEVEL, p.y - ny * half);
+      if (i) idx.push((i - 1) * 2, (i - 1) * 2 + 1, i * 2, (i - 1) * 2 + 1, i * 2 + 1, i * 2);
+    });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const water = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x23505e, roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.78, side: THREE.DoubleSide }));
+    water.renderOrder = 0;
+    this.scene.add(water);
+  }
+
+  /** Stone-footed plank bridges where the roads cross the river. */
+  private buildBridges(map: GameMap) {
+    const wood = new THREE.MeshLambertMaterial({ color: 0x6b4f33, flatShading: true });
+    const dark = new THREE.MeshLambertMaterial({ color: 0x4a3524, flatShading: true });
+    const stone = new THREE.MeshLambertMaterial({ color: 0x6f6a62, flatShading: true });
+    for (const b of map.bridges) {
+      const g = new THREE.Group();
+      const deck = new THREE.Mesh(new THREE.BoxGeometry(b.length, 0.3, b.width), wood);
+      deck.position.y = BRIDGE_DECK - 0.15;
+      deck.receiveShadow = true;
+      g.add(deck);
+      for (let x = -b.length / 2 + 0.6; x < b.length / 2; x += 1.2) {
+        const plank = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.02, b.width), dark);
+        plank.position.set(x, BRIDGE_DECK + 0.01, 0);
+        g.add(plank);
+      }
+      for (const side of [-1, 1]) {
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(b.length, 0.18, 0.2), dark);
+        rail.position.set(0, BRIDGE_DECK + 0.9, side * (b.width / 2 - 0.1));
+        rail.castShadow = true;
+        g.add(rail);
+        for (let x = -b.length / 2 + 0.3; x <= b.length / 2; x += 2.4) {
+          const post = new THREE.Mesh(new THREE.BoxGeometry(0.24, 1.0, 0.24), dark);
+          post.position.set(x, BRIDGE_DECK + 0.4, side * (b.width / 2 - 0.1));
+          g.add(post);
+        }
+        for (const end of [-1, 1]) {
+          const pier = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.4, 1.4), stone);
+          pier.position.set(end * (b.length / 2 - 0.6), -0.9, side * (b.width / 2 - 0.4));
+          g.add(pier);
+        }
+      }
+      for (const x of [-b.length / 6, b.length / 6]) {
+        const pier = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.7, 2, 7), stone);
+        pier.position.set(x, -0.9, 0);
+        g.add(pier);
+      }
+      g.position.set(b.x, 0, b.y);
+      g.rotation.y = -b.angle;
+      this.scene.add(g);
+    }
+  }
+
+  /** Boulders and stones in the woods and along the river banks. */
+  private buildRocks(map: GameMap) {
+    const n = map.grid;
+    const spots: { x: number; y: number; s: number }[] = [];
+    for (let i = 0; i < 900 && spots.length < 260; i++) {
+      const h = (k: number) => Math.abs(Math.sin(i * 91.7 + k * 47.3) * 43758.5453) % 1;
+      const x = 6 + h(1) * (map.size - 12);
+      const y = 6 + h(2) * (map.size - 12);
+      const cx = Math.floor(x / map.cell);
+      const cy = Math.floor(y / map.cell);
+      // Only in the woods: next to trees, never on roads or lanes.
+      if (map.walkable[cy * n + cx]) continue;
+      if (map.trees.length && !map.walkable[cy * n + cx] && h(3) < 0.4) spots.push({ x, y, s: 0.4 + h(4) * 0.9 });
+    }
+    // Banks: a line of stones along both sides of the river.
+    map.riverPath.forEach((p, i) => {
+      if (i % 3) return;
+      const a = map.riverPath[Math.max(0, i - 1)];
+      const b = map.riverPath[Math.min(map.riverPath.length - 1, i + 1)];
+      const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      const side = i % 2 ? 1 : -1;
+      const off = map.riverWidth / 2 + 0.8;
+      spots.push({ x: p.x + (-(b.y - a.y) / l) * off * side, y: p.y + ((b.x - a.x) / l) * off * side, s: 0.5 + ((i * 0.37) % 1) * 0.7 });
+    });
+    const rocks = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(0.8, 0), new THREE.MeshLambertMaterial({ color: 0x6d6860, flatShading: true }), spots.length);
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    spots.forEach((r, k) => {
+      q.setFromEuler(new THREE.Euler(r.x % 1, r.y % 3, 0));
+      m.compose(new THREE.Vector3(r.x, this.terrainAt(r.x, r.y) + 0.1 * r.s, r.y), q, new THREE.Vector3(r.s * 1.3, r.s * 0.75, r.s));
+      rocks.setMatrixAt(k, m);
+    });
+    rocks.receiveShadow = true;
+    this.scene.add(rocks);
   }
 
   // ------------------------------------------------------------------ camera & input
@@ -487,13 +653,12 @@ export class Renderer3D extends Renderer {
     const now = performance.now();
     if (this.trees && now - this.lastTreeShade > 250) {
       this.lastTreeShade = now;
-      const { crowns, cells, colors } = this.trees;
+      const { meshes, entries } = this.trees;
       const tmp = new THREE.Color();
-      for (let k = 0; k < cells.length; k++) {
-        const i = cells[k];
-        const cx = i % n;
-        const cy = (i / n) | 0;
-        // A tree is "seen" if any neighbouring walkable cell is in vision.
+      for (const e of entries) {
+        const cx = e.cell % n;
+        const cy = (e.cell / n) | 0;
+        // A tree is "seen" if any neighbouring cell is in vision.
         let lit = false;
         for (let dy = -1; dy <= 1 && !lit; dy++)
           for (let dx = -1; dx <= 1 && !lit; dx++) {
@@ -501,9 +666,9 @@ export class Renderer3D extends Renderer {
             const y = cy + dy;
             if (x >= 0 && y >= 0 && x < n && y < n && g[y * n + x]) lit = true;
           }
-        crowns.setColorAt(k, tmp.copy(colors[k]).multiplyScalar(lit ? 1 : 0.4));
+        meshes[e.mesh].setColorAt(e.k, tmp.copy(e.color).multiplyScalar(lit ? 1 : 0.4));
       }
-      crowns.instanceColor!.needsUpdate = true;
+      for (const mesh of meshes) if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
   }
 
@@ -558,7 +723,18 @@ export class Renderer3D extends Renderer {
     /** Syl's Execution this batch (its explosion event follows the cast). */
     let exec = -1;
     for (const e of events) {
-      if (e.type === 'attack') {
+      if (e.type === 'glyph') {
+        for (const u of w.units) {
+          if (!u.alive || !u.structure || u.team !== e.team || u.structure.glyph <= 0) continue;
+          this.fx3.flash(u.x, u.y, 4, u.radius * 4, 0xffd36a, 0.5);
+          this.fx3.shockwave(u.x, u.y, u.radius + 4, 0xffd36a, 0.5);
+        }
+      } else if (e.type === 'attack') {
+        const src = w.unit(e.sourceId);
+        if (src?.structure && w.canSee(this.viewTeam, src)) {
+          // The tower's crystal flares as it fires.
+          this.fx3.flash(src.x, src.y, towerTop(src.structure.tier) + 2.35, 3.2, TEAM_HEX[src.team === 1 ? 1 : 0], 0.25);
+        }
         const a = this.anim(e.sourceId);
         a.atk = 1;
         a.atkAt = this.clock;
@@ -743,6 +919,13 @@ export class Renderer3D extends Renderer {
         const side = u.team === 1 ? 1 : 0;
         if (u.alive) this.place(`structure:${tier}:${side}${u.structure!.rax ? ':' + u.structure!.rax : ''}`, id, u.x, u.y, 0, side ? Math.PI : 0);
         else this.place(`rubble:${u.radius}`, id, u.x, u.y);
+        // Tower shield (glyph): a golden dome over every shielded building, seen by everyone.
+        const gl = u.structure!.glyph;
+        if (u.alive && gl > 0) {
+          const k = Math.min(1, gl / 0.6, (GLYPH_DURATION - gl) / 0.3 + 0.2);
+          const tall = tier === 'barracks' ? 6.5 : tier === 'shrine' ? 9 : 10;
+          this.fx3.shield('glyph' + u.id, u.x, u.y, u.radius + 1.8, tall, Math.max(0, k));
+        }
         continue;
       }
       if (!u.alive || !w.canSee(team, u)) continue;
@@ -774,9 +957,16 @@ export class Renderer3D extends Renderer {
       const x = p.px + (p.x - p.px) * alpha;
       const y = p.py + (p.y - p.py) * alpha;
       if (p.team !== team && !w.vision.seesPoint(team, x, y)) continue;
-      // Arrows and bolts point the way they fly.
+      // Arrows and bolts point the way they fly; tower bolts drop from the crystal onto the target.
       const dir = Math.atan2(p.x - p.px, p.y - p.py);
-      this.place(p.spell ? 'shot:spell' : SpellFx.shotKey(w, p.sourceId, !!p.crit, p.team), 'p' + p.id, x, y, 1.6, dir);
+      const src = w.unit(p.sourceId);
+      let h = 1.6;
+      if (src?.structure) {
+        const t = w.unit(p.targetId);
+        const left = t ? Math.hypot(t.x - x, t.y - y) : 0;
+        h = 1.4 + Math.min(1, left / 11) * (towerTop(src.structure.tier) + 1);
+      }
+      this.place(p.spell ? 'shot:spell' : SpellFx.shotKey(w, p.sourceId, !!p.crit, p.team), 'p' + p.id, x, y, h, dir);
     }
     for (const s of w.skillshots) {
       const x = s.px + (s.x - s.px) * alpha;
@@ -952,3 +1142,18 @@ function setOpacity(o: THREE.Object3D, a: number) {
 }
 
 export { TEAM_HEX };
+
+/** Distance from (x, y) to the segment a–b. */
+function distToSeg(x: number, y: number, a: { x: number; y: number }, b: { x: number; y: number }) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const l2 = dx * dx + dy * dy || 1;
+  const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / l2));
+  return Math.hypot(x - a.x - dx * t, y - a.y - dy * t);
+}
+
+/** Height of a tower's top platform (matches the models: the crystal floats 2.35 m above it). */
+function towerTop(tier: string): number {
+  const lvl = tier === 'tower1' ? 0 : tier === 'tower2' ? 1 : tier === 'tower3' ? 2 : tier === 'shrineTower' ? 3 : 1;
+  return 0.95 + 4.8 + lvl * 0.6;
+}
