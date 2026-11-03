@@ -75,7 +75,7 @@ export class MenuShowcase {
   }
 
   /** Round portraits (head and shoulders) for the hero picker, as image URLs. */
-  portraits(): Record<HeroId, string> {
+  portraits(make: (id: HeroId) => THREE.Object3D | null = () => null): Record<HeroId, string> {
     const out = {} as Record<HeroId, string>;
     const size = 160;
     const prevStage = this.stage.visible;
@@ -83,13 +83,19 @@ export class MenuShowcase {
     this.gl.setSize(size, size, false);
     this.stage.visible = false;
     for (const id of HERO_IDS) {
-      const m = model(`hero:${id}`);
+      const art = make(id);
+      const m = art ?? model(`hero:${id}`);
       m.rotation.y = 0.35;
       this.scene.add(m);
       // Frame the head and shoulders (props like raised hammers would throw off a bounding box).
       m.updateMatrixWorld(true);
       const torso = m.getObjectByName('torso');
-      const headY = torso ? torso.getWorldPosition(new THREE.Vector3()).y + 0.85 : 1.8;
+      let headY = torso ? torso.getWorldPosition(new THREE.Vector3()).y + 0.85 : 1.8;
+      if (art) {
+        // Artist models are normalised to their height: the head sits near the top.
+        const b = new THREE.Box3().setFromObject(art, true);
+        headY = b.max.y - (b.max.y - b.min.y) * 0.13;
+      }
       cam.position.set(0.8, headY + 0.35, 3.2);
       cam.lookAt(0, headY - 0.12, 0);
       this.rim.color.set(HEROES[id].color);

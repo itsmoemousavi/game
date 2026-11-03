@@ -13,6 +13,7 @@ import { PING_STYLE } from './renderer';
 import { Renderer } from './renderer';
 import { QUALITY, Quality, Renderer3D } from './renderer3d';
 import { MenuShowcase } from './menu3d';
+import { character, loadAssets } from './three/assets';
 import { enterImmersive, setupLandscape } from './screen';
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
@@ -30,7 +31,7 @@ let myHeroId = 0;
 const myTeam: Team = 0;
 let devPick: HeroId | null = null;
 // Local dev server only (never in the published game): lets test scripts look at the match.
-if (import.meta.env.DEV) Object.assign(window, { dbg: { world: () => world, me: () => world?.unit(myHeroId), pick: (h: HeroId) => (devPick = h) } });
+if (import.meta.env.DEV) Object.assign(window, { dbg: { world: () => world, me: () => world?.unit(myHeroId), pick: (h: HeroId) => (devPick = h), renderer: () => renderer } });
 let pickedLane: LaneId = 'mid';
 let pickedDifficulty: BotDifficulty = 'normal';
 try {
@@ -41,11 +42,15 @@ try {
 
 // ------------------------------------------------------------- menu & draft
 
-// The 3D hero models are rendered once into round headshots (HUD and draft screen).
+// The 3D hero models are rendered once into round headshots (HUD and draft screen): first the
+// placeholders, then again with the artist models once those have loaded.
 try {
   const showcase = new MenuShowcase($<HTMLCanvasElement>('#menu3d'));
   Object.assign(heroPortraits, showcase.portraits());
-  showcase.dispose();
+  void loadAssets(import.meta.env.BASE_URL).then(() => {
+    Object.assign(heroPortraits, showcase.portraits((id) => character(`hero:${id}`)?.root ?? null));
+    showcase.dispose();
+  });
 } catch (err) {
   console.warn('Hero headshots unavailable', err);
 }

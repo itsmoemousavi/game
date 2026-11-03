@@ -1,8 +1,10 @@
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { GameMap, HEROES, Team, Unit, World, isHouseWallAt, isInvisible, isNight } from '../sim';
 import type { Aim } from './input';
 import { Renderer, TEAM_COLORS } from './renderer';
 import { JOINTS, Joint, TEAM_HEX, model } from './three/models';
+import { Character, character, hasAsset, loadAssets } from './three/assets';
 import type { GameEvent } from '../sim';
 
 /** Ground level per map height (1 = normal, 2 = base plateau, 3 = ward hill), in meters. */
@@ -98,6 +100,11 @@ export class Renderer3D extends Renderer {
     Object.assign(this.sun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 120 });
     this.sun.shadow.bias = -0.0008;
     this.scene.add(this.sun, this.sun.target);
+    // Soft surrounding light for the artist models' metal and leather (computed once, cheap to use).
+    const pmrem = new THREE.PMREMGenerator(this.gl);
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environmentIntensity = 0.45;
+    pmrem.dispose();
 
     // ---- terrain with height
     this.grid = map.grid;
@@ -152,6 +159,8 @@ export class Renderer3D extends Renderer {
 
     this.buildTrees(map);
     this.buildHouse(map);
+    // Artist models load in the background; compile their shaders as soon as they arrive.
+    void loadAssets(import.meta.env.BASE_URL).then(() => this.prewarmAssets());
     this.resize();
     this.prewarm();
   }
@@ -188,8 +197,27 @@ export class Renderer3D extends Renderer {
     this.scene.remove(tmp);
   }
 
+  private prewarmAssets() {
+    if (this.destroyed) return;
+    const tmp = new THREE.Group();
+    for (const k of ['hero:brakk', 'hero:vexa', 'hero:orin', 'hero:syl', 'hero:grom', 'hero:kaela', 'imp', 'brute', 'warden']) {
+      const c = character(k);
+      if (c) tmp.add(c.root);
+    }
+    for (const t of TINTS) {
+      const c = character('creep', t);
+      if (c) tmp.add(c.root);
+    }
+    tmp.position.set(this.camX, -50, this.camY);
+    this.scene.add(tmp);
+    this.gl.compile(this.scene, this.camera);
+    this.scene.remove(tmp);
+  }
+  private destroyed = false;
+
   /** Free the GPU resources (when switching views or starting a new match). */
   destroy() {
+    this.destroyed = true;
     this.gl.dispose();
   }
 
@@ -446,10 +474,13 @@ export class Renderer3D extends Renderer {
 
   private placeObj(key: string, id: string, x: number, y: number, h = 0, rotY = 0, scale = 1): Obj {
     let e = this.objs.get(id);
-    if (!e || e.key !== key) {
+    const ak = assetKey(key);
+    // Rebuild when the key changes, or when an artist model finished loading for a placeholder.
+    if (!e || e.key !== key || (!e.char && ak && hasAsset(ak))) {
       if (e) this.scene.remove(e.o);
-      const o = model(key);
-      e = { o, seen: 0, key, joints: jointsOf(o) };
+      const ch = ak ? character(ak, creepTint(key)) : null;
+      const o = ch ? ch.root : model(key);
+      e = { o, seen: 0, key, joints: ch ? {} : jointsOf(o), char: ch ?? undefined };
       this.scene.add(o);
       this.objs.set(id, e);
     }
@@ -492,8 +523,35 @@ export class Renderer3D extends Renderer {
     return a;
   }
 
+  /** Artist models: their own idle/walk clips where they have them, plus a lean for attacks and casts. */
+  private animateChar(c: Character, u: Unit) {
+    const a = this.anim(u.id);
+    const dt = this.dt;
+    const speed = Math.hypot(u.x - u.px, u.y - u.py) * 30;
+    const moving = speed > 0.5 && u.stunTimer <= 0;
+    a.walk += ((moving ? 1 : 0) - a.walk) * Math.min(1, dt * 8);
+    if (moving) a.phase += dt * (5 + speed * 0.9);
+    if (a.atk >= 1 && c.attack) c.attack.reset().play();
+    a.atk = Math.max(0, a.atk - dt / 0.38);
+    a.cast = Math.max(0, a.cast - dt / 0.55);
+    const hit = a.atk > 0 ? Math.sin((1 - a.atk) * Math.PI) : 0;
+    const cast = a.cast > 0 ? Math.sin((1 - a.cast) * Math.PI) : 0;
+    if (c.walk) {
+      c.walk.setEffectiveWeight(a.walk);
+      c.walk.setEffectiveTimeScale(Math.max(0.6, Math.min(1.6, speed / 5)));
+      c.idle?.setEffectiveWeight(1 - a.walk);
+    }
+    // No walk clip: a step bob and sway instead.
+    const bob = c.walk ? 0 : Math.abs(Math.sin(a.phase)) * 0.12 * a.walk;
+    const sway = c.walk ? 0 : Math.sin(a.phase) * 0.06 * a.walk;
+    c.body.position.y = bob;
+    c.body.rotation.set((c.attack ? 0 : hit * 0.35) - cast * 0.18 + (c.walk ? 0 : a.walk * 0.08), 0, sway);
+    c.mixer?.update(dt);
+  }
+
   /** Walk cycle, attack swing and casting pose, layered on the model's rest pose. */
   private animate(e: Obj, u: Unit, time: number) {
+    if (e.char) return this.animateChar(e.char, u);
     const a = this.anim(u.id);
     const dt = this.dt;
     const speed = Math.hypot(u.x - u.px, u.y - u.py) * 30; // meters per second
@@ -680,6 +738,21 @@ interface Obj {
   seen: number;
   key: string;
   joints: Partial<Record<Joint, THREE.Object3D>>;
+  /** Set when the unit uses an artist model instead of the placeholder. */
+  char?: Character;
+}
+
+/** Which artist model replaces a placeholder key (lane creeps of both teams share one model). */
+function assetKey(key: string): string | null {
+  if (key.startsWith('hero:')) return key;
+  if (key.startsWith('creep:')) return 'creep';
+  if (key === 'imp' || key === 'brute' || key === 'warden') return key;
+  return null;
+}
+const TINTS = [new THREE.Color(0x1d4fd8), new THREE.Color(0xb91c1c)];
+/** Lane creeps share one model, so they get a glow in their team's colour. */
+function creepTint(key: string): THREE.Color | undefined {
+  return key.startsWith('creep:') ? TINTS[Number(key.split(':')[2]) || 0] : undefined;
 }
 interface Anim {
   phase: number;

@@ -51,8 +51,9 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
   `ai/bots.ts` (team plans: farm / push / defend; difficulty easy/normal/hard), `data/*` (all numbers).
 - `src/client/` `main.ts` (menus, settings, loop), `renderer.ts` (2D; in 3D mode it draws only the ground
   layer into a texture), `renderer3d.ts` (Three.js view, animations, overlay bars/text, picking),
-  `three/hero-models.ts` + `three/models.ts` (low-poly placeholder models, baked into few meshes with
-  animatable joints), `menu3d.ts` (start screen 3D hero + portraits), `hud.ts`, `input.ts`, `items-ui.ts`
+  `three/assets.ts` (artist models from Sketchfab, CC BY 4.0, in `public/models/`, credits in
+  Settings and `public/models/CREDITS.md`; they replace the placeholders once loaded), `three/hero-models.ts` +
+  `three/models.ts` (low-poly placeholder models, baked into few meshes with animatable joints; still the fallback), `menu3d.ts` (start screen 3D hero + portraits), `hud.ts`, `input.ts`, `items-ui.ts`
   (shop), `audio.ts` (synthesized sounds), `tutorial.ts`.
 - `tests/` vitest. Positions in tests are on the 300 m map. Long full-match tests must `await` a
   `setTimeout(0)` now and then, or vitest's worker heartbeat times out on CI.
@@ -71,6 +72,9 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
 - Shop: tabs + grid + detail panel with BUY/SELL; taps only select (no accidental buys when scrolling);
   sell = full refund within 10 s, then half; dead heroes can shop; **no quick-buy**.
 - Match start: menu has no heroes; **draft inside the match** (1 ban per team, picks 1-2-2-1, then 30 s warm-up).
+- Art style: **semi-realistic, darker, painted** (owner loved Sketchfab "Minotaur Berserker" by Yury Misiyuk).
+  Rejected: cute kits (KayKit, Kenney), Grab3D, Mixamo realistic humans. Models must be free for commercial use
+  (CC0 / CC BY, no fan art of other games). Owner's Sketchfab API token is in `~/.sketchfab-token` (never commit it).
 - Warden: walled house on the river (bot/mid side), seen and fought only from inside, slam stun, charm anyone can grab.
 - Dying costs gold; buyback exists. Android build: not now. App stores: later.
 
