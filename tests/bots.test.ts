@@ -34,8 +34,8 @@ describe('smarter bots', () => {
       for (const team of [0, 1] as Team[])
         HERO_IDS.slice(0, 3).forEach((heroId, i) => slots.push({ team, heroId, controller: 'bot', lane: LANE_IDS[i], difficulty: diff[team] }));
       const w = new World({ seed, slots });
-      for (let m = 0; m < 60 && w.winner === null; m++) {
-        run(w, 60);
+      for (let m = 0; m < 360 && w.winner === null; m++) {
+        run(w, 10);
         await new Promise((r) => setTimeout(r, 0)); // keep the test runner's heartbeat alive
       }
       if (w.winner === 0) wins++;

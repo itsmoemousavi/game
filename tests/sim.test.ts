@@ -28,11 +28,14 @@ describe('simulation', () => {
     }
   });
 
-  it('is deterministic for the same seed and inputs', () => {
+  it('is deterministic for the same seed and inputs', async () => {
     const a = newWorld(7);
     const b = newWorld(7);
-    run(a, 120);
-    run(b, 120);
+    for (let i = 0; i < 12; i++) {
+      run(a, 10);
+      run(b, 10);
+      await new Promise((r) => setTimeout(r, 0)); // keep the test runner's heartbeat alive
+    }
     expect(snapshot(a)).toBe(snapshot(b));
   });
 
@@ -51,9 +54,12 @@ describe('simulation', () => {
     expect(me.hero!.order.type).toBe('idle');
   });
 
-  it('heroes gain gold and xp over time, and nothing becomes NaN', () => {
+  it('heroes gain gold and xp over time, and nothing becomes NaN', async () => {
     const w = newWorld();
-    run(w, 180);
+    for (let i = 0; i < 18; i++) {
+      run(w, 10);
+      await new Promise((r) => setTimeout(r, 0)); // keep the test runner's heartbeat alive
+    }
     for (const h of w.heroes) {
       // Bots spend gold, so count what they own too.
       const owned =
@@ -76,7 +82,7 @@ describe('simulation', () => {
     while (w.winner === null && w.time < 75 * 60) {
       w.step();
       // Let the test runner breathe now and then (long synchronous runs time out its heartbeat).
-      if (++n % 3000 === 0) await new Promise((r) => setTimeout(r, 0));
+      if (++n % 600 === 0) await new Promise((r) => setTimeout(r, 0));
       casts += w.events.filter((e) => e.type === 'cast').length;
       for (const h of w.heroes) {
         const moving = h.alive && h.hero!.order.type === 'move' && h.stunTimer <= 0;

@@ -141,7 +141,7 @@ describe('Syl, Grom and Kaela', () => {
     while (w.winner === null && w.time < 60 * 60) {
       w.step();
       // Let the test runner breathe now and then (long synchronous runs time out its heartbeat on CI).
-      if (++n % 3000 === 0) await new Promise((r) => setTimeout(r, 0));
+      if (++n % 600 === 0) await new Promise((r) => setTimeout(r, 0));
       for (const e of w.events) if (e.type === 'cast' && w.unit(e.unitId)?.team === 0) casts++;
     }
     expect(w.winner).not.toBeNull();
