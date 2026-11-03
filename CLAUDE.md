@@ -36,6 +36,7 @@ npm run build
 npx tsc --noEmit
 npx vite-node scripts/simulate.ts [seed] [minutes]           # headless all-bot match log
 npx vite-node scripts/hero-winrates.ts [firstSeed] [matches] # random 3v3 bot lineups → win % per hero
+npx vite-node scripts/map-check.ts [firstSeed] [matches] > out.jsonl  # per-match JSON: winner, heroes+items, buildings fallen, stuck heroes
 # Animation close-ups (dev only): npm run dev, open /anim-preview.html, then in the console
 #   run('syl', 'attack', 0.1, 'front')  /  run('orin', 'cast', 0.8, 'game', 2)  /  area('maelstrom', 1.5)
 python3 scripts/tune-hero.py 'vexa.baseDamage=35' 'brakk.ironHide.block=[5, 8, 11, 14]'   # edit hero numbers
@@ -50,7 +51,7 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
   `world.ts` (units, combat, waves, structure rules), `map.ts` (layout written for 200 m and scaled by
   `MAP_SIZE / 200`, now 300 m), `abilities.ts`, `inventory.ts` (shop, sell refund window, courier purchases), `courier.ts` (courier movement + delivery), `objectives.ts`
   (runes, Warden boss, wards, glyph, backdoor), `vision.ts` (fog, trees block sight, high ground, day/night),
-  `ai/bots.ts` (team plans: farm / push / defend; difficulty easy/normal/hard), `data/*` (all numbers).
+  `ai/bots.ts` (team plans: farm / push / defend / warden; difficulty easy/normal/hard), `ai/bot-items.ts` (bot item choices from the enemy lineup), `data/*` (all numbers).
 - `src/client/` `main.ts` (menus, settings, loop), `renderer.ts` (2D; in 3D mode it draws only the ground
   layer into a texture), `renderer3d.ts` (Three.js view, animations, overlay bars/text, picking),
   `three/hero-anims.ts` (hand-made hero animations: idle, walk,
@@ -99,9 +100,9 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
 ## Open items / next steps
 
 1. **Phone feedback on 3D**: frame rate / freezes, animations, unit sizes, camera. Ask for it.
-2. **Hard bots vs easy bots** on the big map: hard won 4/6 last check (they still lose lanes while grouped).
-   Improve lane defence; the CI test plays seeds 7, 8, 9 and expects ≥2 hard wins.
-3. **Hero balance re-check** on the 300 m map with 3 towers + 2 barracks per lane (avg match ≈24 min).
+2. **Hard bots vs easy bots**: CI plays seeds 7, 8, 9 and expects ≥2 hard wins (passes).
+3. **Hero balance** on the 300 m map: all 46–54% (240 matches, 2026-11-03, `scripts/map-check.ts`).
+   Open: red (Crimson) wins ~55% in every run; blue's hard-lane T1 falls first more often. Investigate the map.
 4. 3D polish: real art/animations (asset packs with commercial licences, or an artist), spell effects in 3D.
 5. Later: multiplayer, Capacitor app builds, store release.
 

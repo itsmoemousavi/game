@@ -2,8 +2,11 @@ import type { Team } from '../constants';
 import { LaneId, teamLanePath } from '../map';
 import { dist, pointAlong, polylineLength, projectOnPolyline } from '../math';
 import type { Unit, World } from '../world';
+import { inHouse } from '../map';
+import { isInvisible } from '../vision';
 import { abilityDef, botLearn, castBlocker } from '../abilities';
-import { BUILDS, ITEMS, TELEPORT } from '../data/items';
+import { ITEMS, ItemId, TELEPORT } from '../data/items';
+import { isTeamSupport, nextBotItem, wantsSentry } from './bot-items';
 import { buyBlocker, buyDestination, inShop, itemBlocker, recipeSources, teleportTargets, tpBlocker } from '../inventory';
 import { courierBlocker } from '../courier';
 
@@ -19,12 +22,19 @@ import { courierBlocker } from '../courier';
  *  - Fight: last-hit/kill creeps, attack weak enemy heroes, siege structures only
  *    when friendly creeps are tanking the tower.
  *  - Otherwise follow the front of our creep wave in the assigned lane.
- *  - Shop at the fountain (fixed build per hero, always carry a teleport) and
- *    teleport back to the lane after respawning / healing.
+ *  - Shop anywhere (items planned from the hero's role and the enemy lineup, see
+ *    bot-items.ts; the courier brings them), always carry a teleport, and teleport
+ *    back to the lane after respawning / healing.
+ *  - Outnumbered in lane: wait near our own tower instead of at the front.
+ *  - The team's support carries totems; sentries go where an enemy hero vanished.
+ *  - Warden (normal/hard, from ~14–17 min): all three go in together when healthy
+ *    and not outnumbered; the best-farmed hero grabs the charm. After a kill they
+ *    check the house again from minute 8 (its return isn't announced).
  *  - Bots only react to enemies they can actually see (fog of war).
  *  - Fight back if a jungle camp attacks them.
  *  - Team plan (shared by a team's bots, refreshed every 2 s):
  *      defend: a building is under attack → go there (teleport if far);
+ *      warden: take the Warden together;
  *      push:   after 6 minutes, when we're not outnumbered → group up in the
  *              lane with the weakest enemy defenses and push together;
  *      farm:   otherwise each bot keeps its own lane.
@@ -46,7 +56,7 @@ const AIM: Record<BotDifficulty, { error: number; castChance: number }> = {
 const PUSH_AFTER = 360;
 
 interface TeamPlan {
-  mode: 'farm' | 'push' | 'defend';
+  mode: 'farm' | 'push' | 'defend' | 'warden';
   lane?: 'top' | 'mid' | 'bot';
   structureId?: number;
   until: number;
@@ -84,6 +94,9 @@ function teamPlan(w: World, team: Team): TeamPlan {
   if (defend) return (cache[team] = { mode: 'defend', structureId: defend.s.id, lane: defend.s.structure!.lane ?? 'mid', until: w.time + 6 });
   // Push together when we have the upper hand.
   const alive = (t: Team) => w.units.filter((h) => h.hero && h.alive && h.team === t).length;
+  if (wantWarden(w, team, cur, alive(team), alive((1 - team) as Team))) {
+    return (cache[team] = { mode: 'warden', until, since: cur?.mode === 'warden' ? cur.since : w.time });
+  }
   if (w.time > PUSH_AFTER && alive(team) >= 2 && alive(team) >= alive((1 - team) as Team)) {
     let best: { lane: 'top' | 'mid' | 'bot'; hp: number } | null = null;
     for (const s of w.units) {
@@ -135,6 +148,8 @@ export function botThink(w: World, me: Unit) {
   const path = teamLanePath(w.map, me.team as Team, lane);
   const myProgress = projectOnPolyline(path, me);
   if (plan.mode === 'defend' && defend(w, me, plan)) return;
+  if (plan.mode === 'warden' && fightWarden(w, me, hpRatio)) return;
+  if (grabCharm(w, me)) return;
   if (inShop(w, me) && hpRatio > 0.85 && teleportToLane(w, me, path)) return;
 
   // Under fire from a tower with nothing else to soak it? Step back.
@@ -156,6 +171,7 @@ export function botThink(w: World, me: Unit) {
     return;
   }
   const careful = pings.some((p) => p.kind === 'missing');
+  if (plantSentry(w, me)) return;
   const target = chooseTarget(w, me, hpRatio) ?? (diff !== 'easy' && !careful ? gankTarget(w, me, hpRatio) : undefined);
   if (target && useAbilities(w, me, target)) return;
   if (!target && answerPing(w, me, pings)) return;
@@ -181,6 +197,22 @@ export function botThink(w: World, me: Unit) {
       }
     }
     if (front < 0) front = 10;
+  }
+  // Outnumbered in lane (more enemy heroes in sight than allies with us)? Wait near our tower
+  // instead of standing at the front where they can gang up on us.
+  if (plan.mode === 'farm') {
+    const seen = w.heroes.filter((e) => e.alive && e.team !== me.team && w.canSee(me.team, e) && dist(e.x, e.y, me.x, me.y) < 22).length;
+    const withMe = w.heroes.filter((a) => a.alive && a.team === me.team && dist(a.x, a.y, me.x, me.y) < 15).length;
+    if (seen > withMe || (seen >= 1 && hpRatio < 0.55)) {
+      let tower = -1;
+      for (const t of w.units) {
+        if (t.structure && t.alive && t.team === me.team && t.structure.lane === lane && t.attackInterval > 0) {
+          const p = projectOnPolyline(path, t);
+          if (p <= front + 2) tower = Math.max(tower, p);
+        }
+      }
+      if (tower >= 0) front = Math.min(front, tower + 6);
+    }
   }
   const spot = pointAlong(path, Math.max(0, front - 4));
   if (dist(me.x, me.y, spot.x, spot.y) > 2.5) {
@@ -391,15 +423,17 @@ function shop(w: World, me: Unit) {
   const atShop = inShop(w, me);
   const tpOnCourier = h.courier.bag.some((s) => s?.id === 'tp');
   if (h.tpCount === 0 && !tpOnCourier && h.gold >= TELEPORT.cost) w.applyCommand({ type: 'buyTp', unitId: me.id });
-  // Supports keep an observer ward on them.
-  if (h.defId === 'orin' && h.gold > 400 && !h.items.some((s) => s?.id === 'observerWard') && !h.courier.bag.some((s) => s?.id === 'observerWard')) {
-    w.applyCommand({ type: 'buy', unitId: me.id, itemId: 'observerWard' });
-  }
-  const build = BUILDS[h.defId];
-  for (let guard = 0; guard < 3 && h.bot.buildIndex < build.length; guard++) {
-    const next = build[h.bot.buildIndex];
+  // The team's support keeps an observer totem (and sentries when the enemy has an invisible hero).
+  const carries = (id: ItemId) => h.items.some((s) => s?.id === id) || h.courier.bag.some((s) => s?.id === id);
+  const freeSlot = h.items.some((x) => !x);
+  if (isTeamSupport(w, me) && freeSlot && h.gold > 400 && !carries('observerWard')) w.applyCommand({ type: 'buy', unitId: me.id, itemId: 'observerWard' });
+  if (wantsSentry(w, me) && freeSlot && h.gold > 300) w.applyCommand({ type: 'buy', unitId: me.id, itemId: 'sentryWard' });
+  // Items: planned from the hero's role and the enemy lineup (see bot-items.ts).
+  for (let guard = 0; guard < 3; guard++) {
+    const next = nextBotItem(w, me);
+    if (!next) break;
     const blocked = buyBlocker(w, me, next);
-    if (blocked === 'gold' || blocked === 'courierFull') break;
+    if (blocked === 'gold' || blocked === 'courierFull' || blocked === 'shop') break;
     // Away from base, only buy what will fit in the bag on delivery (otherwise wait for the shop).
     if (!atShop && buyDestination(w, me, next) === 'courier') {
       const def = ITEMS[next];
@@ -409,19 +443,18 @@ function shop(w: World, me: Unit) {
       if (!stack && recipeSources(h, next).inv.length === 0 && free <= 0) break;
     }
     if (blocked === 'full') {
-      // Make room by selling the cheapest item (never the Crown).
+      // Make room by selling the cheapest item that isn't a part of what we're buying (never the Crown).
+      const parts = new Set(recipeSources(h, next).inv);
       let cheapest = -1;
       h.items.forEach((s, i) => {
-        if (s && s.id !== 'crownOfAscension' && (cheapest < 0 || ITEMS[s.id].cost < ITEMS[h.items[cheapest]!.id].cost)) cheapest = i;
+        if (s && !parts.has(i) && !s.reserved && s.id !== 'crownOfAscension' && !ITEMS[s.id].consumable && (cheapest < 0 || ITEMS[s.id].cost < ITEMS[h.items[cheapest]!.id].cost)) cheapest = i;
       });
-      if (cheapest < 0 || ITEMS[h.items[cheapest]!.id].cost >= ITEMS[next].cost) {
-        h.bot.buildIndex++;
-        continue;
-      }
+      if (cheapest < 0 || ITEMS[h.items[cheapest]!.id].cost >= ITEMS[next].cost) break;
       w.applyCommand({ type: 'sell', unitId: me.id, slot: cheapest });
     }
+    const before = h.gold;
     w.applyCommand({ type: 'buy', unitId: me.id, itemId: next });
-    h.bot.buildIndex++;
+    if (h.gold === before) break; // didn't go through
   }
   // Courier: send it whenever something is waiting for us.
   if (!atShop && !courierBlocker(me)) w.applyCommand({ type: 'courier', unitId: me.id });
@@ -556,4 +589,119 @@ function answerPing(w: World, me: Unit, pings: { kind: string; x: number; y: num
   }
   w.applyCommand({ type: 'moveTo', unitId: me.id, x: call.x, y: call.y });
   return true;
+}
+
+// ------------------------------------------------------------------ the Warden
+
+interface WardenMemory {
+  /** The Warden was alive the last time we looked at the world (its death is announced to everyone). */
+  wasAlive: boolean;
+  /** When it died (or when we last found the house empty). */
+  goneAt: number | null;
+}
+
+function wardenMemory(w: World, team: Team): WardenMemory {
+  const all = ((w as unknown as { botWarden?: Record<number, WardenMemory> }).botWarden ??= {});
+  const m = (all[team] ??= { wasAlive: true, goneAt: null });
+  const alive = !!theWarden(w);
+  if (m.wasAlive && !alive) m.goneAt = w.time; // "the Warden was slain" is announced to both teams
+  m.wasAlive = alive;
+  return m;
+}
+
+const theWarden = (w: World) => w.units.find((u) => u.alive && u.neutral?.boss);
+
+/** It respawns 8–11 minutes after dying, unannounced: bots go and check from minute 8. */
+const WARDEN_CHECK_AFTER = 8 * 60;
+
+/**
+ * Take the Warden together: late enough, everyone alive and healthy, not outnumbered.
+ * Once started, keep going while at least two of us can still fight.
+ */
+function wantWarden(w: World, team: Team, cur: TeamPlan | undefined, ours: number, theirs: number): boolean {
+  const mem = wardenMemory(w, team);
+  if (mem.goneAt !== null && w.time - mem.goneAt < WARDEN_CHECK_AFTER) return false;
+  const heroes = w.heroes.filter((h) => h.team === team);
+  if (heroes.some((h) => h.hero!.bot.difficulty === 'easy')) return false;
+  if (cur?.mode === 'warden') {
+    const fit = heroes.filter((h) => h.alive && h.hp > h.maxHp * 0.4).length;
+    const enemiesNear = w.heroes.filter((e) => e.alive && e.team !== team && w.canSee(team, e) && dist(e.x, e.y, w.map.bossPit.x, w.map.bossPit.y) < 25).length;
+    return fit >= 2 && enemiesNear <= fit && w.time < (cur.since ?? 0) + 90;
+  }
+  const hard = heroes.some((h) => h.hero!.bot.difficulty === 'hard');
+  if (w.time < (hard ? 14 : 17) * 60 || ours < 3 || theirs > ours - (w.time > 24 * 60 ? 0 : 1)) return false;
+  const avgLevel = heroes.reduce((s, h) => s + h.hero!.level, 0) / heroes.length;
+  return avgLevel >= 11 && heroes.every((h) => h.hp > h.maxHp * 0.75);
+}
+
+/** Walk into the house and hit the Warden (enemy heroes in reach come first). */
+function fightWarden(w: World, me: Unit, hpRatio: number): boolean {
+  const pit = w.map.bossPit;
+  const boss = theWarden(w);
+  const inside = inHouse(w.map, me.x, me.y);
+  if (inside && !boss) {
+    // Not back yet: remember, and look again in a minute.
+    wardenMemory(w, me.team as Team).goneAt = w.time - WARDEN_CHECK_AFTER + 60;
+    return false;
+  }
+  const enemy = chooseTarget(w, me, hpRatio);
+  // Enemy heroes, and creeps in the way or hitting us: the normal fight logic takes over.
+  if (enemy && !enemy.neutral && (enemy.hero || dist(enemy.x, enemy.y, me.x, me.y) < 5 || enemy.targetId === me.id)) return false;
+  if (!inside || !boss || !w.canSee(me.team, boss)) {
+    if (dist(me.x, me.y, pit.x, pit.y) > 2.5) w.applyCommand({ type: 'moveTo', unitId: me.id, x: pit.x, y: pit.y });
+    return true;
+  }
+  // Damage spells on the boss when mana allows (keep enough for a fight with heroes).
+  if (me.mana > me.maxMana * 0.5 && ready(me, 0)) {
+    const def = abilityDef(me, 0)!;
+    if (def.targeting !== 'ally' && def.targeting !== 'passive' && def.targeting !== 'none' && dist(me.x, me.y, boss.x, boss.y) <= def.castRange) {
+      cast(w, me, 0, boss);
+      return true;
+    }
+  }
+  const o = me.hero!.order;
+  if (o.type !== 'attack' || o.targetId !== boss.id) w.applyCommand({ type: 'attack', unitId: me.id, targetId: boss.id });
+  return true;
+}
+
+/** The Warden's Charm on the ground: our best-farmed hero with a free slot nearby goes for it. */
+function grabCharm(w: World, me: Unit): boolean {
+  const charm = w.groundItems.find((g) => g.item.id === 'wardenCharm' && dist(g.x, g.y, me.x, me.y) < 30);
+  if (!charm) return false;
+  const takers = w.heroes
+    .filter((a) => a.alive && a.team === me.team && a.hero!.items.some((s) => !s) && dist(a.x, a.y, charm.x, charm.y) < 30)
+    .sort((a, b) => b.hero!.goldEarned - a.hero!.goldEarned);
+  if (takers[0] !== me) return false;
+  const o = me.hero!.order;
+  if (o.type !== 'pickUp' || o.groundId !== charm.id) w.applyCommand({ type: 'pickUp', unitId: me.id, groundId: charm.id });
+  return true;
+}
+
+// ------------------------------------------------------------------ sentry totems
+
+/** Where an enemy hero vanished from sight next to us (likely went invisible), per bot. */
+function plantSentry(w: World, me: Unit): boolean {
+  const slot = me.hero!.items.findIndex((s) => s?.id === 'sentryWard');
+  const mem = ((w as unknown as { botSeen?: Record<number, { id: number; x: number; y: number; at: number }[]> }).botSeen ??= {});
+  const seen = (mem[me.id] ??= []);
+  // Remember enemy heroes seen close by in the last couple of seconds.
+  for (const e of w.heroes) {
+    if (e.team === me.team || !e.alive || !w.canSee(me.team, e) || dist(e.x, e.y, me.x, me.y) > 14) continue;
+    const r = seen.find((q) => q.id === e.id);
+    if (r) Object.assign(r, { x: e.x, y: e.y, at: w.time });
+    else seen.push({ id: e.id, x: e.x, y: e.y, at: w.time });
+  }
+  if (slot < 0) return false;
+  const covered = (x: number, y: number) => w.units.some((u) => u.ward?.kind === 'sentry' && u.alive && u.team === me.team && dist(u.x, u.y, x, y) < 10);
+  for (const r of seen) {
+    const e = w.unit(r.id);
+    if (!e || !e.alive || w.canSee(me.team, e) || w.time - r.at > 2.5 || !isInvisible(e)) continue;
+    // isInvisible is only used to skip heroes that simply walked into the fog: a bot that just saw
+    // a hero disappear from right in front of it would guess the same.
+    if (dist(r.x, r.y, me.x, me.y) > 10 || covered(r.x, r.y)) continue;
+    w.applyCommand({ type: 'placeWard', unitId: me.id, slot, x: r.x, y: r.y });
+    r.at = -1e9;
+    return true;
+  }
+  return false;
 }

@@ -89,7 +89,7 @@ If 3D performance in a Capacitor WebView ever becomes a blocker, the simulation 
 | **Grom, the Ironroot** | Melee bruiser | *Root Snare*: after 0.4 s, roots (1.2–2.1 s) and damages (60–180) in a 3 m area | *Bark Skin*: +6–12 armor and 8–20 health regen for 6 s | *Overgrowth*: roots everyone within 9 m (2–3 s), then 40–80 damage per second for 3 s |
 | **Kaela, the Tidecaller** | Ranged support | *Tidal Wave*: line wave, 70–190 damage + 30% slow to everyone hit | *Brine Veil*: heal an ally 60–150, +4–10 armor and +15% speed for 5 s | *Maelstrom*: 6 m area for 4 s, 50–110 damage per second, 50% slow |
 
-Bots pick random heroes (no duplicates within a team), and every hero has a recommended item build.
+Bots pick random heroes (no duplicates within a team), and every hero has a recommended item build (shown in the shop). Bots themselves plan their items from their role and the enemy lineup (`src/sim/ai/bot-items.ts`): armor (Stoneskin Amulet) against attack-heavy teams, the Warded Cloak against spell- and stun-heavy ones, only one Banner of Valor per team, sentry totems against Syl, and the defensive pick sooner when a hero keeps dying.
 
 Ability levels: basic abilities max level 4 (and at most ⌈hero level / 2⌉), ultimate max level 3 (learnable at levels 6 / 10 / 14). Heroes start with 1 skill point and gain 1 per level.
 
@@ -197,30 +197,34 @@ Goal: 15–20 minute matches. Bots-only test matches went from 33–53 min to **
 | Passive gold | 2 → 3 per second |
 | XP table | about 15% faster (level 6 around minute 5) |
 | Respawn time | 4 + 2×level → 3 + 1.5×level seconds |
-| Bots | group up and push from minute 6 when not outnumbered |
+| Bots | group up and push from minute 6 when not outnumbered; take the Warden together from ~14 (hard) / 17 (normal) min when healthy and not outnumbered, then check its house again from 8 min after the kill; wait near their tower when outnumbered in lane |
 
 ### Hero balance (no hero is a "must pick")
 
-Goal: picking a hero should not make a team stronger; team composition and play should decide matches. Measured with `npx vite-node scripts/hero-winrates.ts [firstSeed] [matches]`: random 3v3 lineups of bots (normal difficulty), each hero's win rate across all matches it appeared in.
+Goal: picking a hero should not make a team stronger; team composition and play should decide matches. Measured with `npx vite-node scripts/map-check.ts [firstSeed] [matches]` (one JSON line per match: winner, length, heroes and items, when each building fell, stuck heroes; run 10 in parallel, e.g. seeds 1000, 1024, … × 24 matches): random 3v3 lineups of normal bots, each hero's win rate across all matches it appeared in.
 
-| Hero | Before | After (108 matches) |
+300 m map check (2026-11-03, 240 matches each):
+
+| Hero | First check | Now |
 |---|---|---|
-| Vexa | 86% | 45% |
-| Brakk | 69% | 50% |
-| Orin | 53% | 45% |
-| Kaela | 33% | 57% |
-| Syl | 31% | 45% |
-| Grom | 28% | 56% |
+| Grom | 70% | 49% |
+| Syl | 59% | 46% |
+| Brakk | 55% | 54% |
+| Kaela | 55% | 50% |
+| Vexa | 40% | 50% |
+| Orin | 21% | 51% |
 
-With ~108 matches a hero's win rate still swings about ±5% from luck alone, so everything is now inside the expected noise band around 50%. Average bots-only match: ~22 min.
+With 240 matches a hero's win rate still swings about ±3–4% from luck. Average bots-only match ~33 min; the Warden is taken about once per match.
+Open: **Crimson (red) wins ~55%** in every run (52–58%), also before the bot changes; Azure's hard-lane tier-1 falls first more often. Worth a look at the map.
 
-Main changes (all numbers live in `src/sim/data/heroes.ts`):
-- **Vexa:** Hunter's Rhythm crits no longer apply to buildings (she was doing 3× anyone's building damage); attack range 10 → 7, lower base damage, damage/attack speed/health per level, weaker crit, Piercing Arrow and Arrow Storm.
-- **Brakk:** Iron Hide blocks 5/8/11/14 (was 10/18/26/34) with less low-health armor; less health, damage; Earthsplitter weaker and shorter stun.
-- **Orin:** more health and armor, faster attacks, stronger Fireball and Mending Flame, Cataclysm lands after 1.2 s (was 1.5 s) and hits harder.
-- **Kaela:** more health and armor, stronger Tidal Wave (more damage, 40% slow, 8 s cooldown), stronger Brine Veil heal, Maelstrom more damage and shorter cooldown.
-- **Syl:** more health, armor, damage and attack speed; stronger Shadow Lunge and Execution.
-- **Grom:** more health, armor and damage; stronger Root Snare and Overgrowth.
+Changes in this pass:
+- **Orin:** more health (660) and mana regen, Fireball every 7 s and harder, stronger Cataclysm and Mending Flame.
+- **Grom:** less health per level, Overgrowth smaller (7.5 m) and weaker.
+- **Brakk:** less health per level, damage and Iron Hide block. **Syl:** Shadow Lunge a bit weaker, a bit more health.
+- **Vexa:** more base damage. **Kaela:** stronger Tidal Wave and Brine Veil.
+- Bots now buy items from the enemy lineup (below), which also changed results.
+
+Earlier passes (200 m map): Vexa crits no longer hit buildings, range 10 → 7; Brakk Iron Hide cut; Orin, Kaela, Syl, Grom buffed.
 
 Re-run the script after any hero or item change and keep every hero within about 45–55%.
 

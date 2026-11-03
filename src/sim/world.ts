@@ -1945,6 +1945,9 @@ export class World {
         const b = movers[j];
         // Jungle monsters only bump into each other, so they never wall off a corridor.
         if ((a.kind === 'neutral') !== (b.kind === 'neutral')) continue;
+        // Allied heroes walk through each other: one standing by a wall could otherwise block a
+        // teammate for good in a narrow spot.
+        if (a.hero && b.hero && a.team === b.team) continue;
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const min = (a.radius + b.radius) * 0.9;

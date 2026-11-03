@@ -40,7 +40,7 @@ for (let seed = first; seed < first + count; seed++) {
       for (const u of w.units) if (!byId.has(u.id)) byId.set(u.id, u);
       for (const h of w.heroes) {
         const prev = last.get(h.id);
-        const wantsToMove = h.alive && h.stunTimer <= 0 && h.castLock <= 0 && (h.path?.length ?? 0) > 0 && h.targetId === null;
+        const wantsToMove = h.alive && h.stunTimer <= 0 && h.castLock <= 0 && h.hero!.order.type === 'move' && h.targetId === null;
         if (!prev || !wantsToMove || Math.hypot(h.x - prev.x, h.y - prev.y) > 1) {
           last.set(h.id, { x: h.x, y: h.y, since: w.time, reported: false });
         } else if (!prev.reported && w.time - prev.since >= 8) {
