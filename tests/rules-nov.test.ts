@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HERO_IDS, LANE_IDS, PlayerSlot, TICK_RATE, Team, Unit, World, heightAt, isWalkable } from '../src/sim';
+import { HERO_IDS, LANE_IDS, PlayerSlot, TICK_RATE, Team, Unit, World, heightAt, isWalkable, pointAlong, polylineLength } from '../src/sim';
 
 function humans() {
   const slots: PlayerSlot[] = [];
@@ -163,5 +163,60 @@ describe('fountain yards', () => {
     place(foe, y.x + y.door.x * (y.outer + 1), y.y + y.door.y * (y.outer + 1));
     run(w, 0.2);
     expect(w.canSee(1, v)).toBe(true);
+  });
+});
+
+describe('side lanes and the river', () => {
+  it('side lanes are solid ground all the way; only mid crosses water', () => {
+    const { w } = humans();
+    for (const lane of ['top', 'bot'] as const) {
+      const path = w.map.lanes[lane];
+      const len = polylineLength(path);
+      for (let d = 0; d < len; d += 1) {
+        const p = pointAlong(path, d);
+        expect(heightAt(w.map, p.x, p.y)).toBeGreaterThanOrEqual(1);
+        expect(isWalkable(w.map, p.x, p.y)).toBe(true);
+      }
+    }
+    const mid = w.map.lanes.mid;
+    let water = 0;
+    for (let d = 0; d < polylineLength(mid); d += 1) {
+      const p = pointAlong(mid, d);
+      if (heightAt(w.map, p.x, p.y) === 0) water++;
+    }
+    expect(water).toBeGreaterThan(5);
+  });
+
+  it('the river ends at each side lane with a slope you can walk up onto the lane', () => {
+    const { w } = humans();
+    for (const end of [w.map.riverPath[0], w.map.riverPath[w.map.riverPath.length - 1]]) {
+      // Walk from the water toward the river's end: it stays walkable, and climbs to the lane.
+      const i = end === w.map.riverPath[0] ? 6 : w.map.riverPath.length - 7;
+      const from = w.map.riverPath[i];
+      expect(heightAt(w.map, from.x, from.y)).toBe(0);
+      const dx = end.x - from.x;
+      const dy = end.y - from.y;
+      const l = Math.hypot(dx, dy);
+      let reachedLane = false;
+      for (let t = 0; t <= l + 4; t += 0.5) {
+        const x = from.x + (dx / l) * t;
+        const y = from.y + (dy / l) * t;
+        expect(isWalkable(w.map, x, y)).toBe(true);
+        if (heightAt(w.map, x, y) >= 1) reachedLane = true;
+      }
+      expect(reachedLane).toBe(true);
+    }
+  });
+
+  it('the hard-lane tier-1 stands near the corner, clear of the water, with a trail behind it', () => {
+    const { w } = humans();
+    const t1 = w.structures.find((s) => s.team === 0 && s.structure!.tier === 'tower1' && s.structure!.lane === 'top')!;
+    expect(t1.y).toBeLessThan(80); // up near the top-left corner
+    const end = w.map.riverPath[0];
+    expect(Math.hypot(t1.x - end.x, t1.y - end.y)).toBeGreaterThan(18);
+    // A trail leaves the lane on the inner side a little behind the tower.
+    let open = 0;
+    for (let x = t1.x + 6; x < t1.x + 28; x += 1) if (isWalkable(w.map, x, t1.y + 12)) open++;
+    expect(open).toBeGreaterThan(14);
   });
 });

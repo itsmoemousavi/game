@@ -86,7 +86,7 @@ describe('wards', () => {
     w.applyCommand({ type: 'buy', unitId: o.id, itemId: 'observerWard' });
     w.applyCommand({ type: 'placeWard', unitId: o.id, slot: 0, x: 60, y: 240 });
     expect(o.hero!.order.type).toBe('ward');
-    run(w, 10);
+    run(w, 14);
     expect(w.units.some((u) => u.ward && u.team === 0)).toBe(true);
   });
 });

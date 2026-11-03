@@ -24,15 +24,18 @@ describe("the Warden's house", () => {
     const { w } = humans();
     const h = w.map.house;
     let gaps = 0;
+    let opens = 0;
     let prevOpen = false;
     // Walk round the middle of the wall: it is solid except for one doorway.
     for (let a = 0; a < 360; a += 2) {
       const r = (a * Math.PI) / 180;
       const open = isWalkable(w.map, h.x + Math.cos(r) * ((h.inner + h.outer) / 2), h.y + Math.sin(r) * ((h.inner + h.outer) / 2));
       if (open && !prevOpen) gaps++;
+      if (open) opens++;
       prevOpen = open;
     }
     expect(gaps).toBe(1);
+    expect(opens).toBeLessThan(180 * 0.3); // (an all-open ring would also count as "one gap")
     expect(inHouse(w.map, h.x + 4, h.y)).toBe(true);
     expect(inHouse(w.map, doorway(w, 10.5).x, doorway(w, 14).y)).toBe(false);
   });

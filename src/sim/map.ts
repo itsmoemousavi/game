@@ -155,17 +155,22 @@ const LANES: Record<LaneId, Vec2[]> = {
   bot: LANES_200.bot.map(sc),
 };
 
+/** Distance from a point to the nearest side lane (top or bottom) centre line. */
+function sideLaneDist(x: number, y: number): number {
+  let d = Infinity;
+  for (const id of ['top', 'bot'] as LaneId[]) for (let i = 1; i < LANES[id].length; i++) d = Math.min(d, distToSegment(x, y, LANES[id][i - 1], LANES[id][i]));
+  return d;
+}
 /**
- * The river ends just past the side lanes: the corners beyond them are dense forest. Walk
- * out from the middle until the river has crossed the top lane, then stop a little beyond it.
+ * Only the mid lane crosses water. The river ends where it reaches the inner edge of each side
+ * lane: the side lanes stay solid ground all the way round their corners, with a slope down
+ * into the river's end (so heroes on the lane look down on anyone coming up the river).
+ * Walk out from the middle until the river's centre line touches the top lane's edge.
  */
 const RIVER_END: number = (() => {
-  const near = (p: Vec2) => LANE_IDS.some((id) => LANES[id].some((a, i) => i > 0 && distToSegment(p.x, p.y, LANES[id][i - 1], a) < LANE_WIDTH / 2 + 1));
-  let crossed = false;
-  for (let t = -0.4; t > -1.05; t -= 0.004) {
-    const n = near(riverAt(t));
-    if (n) crossed = true;
-    else if (crossed) return t;
+  for (let t = -0.4; t > -1.05; t -= 0.002) {
+    const p = riverAt(t);
+    if (sideLaneDist(p.x, p.y) <= LANE_WIDTH / 2) return t;
   }
   return -1;
 })();
@@ -192,6 +197,8 @@ const JUNGLE_ROOMS: { c: Vec2; r: number }[] = [
  * Trees on both sides still block sight. Polylines, team-0 half; mirrored for team 1.
  */
 const FOREST_PATHS_200: Vec2[][] = [
+  // Behind the hard-lane tier-1 (near the top corner): a way in from the woods for helpers.
+  [{ x: 22, y: 50 }, { x: 32, y: 48 }, { x: 44, y: 46 }],
   [{ x: 22, y: 70 }, { x: 40, y: 62 }, { x: 58, y: 59 }],
   [{ x: 22, y: 96 }, { x: 34, y: 91 }, { x: 47, y: 100 }],
   [{ x: 22, y: 124 }, { x: 40, y: 128 }, { x: 59, y: 139 }],
@@ -241,7 +248,7 @@ const HOUSE: House = (() => {
 const FOUNTAIN_YARDS: [House, House] = (() => {
   const d = Math.SQRT1_2;
   const f = FOUNTAIN0;
-  const yard0: House = { x: f.x, y: f.y, inner: 16, outer: 19.5, door: { x: d, y: -d }, doorHalf: 4.5 };
+  const yard0: House = { x: f.x, y: f.y, inner: 16, outer: 19.5, door: { x: d, y: -d }, doorHalf: 9 };
   return [yard0, { ...yard0, x: MAP_SIZE - f.x, y: MAP_SIZE - f.y, door: { x: -d, y: d } }];
 })();
 /** Open ground around the house, so you can walk all the way round it. */
@@ -256,21 +263,20 @@ const T1_FRACTION = 0.86;
 /** The easy side lane's tier-1 sits a little further back than mid's. */
 const T1_EASY_LANE_FRACTION = 0.8;
 /**
- * Like Dota, each team has an easy lane and a hard lane: team 0's easy lane is the bottom one
- * (its first tower stands out near the river) and its hard lane is the top one (first tower
- * much closer to base). Mirrored, team 1's easy lane is the top and its hard lane the bottom,
- * so both teams get one of each.
+ * Each team has an easy lane and a hard lane: team 0's easy lane is the bottom one and its hard
+ * lane the top one, whose tier-1 stands out near the corner (clear of the river's end, with a
+ * trail behind it). Mirrored, team 1's easy lane is the top and its hard lane the bottom.
  */
-const T1_HARD_LANE_FRACTION = 0.55;
+const T1_HARD_LANE_FRACTION = 0.85;
 /** Tier-2 towers stand further back toward the base (on the hard lane well behind its tier-1). */
 const T2_FRACTION = 0.45;
 const T2_EASY_LANE_FRACTION = 0.4;
-const T2_HARD_LANE_FRACTION = 0.3;
+const T2_HARD_LANE_FRACTION = 0.45;
 /**
- * Towers stand just past the lane edge: they leave most of the lane open, and their reach
- * (11 m + body sizes) still covers the far side of the lane.
+ * Towers stand a little off the lane's centre line (toward the map's inside): creeps walk
+ * past on the outer side, and their reach covers the whole lane.
  */
-const TOWER_SIDE_OFFSET = LANE_WIDTH / 2 - 0.5;
+const TOWER_SIDE_OFFSET = 3;
 /** Tier-3 tower + barracks form a gate this far from where the lane leaves the base. */
 const GATE_DISTANCE = 5 * S;
 
@@ -375,14 +381,19 @@ export function createMap(): GameMap {
     const front = sideOf(path, GATE_DISTANCE + 4);
     const t3Pos = { x: front.at.x + front.px * TOWER_SIDE_OFFSET, y: front.at.y + front.py * TOWER_SIDE_OFFSET };
     const back = sideOf(path, Math.max(1, GATE_DISTANCE - 3));
-    const meleePos = { x: back.at.x + back.px * (TOWER_SIDE_OFFSET + 1.5), y: back.at.y + back.py * (TOWER_SIDE_OFFSET + 1.5) };
-    const rangedPos = { x: back.at.x - back.px * (TOWER_SIDE_OFFSET + 1.5), y: back.at.y - back.py * (TOWER_SIDE_OFFSET + 1.5) };
+    // Barracks flank the road on both sides (kept at the lane edges so the gate stays wide).
+    const RAX_OFFSET = LANE_WIDTH / 2 + 1;
+    const meleePos = { x: back.at.x + back.px * RAX_OFFSET, y: back.at.y + back.py * RAX_OFFSET };
+    const rangedPos = { x: back.at.x - back.px * RAX_OFFSET, y: back.at.y - back.py * RAX_OFFSET };
     structures.push({ team: 0, tier: 'tower1', lane, pos: t1Pos });
     structures.push({ team: 0, tier: 'tower2', lane, pos: t2Pos });
     structures.push({ team: 0, tier: 'tower3', lane, pos: t3Pos });
     structures.push({ team: 0, tier: 'barracks', lane, pos: meleePos, rax: 'melee' });
     structures.push({ team: 0, tier: 'barracks', lane, pos: rangedPos, rax: 'ranged' });
-    for (const p of [t1Pos, t2Pos, t3Pos]) carveCircle(p, 5.5); // room to walk all the way round
+    // Room to walk all the way round each tower, and the lane bulges out on the far side so
+    // creeps and heroes still have a wide road past it.
+    for (const p of [t1Pos, t2Pos, t3Pos]) carveCircle(p, 5.5);
+    for (const [t, p] of [[t1, t1Pos], [t2, t2Pos], [front, t3Pos]] as const) carveCircle({ x: p.x - t.px * 7, y: p.y - t.py * 7 }, 6.5);
     for (const p of [meleePos, rangedPos]) carveCircle(p, 6.5);
   }
   // Shrine towers flank the Shrine on the side facing the lanes.
@@ -496,8 +507,11 @@ export function createMap(): GameMap {
       if (d <= half - 1.6 || ramp) {
         // Only the water itself is low ground; the top of a slope counts as the bank.
         const water = d <= half - 1.6;
-        if (water && Math.hypot(x - HOUSE.x, y - HOUSE.y) > HOUSE_CLEARING && Math.hypot(MAP_SIZE - x - HOUSE.x, MAP_SIZE - y - HOUSE.y) > HOUSE_CLEARING) height[i] = 0;
+        const onSideLane = sideLaneDist(x, y) <= LANE_WIDTH / 2;
+        if (water && !onSideLane && Math.hypot(x - HOUSE.x, y - HOUSE.y) > HOUSE_CLEARING && Math.hypot(MAP_SIZE - x - HOUSE.x, MAP_SIZE - y - HOUSE.y) > HOUSE_CLEARING) height[i] = 0;
         if (ramp && d > half) continue; // the top of a slope keeps whatever is there
+        // The Warden's house sits on the river: its wall stays solid.
+        if (isHouseWallAt(HOUSE, x, y)) continue;
         if (d <= half) walkable[i] = 1;
       } else {
         cliff[i] = 1;
