@@ -66,7 +66,7 @@ export class Tutorial {
         done: (w) => !w.unit(this.dummyId)?.alive,
       },
       {
-        text: 'Head back to your base and open the shop 🛒. Tap the Healing Salve, then tap BUY.',
+        text: 'Head back to your base and open the shop 🛒. Tap the Herbal Poultice, then tap BUY.',
         marker: (w) => w.map.fountains[0],
         done: (_w, me) => me.hero!.items.some((s) => s?.id === 'healingSalve'),
       },

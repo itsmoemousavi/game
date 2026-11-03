@@ -40,8 +40,8 @@ export const NEUTRAL_LEASH = 11;
 /** Power-ups (runes): first at 1:00, then every 2 minutes, at one of the two river spots. */
 export const RUNE_FIRST = 60;
 export const RUNE_INTERVAL = 120;
-/** The boss returns this long after it dies. */
-export const BOSS_RESPAWN = 300;
+/** The boss returns a random time in this range (seconds) after it dies; nobody is told. */
+export const BOSS_RESPAWN: [number, number] = [480, 660];
 /** Revive charm from the boss lasts this long; reviving takes REVIVE_DELAY. */
 export const CHARM_DURATION = 300;
 /** The Warden chases attackers at most this far from the middle of its house. */

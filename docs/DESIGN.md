@@ -41,7 +41,7 @@ If 3D performance in a Capacitor WebView ever becomes a blocker, the simulation 
   - **Ground levels:** normal ground is level 1. Each base sits on a plateau (level 2). There are three ward hills per side (level 3, small raised clearings on the forest paths).
   - **Seeing up:** you can't see ground higher than you're standing on.
   - **Trees** only block you if their tops (their ground level + 1) are at or above your level. So a ward or hero on a hill sees over the normal forest into the paths, but not over the trees around a base.
-  - **Uphill attacks:** attacks from lower ground onto higher ground miss 25% of the time, and you need vision up there to keep attacking at all.
+  - **Uphill attacks:** ranged attacks (heroes, creeps, towers) from lower ground onto higher ground miss 25% of the time (melee attacks never miss), and you need vision up there to keep attacking at all.
   - **Drawing:** plateaus and hills are drawn lighter with dark cliff edges.
 - **Per team (Dota-style layout):**
   - each lane: a Tier‑1 tower beside the lane, about halfway from the base to the river
@@ -137,15 +137,15 @@ The start menu no longer shows heroes: you choose lane and bot difficulty, then 
 
 **Bottom bar layout:** the hero bar (portrait, health, mana, level, gold) sits just left of the ability buttons; the 2×3 items, TP and shop are to its right; **status icons** are in a row above the health/mana bars.
 
-**Status icons:** every effect on your hero is a small round icon. **Green border = helpful** (yours or from allies: salve, runes, Mending Flame, Bark Skin, Brine Veil, Veil, immunity, revive charm, Iron Hide while hurt…). **Red border = harmful** (stunned, slowed, standing in Arrow Storm / Maelstrom / burning ground). A dark sweep fills the icon as its time runs out. Tap an icon to see what it is and how long is left. **Counters:** Vexa's Hunter's Rhythm shows how many attacks she has made toward the next critical hit (1, 2, 3; hidden at 0). At **3 the icon glows gold: the next attack is a crit.**
+**Status icons:** every effect on your hero is a small round icon. **Green border = helpful** (yours or from allies: poultice, runes, Mending Flame, Bark Skin, Brine Veil, Veil, immunity, revive charm, Iron Hide while hurt…). **Red border = harmful** (stunned, slowed, standing in Arrow Storm / Maelstrom / burning ground). A dark sweep fills the icon as its time runs out. Tap an icon to see what it is and how long is left. **Counters:** Vexa's Hunter's Rhythm shows how many attacks she has made toward the next critical hit (1, 2, 3; hidden at 0). At **3 the icon glows gold: the next attack is a crit.**
 
 **Inventory and shop:**
 - **6 inventory slots in 2 rows of 3, plus a separate Teleport slot.** The TP slot shows how many scrolls you carry, 0 if none. You can buy as many as you like.
 - **The 🛒 shop** opens anywhere, but buying and selling only work near your fountain. Selling refunds 50%.
 - **Recommended items** for your hero are marked ★ and listed first.
-- **Healing Salves** stack up to 3 in one slot; tap the slot to use one.
+- **Herbal Poultices** stack up to 3 in one slot; tap the slot to use one.
 - **While the shop is open,** tapping one of your items sells it.
-- **Dropping items:** press and hold an item (or use DROP in the shop) to put it on the ground in front of you. It shows as its icon on the ground with a ring that empties over its **2 minutes**, then it's gone. Tap it to walk over and pick it up. **Only the hero who dropped an item can pick it up again**, so nobody can buy items for a teammate or feed an enemy. Exception: **Observer and Sentry wards can be handed to allies** (never to enemies); a gifted ward sells for half price. The ring is gold on items you can take, grey otherwise.
+- **Dropping items:** press and hold an item (or use DROP in the shop) to put it on the ground in front of you. It shows as its icon on the ground with a ring that empties over its **2 minutes**, then it's gone. Tap it to walk over and pick it up. **Only the hero who dropped an item can pick it up again**, so nobody can buy items for a teammate or feed an enemy. Exception: **Watcher and Seer Totems can be handed to allies** (never to enemies); a gifted totem sells for half price. The ring is gold on items you can take, grey otherwise.
 
 **Teleport:**
 - 50 gold each.
@@ -168,7 +168,7 @@ Item numbers are in `src/sim/data/items.ts`.
 | Arcane Amplifier | +15% ability damage |
 | Lifedrinker | attack lifesteal |
 | **Crown of Ascension** | upgrades the hero's Ultimate (stronger effect, −30% cooldown) |
-| Healing Salve | consumable, heal over time |
+| Herbal Poultice | consumable, heal over time |
 | Teleport Scroll | own slot, unlimited stack (see above) |
 
 ### Combined items and items with a button (implemented)
@@ -251,7 +251,7 @@ Tap 📍 under the minimap, pick a ping, then tap the map or the minimap where i
   2. learn Q
   3. cast it on a dummy
   4. finish the dummy with Attack
-  5. buy a Healing Salve
+  5. buy a Herbal Poultice
   6. hold the minimap to look around
   7. get 2 last hits
   8. how to win
@@ -299,9 +299,10 @@ Numbers are in `src/sim/constants.ts`, `data/units.ts` and `objectives.ts`.
 | Feature | How it works |
 |---|---|
 | **Denying** | Last-hit your own creeps below 50% HP, or your own towers below 10%. The enemy gets no gold and only 30% of the XP; a denied tower pays the enemy half. Shows a floating "!" and "Denied!". |
-| **Wards** | Observer Ward (75 gold): invisible, 16 m day / 12 m night vision for 6 min. Sentry Ward (50 gold): reveals invisible enemies (wards, invisible heroes) within 10 m. Tap the ward slot, then tap the ground; the hero walks into range (7 m). Killing an enemy ward pays gold. Fountains also reveal invisible units. |
+| **Totems (wards)** | Watcher Totem (75 gold): invisible, 16 m day / 12 m night vision for 6 min. Seer Totem (50 gold): reveals invisible enemies (totems, invisible heroes) within 10 m. Tap the totem slot, then tap the ground; the hero walks into range (7 m). Totems are always invisible: attacking one needs true sight (a Seer Totem or the fountain), spells don't hurt them and **every totem dies to exactly 2 attacks**. They can't be placed inside the Warden's house. Killing an enemy totem pays gold. |
 | **River power-ups** | First at 1:00, then every 2 min, at one of two river junctions. Walk over it to take it. **Haste** (max speed 15 s), **Double Damage** (25 s), **Regeneration** (15 s), **Invisibility** (20 s; attacking or casting reveals you), **Bounty** (gold for you, half for teammates). |
-| **The Warden (boss)** | Lives in a **round walled house with one doorway**, on the river between the bottom and middle lanes (the doorway faces the map centre, so both teams are equally far). **Always dark from outside**, even through the doorway: your team sees inside only while one of its units is in the house. **Can only be hurt from inside** (attacks and spells from outside do nothing); it hits anyone. When hurt it fights back, also against anyone else in the house, chases up to **17 m** from home, then gives up and walks home (it heals slowly once left alone). Every **8 s** in a fight it raises its arms (a red circle fills for 0.8 s) and **slams the ground**: 120 damage and a **1.5 s stun** to every hero and creep within 5 m. 14000 HP, 12 armor, 110 damage. Reward: the **killing blow gets 300 gold**, teammates 150, plus XP. It drops a **Warden's Charm** on the ground that **anyone can pick up, enemies too**. If the holder dies, they get back up on the spot 3 s later and lose no gold (the charm is used up). The charm can't be sold, can be dropped, and **crumbles 5 minutes after the Warden falls** (in a bag or on the ground). The Warden returns 5 min after dying. |
+| **The Warden (boss)** | Lives in a **round walled house with one doorway**, on the river between the bottom and middle lanes (the doorway faces the map centre, so both teams are equally far). **The walls block sight both ways**: from outside it is dark (even through the doorway), your team sees inside only while one of its units is in the house, and units inside see nothing outside (bring a teammate or a Watcher Totem outside for that; totems can't be placed inside). **Can only be hurt from inside** (attacks and spells from outside do nothing); it hits anyone. When hurt it fights back, also against anyone else in the house, chases up to **17 m** from home, then gives up and walks home (it heals slowly once left alone). Every **8 s** in a fight it raises its arms (a red circle fills for 0.8 s) and **slams the ground**: 120 damage and a **1.5 s stun** to every hero and creep within 5 m. 14000 HP, 12 armor, 110 damage. Everyone (both teams) is told who killed it and who took the charm. Reward: the **killing blow gets 300 gold**, teammates 150, plus XP. It drops a **Warden's Charm** on the ground that **anyone can pick up, enemies too**. If the holder dies, they get back up on the spot 3 s later and lose no gold (the charm is used up). The charm can't be sold, can be dropped, and **crumbles 5 minutes after the Warden falls** (in a bag or on the ground). The Warden returns a **random 8–11 minutes** after dying, without any announcement, so teams have to go and check. |
+| **Fountain yard** | Each fountain stands in a stone-walled yard (just outside its healing area) with **one doorway facing the map centre**. The walls block walking and sight: enemies see inside only through the doorway or once they come in. |
 | **Buyback** | While dead: pay 150 + 30×level + 8×minutes gold to respawn now. 5 min cooldown. Button in the respawn banner. |
 | **Tower shield** | 🛡 button under the minimap: all your buildings invulnerable for 5 s. Shared team cooldown of 5 min. |
 | **Backdoor protection** | Tier-2 towers, barracks, shrine towers and the Shrine take 75% less damage when no enemy creeps are within 18 m, and regenerate for a short while after such a hit. Tier-1 towers are not protected. |
@@ -363,9 +364,9 @@ Numbers are in `src/sim/constants.ts`, `data/units.ts` and `objectives.ts`.
   - use nukes and stuns on enemy heroes; save ultimates for weakened targets or groups
   - farm creep waves with area spells when mana is high
   - Orin heals hurt allies
-  - buy items along a fixed build when at base, always carry a TP, teleport back to their lane after healing, use salves when hurt
+  - buy items along a fixed build when at base, always carry a TP, teleport back to their lane after healing, use poultices when hurt
   - only react to enemies they can see; fight back against jungle camps
-  - deny their own creeps, grab nearby power-ups, use the tower shield when a tower is about to fall, buy back when the base is under attack; Orin keeps an observer ward and plants it where its lane meets the river
+  - deny their own creeps, grab nearby power-ups, use the tower shield when a tower is about to fall, buy back when the base is under attack; Orin keeps a Watcher Totem and plants it where its lane meets the river
   - lane assignment
   - follow the creep wave
   - last-hit / harass

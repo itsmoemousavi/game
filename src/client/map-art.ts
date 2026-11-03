@@ -300,6 +300,15 @@ export function bakeMap(map: GameMap): HTMLCanvasElement {
     g.lineCap = 'round';
   }
 
+  // 8b. Fountain yard walls (only the stretches standing on open ground).
+  g.fillStyle = '#77736b';
+  for (let i = 0; i < n * n; i++) {
+    if (!map.fountainWall[i]) continue;
+    const cx = i % n;
+    const cy = (i - cx) / n;
+    g.fillRect(cx * map.cell * px, cy * map.cell * px, map.cell * px + 1, map.cell * px + 1);
+  }
+
   // 9. Pebbles and small rocks on open ground (not on roads or water).
   for (let i = 0; i < 2600; i++) {
     const x = hash(i, 0, 21) * map.size;

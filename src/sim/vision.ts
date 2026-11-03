@@ -18,8 +18,8 @@ import type { Unit, World } from './world';
  *    straight into the forest paths, but not over the trees around a base (top 3).
  */
 /**
- * The Warden's house is always dark from outside (even through its doorway): a team sees
- * its floor only while one of its units is inside, and then sees all of it.
+ * The Warden's house walls block sight both ways: a team sees its floor only while one of
+ * its units is inside (then all of it), and units inside see nothing outside the house.
  */
 /** Wards are always invisible; heroes are while an invisibility buff is active. */
 export const isInvisible = (u: Unit) => !!u.ward || u.buffs.some((b) => b.invisible);
@@ -65,18 +65,21 @@ export class Vision {
       const ts = this.trueSight[team];
       g.fill(0);
       ts.fill(0);
+      const hs = this.house;
+      let inside = false;
       for (const u of w.units) {
         if (!u.alive || u.team !== team) continue;
+        // Inside the house you only see the house: its walls block sight both ways.
+        if (hs && Math.hypot(u.x - hs.x, u.y - hs.y) < hs.inner) {
+          inside = true;
+          continue;
+        }
         const r = night ? u.visionNight : u.visionDay;
         if (r > 0) this.reveal(g, u.x, u.y, r);
         if (u.ward?.kind === 'sentry') this.disc(ts, u.x, u.y, TRUE_SIGHT_RADIUS);
         if (u.structure?.tier === 'fountain') this.disc(ts, u.x, u.y, 16);
       }
-      const hs = this.house;
-      if (hs) {
-        const inside = w.units.some((u) => u.alive && u.team === team && Math.hypot(u.x - hs.x, u.y - hs.y) < hs.inner);
-        for (const c of this.houseCells) g[c] = inside ? 1 : 0;
-      }
+      if (hs) for (const c of this.houseCells) g[c] = inside ? 1 : 0;
     }
   }
 

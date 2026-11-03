@@ -53,8 +53,7 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
   `ai/bots.ts` (team plans: farm / push / defend; difficulty easy/normal/hard), `data/*` (all numbers).
 - `src/client/` `main.ts` (menus, settings, loop), `renderer.ts` (2D; in 3D mode it draws only the ground
   layer into a texture), `renderer3d.ts` (Three.js view, animations, overlay bars/text, picking),
-  `three/assets.ts` (artist models from Sketchfab, CC BY 4.0, in `public/models/`; **switched off**:
-  the owner chose our own models), `three/hero-anims.ts` (hand-made hero animations: idle, walk,
+  `three/hero-anims.ts` (hand-made hero animations: idle, walk,
   attacks, every spell, buffs, deaths), `three/spell-fx.ts` (projectile trails, area spells),
   `three/fx.ts` (dust, sparks, slashes, roots, meteor, whirlpool, camera shake), `three/hero-models.ts` +
   `three/models.ts` (low-poly placeholder models, baked into few meshes with animatable joints; still the fallback), `menu3d.ts` (start screen 3D hero + portraits), `hud.ts`, `input.ts`, `items-ui.ts`
@@ -77,6 +76,7 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
   sell = full refund within 10 s, then half; dead heroes can shop; **no quick-buy**.
 - Match start: menu has no heroes; **draft inside the match** (1 ban per team, picks 1-2-2-1, then 30 s warm-up).
 - Art style: **semi-realistic, darker, painted** (owner loved Sketchfab "Minotaur Berserker" by Yury Misiyuk).
+  All models are our own (the trial Sketchfab models were removed for good, 2026-11-03).
   Rejected: cute kits (KayKit, Kenney), Grab3D, Mixamo realistic humans. Models must be free for commercial use
   (CC0 / CC BY, no fan art of other games). Owner's Sketchfab API token is in `~/.sketchfab-token` (never commit it).
 - Warden: walled house on the river (bot/mid side), seen and fought only from inside, slam stun, charm anyone can grab.
@@ -84,6 +84,10 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
   with slopes at lanes (no bridges), around runes, at the Warden's house and where trails meet it; normal speed in water.
   Trees are individual (`map.trees`): thickets, open woods with walkable gaps, glades; solid forest outside the side
   lanes and around bases. Painted ground in `src/client/map-art.ts`.
+- Item names must be our own (renamed 2026-11-03: Watcher Totem, Seer Totem, Herbal Poultice, Mystic Treads;
+  "Warden's Charm" stays). Never use "Dota" in anything public (store listing, screenshots, ads).
+- Each fountain sits in a walled yard with one doorway toward the centre; the Warden's house walls block sight
+  both ways; the Warden returns 8–11 min after dying (random, unannounced); wards die to exactly 2 attacks.
 - Dying costs gold; buyback exists. Android build: not now. App stores: later.
 
 ## Open items / next steps

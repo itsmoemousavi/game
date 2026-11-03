@@ -48,6 +48,10 @@ export interface GameMap {
   hillTop: Uint8Array;
   shrines: [Vec2, Vec2];
   fountains: [Vec2, Vec2];
+  /** Walled yard around each fountain (ring + doorway). */
+  fountainYards: [House, House];
+  /** Cells where a fountain-yard wall stands (1). */
+  fountainWall: Uint8Array;
   structures: StructureSpawn[];
   /** Neutral jungle camp spots (both halves). */
   camps: Vec2[];
@@ -233,6 +237,13 @@ const HOUSE: House = (() => {
   const d = Math.SQRT1_2;
   return { x: BOSS_PIT.x, y: BOSS_PIT.y, inner: 5, outer: 8, door: { x: -d, y: -d }, doorHalf: 4 };
 })();
+/** Each fountain's walled yard (same shape as the house: a ring with one doorway toward the centre). */
+const FOUNTAIN_YARDS: [House, House] = (() => {
+  const d = Math.SQRT1_2;
+  const f = FOUNTAIN0;
+  const yard0: House = { x: f.x, y: f.y, inner: 16, outer: 19.5, door: { x: d, y: -d }, doorHalf: 4.5 };
+  return [yard0, { ...yard0, x: MAP_SIZE - f.x, y: MAP_SIZE - f.y, door: { x: -d, y: d } }];
+})();
 /** Open ground around the house, so you can walk all the way round it. */
 const HOUSE_CLEARING = 12;
 
@@ -242,15 +253,19 @@ const HOUSE_CLEARING = 12;
  * (as a fraction), so every lane's outer tower is equally "half-way out".
  */
 const T1_FRACTION = 0.86;
+/** The easy side lane's tier-1 sits a little further back than mid's. */
+const T1_EASY_LANE_FRACTION = 0.8;
 /**
  * Like Dota, each team has an easy lane and a hard lane: team 0's easy lane is the bottom one
  * (its first tower stands out near the river) and its hard lane is the top one (first tower
  * much closer to base). Mirrored, team 1's easy lane is the top and its hard lane the bottom,
  * so both teams get one of each.
  */
-const T1_HARD_LANE_FRACTION = 0.6;
-/** Tier-2 towers stand a bit further back toward the base. */
+const T1_HARD_LANE_FRACTION = 0.55;
+/** Tier-2 towers stand further back toward the base (on the hard lane well behind its tier-1). */
 const T2_FRACTION = 0.45;
+const T2_EASY_LANE_FRACTION = 0.4;
+const T2_HARD_LANE_FRACTION = 0.3;
 /**
  * Towers stand just past the lane edge: they leave most of the lane open, and their reach
  * (11 m + body sizes) still covers the far side of the lane.
@@ -352,8 +367,8 @@ export function createMap(): GameMap {
         break;
       }
     }
-    const t1 = sideOf(path, river * (lane === 'top' ? T1_HARD_LANE_FRACTION : T1_FRACTION));
-    const t2 = sideOf(path, river * T2_FRACTION);
+    const t1 = sideOf(path, river * (lane === 'top' ? T1_HARD_LANE_FRACTION : lane === 'bot' ? T1_EASY_LANE_FRACTION : T1_FRACTION));
+    const t2 = sideOf(path, river * (lane === 'top' ? T2_HARD_LANE_FRACTION : lane === 'bot' ? T2_EASY_LANE_FRACTION : T2_FRACTION));
     const t1Pos = { x: t1.at.x + t1.px * TOWER_SIDE_OFFSET, y: t1.at.y + t1.py * TOWER_SIDE_OFFSET };
     const t2Pos = { x: t2.at.x + t2.px * TOWER_SIDE_OFFSET, y: t2.at.y + t2.py * TOWER_SIDE_OFFSET };
     // Gate: the tier-3 tower stands out front, the two barracks behind it on either side.
@@ -398,6 +413,23 @@ export function createMap(): GameMap {
   // woods with gaps you can walk through, and glades with a few trees. Generated for team 0's
   // half and mirrored, so both sides are identical.
   const trees = plantForest(walkable);
+
+  // Walled fountain yards: a stone ring just outside each healing area with one doorway facing
+  // the map centre. Wall cells block walking and sight (like trees), so enemies outside only see
+  // in through the doorway. Only open ground gets wall; where the ring runs through forest the
+  // trees already close it.
+  const fountainWall = new Uint8Array(GRID * GRID);
+  for (const yard of FOUNTAIN_YARDS) {
+    for (let cy = 0; cy < GRID; cy++) {
+      for (let cx = 0; cx < GRID; cx++) {
+        const i = cy * GRID + cx;
+        if (walkable[i] && isHouseWallAt(yard, (cx + 0.5) * CELL, (cy + 0.5) * CELL)) {
+          walkable[i] = 0;
+          fountainWall[i] = 1;
+        }
+      }
+    }
+  }
 
   // Solid border.
   for (let i = 0; i < GRID; i++) {
@@ -509,6 +541,8 @@ export function createMap(): GameMap {
     hillTop,
     shrines,
     fountains: [FOUNTAIN0, mirror(FOUNTAIN0)],
+    fountainYards: FOUNTAIN_YARDS,
+    fountainWall,
     structures,
     camps: [...JUNGLE_ROOMS.map((r) => r.c), ...JUNGLE_ROOMS.map((r) => mirror(r.c))],
     runeSpots: [RUNE_SPOT, mirror(RUNE_SPOT)],

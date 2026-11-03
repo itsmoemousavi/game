@@ -13,7 +13,7 @@ import {
   buybackCost,
 } from './constants';
 import { BOSS, WARDS } from './data/units';
-import { isWalkable } from './map';
+import { inHouse, isWalkable } from './map';
 import { dist } from './math';
 import type { Unit, World } from './world';
 
@@ -141,6 +141,8 @@ export function placeWard(w: World, u: Unit, slot: number, x: number, y: number)
   const s = h.items[slot];
   if (!s || (s.id !== 'observerWard' && s.id !== 'sentryWard') || !u.alive) return 'fail';
   if (!isWalkable(w.map, x, y) && !onHillTop(w, x, y)) return 'fail';
+  // No wards inside the Warden's house (you need someone outside for outside vision).
+  if (inHouse(w.map, x, y)) return 'fail';
   if (dist(u.x, u.y, x, y) > WARD_CAST_RANGE) return 'approach';
   const kind = s.id === 'observerWard' ? 'observer' : 'sentry';
   const ward = w.spawnUnit('ward', u.team, { x, y }, WARDS[kind]);

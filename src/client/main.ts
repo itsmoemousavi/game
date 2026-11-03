@@ -13,7 +13,6 @@ import { PING_STYLE } from './renderer';
 import { Renderer } from './renderer';
 import { QUALITY, Quality, Renderer3D } from './renderer3d';
 import { MenuShowcase } from './menu3d';
-import { character, loadAssets } from './three/assets';
 import { enterImmersive, setupLandscape } from './screen';
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
@@ -42,15 +41,11 @@ try {
 
 // ------------------------------------------------------------- menu & draft
 
-// The 3D hero models are rendered once into round headshots (HUD and draft screen): first the
-// placeholders, then again with the artist models once those have loaded.
+// The 3D hero models are rendered once into round headshots (HUD and draft screen).
 try {
   const showcase = new MenuShowcase($<HTMLCanvasElement>('#menu3d'));
   Object.assign(heroPortraits, showcase.portraits());
-  void loadAssets(import.meta.env.BASE_URL).then(() => {
-    Object.assign(heroPortraits, showcase.portraits((id) => character(`hero:${id}`)?.root ?? null));
-    showcase.dispose();
-  });
+  showcase.dispose();
 } catch (err) {
   console.warn('Hero headshots unavailable', err);
 }
@@ -407,7 +402,10 @@ function announce(w: World, events: GameEvent[]) {
       continue;
     }
     if (e.type === 'bossKilled') {
-      hud.toast(`${e.team === 2 ? 'The Warden fell' : `${TEAM_NAMES[e.team]} slew the Warden`}. It dropped a revive charm: anyone can grab it!`, '#c4b5fd');
+      // Told to everyone, enemies included: who landed the killing blow, and for which team.
+      const killer = e.killerId !== null ? w.unit(e.killerId) : undefined;
+      const who = killer?.hero ? `${name(killer.id)} (${TEAM_NAMES[e.team as Team]})` : e.team === 2 ? null : TEAM_NAMES[e.team as Team];
+      hud.toast(`${who ? `${who} slew the Warden` : 'The Warden fell'}. It dropped a revive charm: anyone can grab it!`, e.team === myTeam ? '#ffd23f' : e.team === 2 ? '#c4b5fd' : '#ff7b7f');
     } else if (e.type === 'itemPickUp' && e.itemId === 'wardenCharm') {
       const u = w.unit(e.unitId);
       hud.toast(`${name(e.unitId)} took the Warden's charm`, u?.team === myTeam ? '#ffd23f' : '#ff7b7f');

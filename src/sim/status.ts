@@ -49,7 +49,7 @@ export const STATUS_INFO: Record<StatusId, { name: string; good: boolean }> = {
   doubleDamage: { name: 'Double damage rune', good: true },
   regen: { name: 'Regeneration rune', good: true },
   invisibility: { name: 'Invisible', good: true },
-  salve: { name: 'Healing Salve', good: true },
+  salve: { name: 'Herbal Poultice', good: true },
   mendingFlame: { name: 'Mending Flame: healing', good: true },
   veil: { name: 'Veil: invisible and faster', good: true },
   barkSkin: { name: 'Bark Skin: armor and regeneration', good: true },

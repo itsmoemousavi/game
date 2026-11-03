@@ -488,7 +488,8 @@ export class World {
   canSee(team: Side, u: Unit): boolean {
     if (team === 2) return true;
     // Attacking or casting gives away your position for a moment, even from the fog.
-    if (u.revealUntil > this.time && !isInvisible(u)) return true;
+    // Not from inside the Warden's house, though: its walls hide everything within.
+    if (u.revealUntil > this.time && !isInvisible(u) && !inHouse(this.map, u.x, u.y)) return true;
     return this.vision.sees(team, u);
   }
 
@@ -1497,8 +1498,8 @@ export class World {
     this.reveal(u);
     let damage = applyAttackPassives(this, u, t);
     const crit = !!u.hero?.lastCrit;
-    // High ground: attacks from lower ground onto higher ground miss 25% of the time.
-    const miss = heightAt(this.map, u.x, u.y) < heightAt(this.map, t.x, t.y) && this.rng.next() < UPHILL_MISS_CHANCE;
+    // High ground: ranged attacks from lower ground onto higher ground miss 25% of the time (melee never does).
+    const miss = u.projectileSpeed > 0 && heightAt(this.map, u.x, u.y) < heightAt(this.map, t.x, t.y) && this.rng.next() < UPHILL_MISS_CHANCE;
     for (const b of u.buffs) if (b.damageMult) damage *= b.damageMult;
     if (u.projectileSpeed > 0) {
       this.projectiles.push({
@@ -1542,9 +1543,14 @@ export class World {
     const src = this.unit(sourceId);
     // Nothing from outside the Warden's house hurts it (spells and arrows included).
     if (target.neutral?.boss && src && src !== target && !inHouse(this.map, src.x, src.y)) return;
-    let amount = kind === 'attack' ? raw * armorMultiplier(this.armorOf(target)) : raw;
+    // Wards ignore spells and splash; every direct attack takes exactly half, so two hits kill one.
+    if (target.ward) {
+      if (kind !== 'attack' || opts.cleave || opts.dot) return;
+      raw = target.maxHp / 2;
+    }
+    let amount = target.ward ? raw : kind === 'attack' ? raw * armorMultiplier(this.armorOf(target)) : raw;
     if (kind === 'spell' && src?.hero) amount *= 1 + src.hero.bonus.spellAmpPct / 100;
-    amount = damageAfterPassives(this, target, amount, kind);
+    if (!target.ward) amount = damageAfterPassives(this, target, amount, kind);
     // Backdoor protection: buildings shrug off damage when no enemy creeps are pushing them.
     if (target.structure?.backdoor && src?.team !== target.team) {
       amount *= BACKDOOR_DAMAGE_MULT;
@@ -1667,7 +1673,7 @@ export class World {
       if (killerHero) this.giveGold(killerHero, u.bountyGold);
     } else if (u.neutral?.boss) {
       const team = killer && killer.team !== 2 ? killer.team : null;
-      this.bossRespawnAt = this.time + BOSS_RESPAWN;
+      this.bossRespawnAt = this.time + BOSS_RESPAWN[0] + this.rng.next() * (BOSS_RESPAWN[1] - BOSS_RESPAWN[0]);
       this.events.push({ type: 'bossKilled', killerId: killer?.id ?? null, team: team ?? 2 });
       if (team !== null) {
         // The killing blow takes the full reward, teammates get half.

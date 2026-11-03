@@ -125,7 +125,10 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 .ability.unlearned { opacity: 0.35; }
 .ability.passive { border-style: dashed !important; }
 #btn-q { right: 100px; bottom: 2px; } #btn-w { right: 88px; bottom: 72px; } #btn-r { right: 20px; bottom: 104px; border-color: #ffd23f !important; }
-#actions .learn { display: none; width: 26px; height: 26px; border-radius: 50%; background: #ffd23f !important; color: #111; font-weight: 900; font-size: 18px; line-height: 1; border: 2px solid #fff; z-index: 2; }
+#actions .learn { display: none; width: 26px; height: 26px; padding: 0; border-radius: 50%; background: #ffd23f !important; color: transparent; font-size: 0; border: 2px solid #fff; z-index: 2; }
+/* The plus is two bars drawn exactly in the middle (a text "+" sits off-centre in most fonts). */
+#actions .learn::before, #actions .learn::after { content: ''; position: absolute; left: 50%; top: 50%; width: 12px; height: 3px; margin: -1.5px 0 0 -6px; border-radius: 1px; background: #111; }
+#actions .learn::after { transform: rotate(90deg); }
 #actions .learn.show { display: grid; animation: pulse 1s infinite alternate; }
 #learn-q { right: 140px; bottom: 44px; } #learn-w { right: 128px; bottom: 116px; } #learn-r { right: 60px; bottom: 148px; }
 @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.15); } }

@@ -1,11 +1,10 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { GLYPH_DURATION, GameMap, HEROES, TELEPORT, Team, Unit, World, isInvisible, isNight } from '../sim';
+import { GLYPH_DURATION, GameMap, HEROES, House, TELEPORT, Team, Unit, World, isInvisible, isNight } from '../sim';
 import type { Aim } from './input';
 import { Renderer, TEAM_COLORS } from './renderer';
 import { JOINTS, Joint, TEAM_HEX, model } from './three/models';
-import { Character, character, hasAsset, loadAssets } from './three/assets';
 import { Fx3D } from './three/fx';
 import { Anim, AnimCtx, Corpse, animateHero, buffFx, heroAttack, heroBlink, heroCast, heroCorpse, newAnim, pose, setGround } from './three/hero-anims';
 import { SpellFx } from './three/spell-fx';
@@ -133,7 +132,7 @@ export class Renderer3D extends Renderer {
     Object.assign(this.sun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 120 });
     this.sun.shadow.bias = -0.0008;
     this.scene.add(this.sun, this.sun.target);
-    // Soft surrounding light for the artist models' metal and leather (computed once, cheap to use).
+    // Soft surrounding light for shiny materials (computed once, cheap to use).
     const pmrem = new THREE.PMREMGenerator(this.gl);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     this.scene.environmentIntensity = 0.45;
@@ -196,13 +195,19 @@ export class Renderer3D extends Renderer {
     this.buildBridges(map);
     this.buildCurbs(map);
     this.buildRocks(map);
-    this.buildHouse(map);
+    this.buildHouse(map.house);
+    // Fountain yards: the same stone ring, only where it stands on open ground (forest closes the rest).
+    for (const yard of map.fountainYards) {
+      this.buildHouse(yard, (x, y) => {
+        const cx = Math.floor(x / map.cell);
+        const cy = Math.floor(y / map.cell);
+        return cx >= 0 && cy >= 0 && cx < map.grid && cy < map.grid && map.fountainWall[cy * map.grid + cx] === 1;
+      });
+    }
     this.fx3 = new Fx3D(this.scene, (x, y) => this.elevationAt(x, y));
     this.spells = new SpellFx((x, y) => this.elevationAt(x, y));
     setGround((x, y) => this.elevationAt(x, y));
     this.actx.fx = this.fx3;
-    // Artist models load in the background; compile their shaders as soon as they arrive.
-    void loadAssets(import.meta.env.BASE_URL).then(() => this.prewarmAssets());
     this.resize();
     this.prewarm();
   }
@@ -240,27 +245,9 @@ export class Renderer3D extends Renderer {
     this.scene.remove(tmp);
   }
 
-  private prewarmAssets() {
-    if (this.destroyed) return;
-    const tmp = new THREE.Group();
-    for (const k of ['hero:brakk', 'hero:vexa', 'hero:orin', 'hero:syl', 'hero:grom', 'hero:kaela', 'imp', 'brute', 'warden']) {
-      const c = character(k);
-      if (c) tmp.add(c.root);
-    }
-    for (const t of TINTS) {
-      const c = character('creep', t);
-      if (c) tmp.add(c.root);
-    }
-    tmp.position.set(this.camX, -50, this.camY);
-    this.scene.add(tmp);
-    this.gl.compile(this.scene, this.camera);
-    this.scene.remove(tmp);
-  }
-  private destroyed = false;
 
   /** Free the GPU resources (when switching views or starting a new match). */
   destroy() {
-    this.destroyed = true;
     this.gl.dispose();
   }
 
@@ -296,8 +283,7 @@ export class Renderer3D extends Renderer {
   }
 
   /** The Warden's house: a ring of low stone wall blocks with a doorway, and two gate pillars. */
-  private buildHouse(map: GameMap) {
-    const h = map.house;
+  private buildHouse(h: House, keep?: (x: number, y: number) => boolean) {
     const mid = (h.inner + h.outer) / 2;
     const thick = h.outer - h.inner;
     const doorAng = Math.atan2(h.door.y, h.door.x);
@@ -313,9 +299,15 @@ export class Renderer3D extends Renderer {
     const q = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0);
     const shades = [0x8a857a, 0x7c776d, 0x938d80, 0x726d64];
+    const hide = new THREE.Matrix4().makeScale(0, 0, 0);
     const put = (k: number, a: number, r: number, len: number, hs: number, w = 1) => {
       const x = h.x + Math.cos(a) * r;
       const y = h.y + Math.sin(a) * r;
+      if (keep && !keep(x, y)) {
+        blocks.setMatrixAt(k, hide);
+        blocks.setColorAt(k, new THREE.Color(0));
+        return;
+      }
       q.setFromAxisAngle(up, -a + Math.PI / 2);
       m.compose(new THREE.Vector3(x, this.elevationAt(x, y) - 0.1, y), q, new THREE.Vector3(len, hs, w));
       blocks.setMatrixAt(k, m);
@@ -707,13 +699,11 @@ export class Renderer3D extends Renderer {
 
   private placeObj(key: string, id: string, x: number, y: number, h = 0, rotY = 0, scale = 1): Obj {
     let e = this.objs.get(id);
-    const ak = assetKey(key);
-    // Rebuild when the key changes, or when an artist model finished loading for a placeholder.
-    if (!e || e.key !== key || (!e.char && ak && hasAsset(ak))) {
+    // Rebuild when the key changes.
+    if (!e || e.key !== key) {
       if (e) this.scene.remove(e.o);
-      const ch = ak ? character(ak, creepTint(key)) : null;
-      const o = ch ? ch.root : model(key);
-      e = { o, seen: 0, key, joints: ch ? {} : jointsOf(o), char: ch ?? undefined };
+      const o = model(key);
+      e = { o, seen: 0, key, joints: jointsOf(o) };
       this.scene.add(o);
       this.objs.set(id, e);
     }
@@ -875,35 +865,8 @@ export class Renderer3D extends Renderer {
     return a;
   }
 
-  /** Artist models: their own idle/walk clips where they have them, plus a lean for attacks and casts. */
-  private animateChar(c: Character, u: Unit) {
-    const a = this.anim(u.id);
-    const dt = this.dt;
-    const speed = Math.hypot(u.x - u.px, u.y - u.py) * 30;
-    const moving = speed > 0.5 && u.stunTimer <= 0;
-    a.walk += ((moving ? 1 : 0) - a.walk) * Math.min(1, dt * 8);
-    if (moving) a.phase += dt * (5 + speed * 0.9);
-    if (a.atk >= 1 && c.attack) c.attack.reset().play();
-    a.atk = Math.max(0, a.atk - dt / 0.38);
-    a.cast = Math.max(0, a.cast - dt / 0.55);
-    const hit = a.atk > 0 ? Math.sin((1 - a.atk) * Math.PI) : 0;
-    const cast = a.cast > 0 ? Math.sin((1 - a.cast) * Math.PI) : 0;
-    if (c.walk) {
-      c.walk.setEffectiveWeight(a.walk);
-      c.walk.setEffectiveTimeScale(Math.max(0.6, Math.min(1.6, speed / 5)));
-      c.idle?.setEffectiveWeight(1 - a.walk);
-    }
-    // No walk clip: a step bob and sway instead.
-    const bob = c.walk ? 0 : Math.abs(Math.sin(a.phase)) * 0.12 * a.walk;
-    const sway = c.walk ? 0 : Math.sin(a.phase) * 0.06 * a.walk;
-    c.body.position.y = bob;
-    c.body.rotation.set((c.attack ? 0 : hit * 0.35) - cast * 0.18 + (c.walk ? 0 : a.walk * 0.08), 0, sway);
-    c.mixer?.update(dt);
-  }
-
   /** Walk cycle, attack swing and casting pose, layered on the model's rest pose. */
   private animate(e: Obj, u: Unit, time: number) {
-    if (e.char) return this.animateChar(e.char, u);
     if (u.hero && e.joints.rig) return animateHero(this.actx, e.o, e.joints, u, this.anim(u.id), time);
     const mk = e.joints.rig ? monsterKind(e.key) : null;
     if (mk) return animateMonster(this.actx, mk, e.o, e.joints, u, this.anim(u.id), time);
@@ -1117,22 +1080,8 @@ interface Obj {
   seen: number;
   key: string;
   joints: Partial<Record<Joint, THREE.Object3D>>;
-  /** Set when the unit uses an artist model instead of the placeholder. */
-  char?: Character;
 }
 
-/** Which artist model replaces a placeholder key (lane creeps of both teams share one model). */
-function assetKey(key: string): string | null {
-  if (key.startsWith('hero:')) return key;
-  if (key.startsWith('creep:')) return 'creep';
-  if (key === 'imp' || key === 'brute' || key === 'warden') return key;
-  return null;
-}
-const TINTS = [new THREE.Color(0x1d4fd8), new THREE.Color(0xb91c1c)];
-/** Lane creeps share one model, so they get a glow in their team's colour. */
-function creepTint(key: string): THREE.Color | undefined {
-  return key.startsWith('creep:') ? TINTS[Number(key.split(':')[2]) || 0] : undefined;
-}
 /** Where a teleport lands: on the home side of the target building (same rule as the simulation). */
 function tpLanding(w: World, team: Team, t: Unit) {
   const f = w.map.fountains[team];
