@@ -109,7 +109,7 @@ const S = MAP_SIZE / 200;
 const sc = (p: Vec2): Vec2 => ({ x: p.x * S, y: p.y * S });
 
 const RIVER: [Vec2, Vec2] = [sc({ x: 20, y: 20 }), sc({ x: 180, y: 180 })];
-const RIVER_WIDTH = 16;
+const RIVER_WIDTH = 18;
 /** Slopes down to the water this far around each rune spot. */
 const RUNE_RAMP = 8.5;
 /** How far the river winds to either side of the diagonal (meters). */
@@ -126,7 +126,7 @@ function riverAt(t: number): Vec2 {
   return { x: c + c * t + o * k, y: c + c * t - o * k };
 }
 
-export const LANE_WIDTH = 13;
+export const LANE_WIDTH = 14;
 const JUNGLE_WIDTH = 10;
 
 const LANES_200: Record<LaneId, Vec2[]> = {
