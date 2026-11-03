@@ -2,6 +2,7 @@ import { Side, Team } from './constants';
 import { BLINK_DAMAGE_LOCK, INVENTORY_SLOTS, ITEMS, ItemId, ItemStats, SALVE, SHOP_RADIUS, TELEPORT } from './data/items';
 import { dist } from './math';
 import { cellCenter, nearestWalkableCell } from './pathfinding';
+import { onHillTop } from './objectives';
 import type { Unit, World } from './world';
 
 /** One inventory slot. Consumables stack (count > 1). */
@@ -167,10 +168,12 @@ export function useItem(w: World, u: Unit, slot: number, x?: number, y?: number)
         tx = u.x + ((tx - u.x) / d) * range;
         ty = u.y + ((ty - u.y) / d) * range;
       }
-      const cell = nearestWalkableCell(w.nav, tx, ty);
-      if (cell < 0) return false;
-      const p = cellCenter(w.nav, cell);
-      const near = dist(p.x, p.y, tx, ty) < 1.2 ? { x: tx, y: ty } : p;
+      // Blinking onto a ward hill lands right on top (the only way up there).
+      const hill = onHillTop(w, tx, ty);
+      const cell = hill ? -1 : nearestWalkableCell(w.nav, tx, ty);
+      if (!hill && cell < 0) return false;
+      const p = hill ? { x: tx, y: ty } : cellCenter(w.nav, cell);
+      const near = hill || dist(p.x, p.y, tx, ty) < 1.2 ? { x: tx, y: ty } : p;
       w.events.push({ type: 'blink', unitId: u.id, fromX: u.x, fromY: u.y });
       u.facing = Math.atan2(near.y - u.y, near.x - u.x);
       u.x = u.px = near.x;

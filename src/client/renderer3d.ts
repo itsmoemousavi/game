@@ -13,7 +13,7 @@ import type { GameEvent } from '../sim';
 
 /** Ground level per map height (1 = normal, 2 = base plateau, 3 = ward hill), in meters. */
 /** Ground height per map level (0 = river bed, 1 = normal, 2 = base plateau, 3 = ward hill). */
-const ELEVATION = [-1.0, 0, 1.1, 2.2];
+const ELEVATION = [-1.0, 0, 1.1, 3.4];
 /** Bridge deck height and the water surface (shallow: about ankle deep over the river bed). */
 const BRIDGE_DECK = 0.25;
 const WATER_LEVEL = -0.72;
@@ -471,6 +471,12 @@ export class Renderer3D extends Renderer {
     const n = map.grid;
     const cells: number[] = [];
     map.cliff.forEach((c, i) => c && cells.push(i));
+    // The rim of each ward hill: a ring of rock (you can't climb up there).
+    map.hillTop.forEach((c, i) => {
+      if (!c) return;
+      const edge = [i - 1, i + 1, i - n, i + n].some((k) => !map.hillTop[k]);
+      if (edge) cells.push(i);
+    });
     if (!cells.length) return;
     const geo = new THREE.DodecahedronGeometry(1, 0);
     const mesh = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ flatShading: true }), cells.length * 2);
@@ -830,7 +836,7 @@ export class Renderer3D extends Renderer {
     }
   }
 
-  /** Teleport beams: at the hero (if you can see them) and at the destination (everyone sees it). */
+  /** Teleport beams: at the hero (if you can see them) and at the destination (if you can see that spot). */
   private updateTeleports(w: World, team: Team) {
     for (const h of w.heroes) {
       const c = h.hero!.channel;
@@ -842,7 +848,8 @@ export class Renderer3D extends Renderer {
       const t = w.unit(c.targetId);
       if (t) {
         const dest = tpLanding(w, h.team as Team, t);
-        this.fx3.beam('to' + h.id, dest.x, dest.y, col, k);
+        // Enemies only see the arrival beam if that spot is outside their fog.
+        if (h.team === team || w.vision.seesPoint(team, dest.x, dest.y)) this.fx3.beam('to' + h.id, dest.x, dest.y, col, k);
       }
     }
   }

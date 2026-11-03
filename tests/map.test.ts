@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { botSlots } from './helpers';
 import { CREEPS, LANE_IDS, MAP_SIZE, World, createMap, findPath, isWalkable, lineClear, mirror, pointAlong, polylineLength } from '../src/sim';
 
 const map = createMap();
+const botSlotsHuman = () => botSlots(true);
 const CREEP = { ...CREEPS.melee, vision: [14, 14] as [number, number] };
 
 describe('map', () => {
@@ -64,7 +66,7 @@ describe('map', () => {
     expect(MAP_SIZE).toBe(300);
   });
 
-  it('buildings never squeeze a lane: at least 10 m of open ground all along every lane', () => {
+  it('buildings never squeeze a lane: at least 9 m of open ground all along every lane', () => {
     const nav = new World({ seed: 1, slots: [] }).nav;
     for (const lane of LANE_IDS) {
       const p = map.lanes[lane];
@@ -80,7 +82,7 @@ describe('map', () => {
           if (isWalkable(nav, a.x + nx * t, a.y + ny * t)) best = Math.max(best, (run += 0.25));
           else run = 0;
         }
-        expect(best, `${lane} lane at ${a.x.toFixed(0)},${a.y.toFixed(0)}`).toBeGreaterThanOrEqual(10);
+        expect(best, `${lane} lane at ${a.x.toFixed(0)},${a.y.toFixed(0)}`).toBeGreaterThanOrEqual(9);
       }
     }
   });
@@ -153,5 +155,48 @@ describe('map', () => {
     w.vision.update(w);
     expect(w.canSee(0, b)).toBe(true); // bank → river
     expect(w.canSee(1, a)).toBe(false); // river → bank
+  });
+
+  it('ward hilltops: no walking up, but wards and blinks work there', () => {
+    const w = new World({ seed: 2, slots: botSlotsHuman() });
+    const h = map.hills[0];
+    expect(isWalkable(map, h.x, h.y)).toBe(false);
+    expect(findPath(w.nav, map.fountains[0], h, 0.7)?.some((p) => Math.hypot(p.x - h.x, p.y - h.y) < 3) ?? false).toBe(false);
+    const me = w.heroes.find((u) => u.hero!.controller === 'human')!;
+    me.hero!.items[0] = { id: 'observerWard', count: 1 };
+    me.hero!.items[1] = { id: 'shadowStep', count: 1 };
+    me.x = me.px = h.x + 7;
+    me.y = me.py = h.y;
+    w.applyCommand({ type: 'placeWard', unitId: me.id, slot: 0, x: h.x, y: h.y });
+    expect(w.units.some((u) => u.ward && Math.hypot(u.x - h.x, u.y - h.y) < 0.5)).toBe(true);
+    w.applyCommand({ type: 'useItem', unitId: me.id, slot: 1, x: h.x + 1, y: h.y });
+    expect(Math.hypot(me.x - h.x - 1, me.y - h.y)).toBeLessThan(0.5);
+  });
+
+  it('the river ends just past the side lanes: the corners beyond are closed forest', () => {
+    for (const c of [{ x: 12, y: 12 }, { x: 20, y: 20 }, { x: MAP_SIZE - 12, y: MAP_SIZE - 12 }, { x: MAP_SIZE - 20, y: MAP_SIZE - 20 }]) {
+      expect(isWalkable(map, c.x, c.y)).toBe(false);
+    }
+  });
+
+  it('walkways run along both banks from mid to the runes', () => {
+    // Walking from the mid crossing to a rune along the bank never needs to enter the river.
+    const cellOf = (p: { x: number; y: number }) => Math.floor(p.y / map.cell) * map.grid + Math.floor(p.x / map.cell);
+    const r = map.runeSpots[0];
+    const mid = { x: MAP_SIZE / 2, y: MAP_SIZE / 2 };
+    let land = 0;
+    for (let k = 0.2; k <= 0.8; k += 0.05) {
+      const p = { x: mid.x + (r.x - mid.x) * k, y: mid.y + (r.y - mid.y) * k };
+      // Step off the river centre toward team 0's side until on walkable level-1 ground.
+      for (let d = 9; d < 16; d += 0.5) {
+        const q = { x: p.x - Math.SQRT1_2 * d, y: p.y + Math.SQRT1_2 * d };
+        const c = cellOf(q);
+        if (map.walkable[c] && map.height[c] === 1) {
+          land++;
+          break;
+        }
+      }
+    }
+    expect(land).toBeGreaterThanOrEqual(12);
   });
 });

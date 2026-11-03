@@ -4,6 +4,7 @@ import { toLocal } from './screen';
 
 /** What the player is currently aiming (drawn by the renderer). */
 export interface Aim {
+  /** Ability slot, or ATTACK_AIM for the attack button's target arrow. */
   slot: number;
   /** Aimed world point. */
   x: number;
@@ -14,6 +15,10 @@ export interface Aim {
 }
 
 const MAX_DRAG = 90;
+/** `Aim.slot` while aiming the Attack button at a target. */
+export const ATTACK_AIM = -1;
+/** How far the attack arrow reaches (meters): well past attack range, the hero walks over. */
+const ATTACK_AIM_REACH = 18;
 const TAP_SLOP = 12;
 
 /**
@@ -100,7 +105,7 @@ export class Input {
       );
     // Attack: press-and-hold. Works together with the joystick (multi-touch):
     // hold Attack while steering to hit anything in range and keep walking otherwise.
-    press(root.querySelector('#btn-attack')!, (e) => this.attackDown(e.pointerId));
+    press(root.querySelector('#btn-attack')!, (e) => this.attackDown(e.pointerId, toLocal(e.clientX, e.clientY)));
     root.querySelectorAll<HTMLElement>('[data-slot]').forEach((btn) => {
       const slot = Number(btn.dataset.slot);
       press(btn, (e) => this.onAbilityDown(e, slot));
@@ -118,15 +123,62 @@ export class Input {
   private attackSince = 0;
   private attackRelease: ReturnType<typeof setTimeout> | null = null;
 
-  private attackDown(pointerId: number) {
+  /** Attack button held: where it was pressed (for aiming by dragging) and whether it moved. */
+  private attackDrag: { ox: number; oy: number; moved: boolean } | null = null;
+
+  private attackDown(pointerId: number, at?: { x: number; y: number }) {
     if (this.attackRelease) clearTimeout(this.attackRelease);
     this.attackPointer = pointerId;
     this.attackSince = performance.now();
     this.queue.push({ type: 'attackHold', unitId: this.heroId(), held: true });
+    // Holding Attack shows an arrow at the best target; drag it to pick another one.
+    if (at) {
+      this.attackDrag = { ox: at.x, oy: at.y, moved: false };
+      const w = this.world();
+      const me = w.unit(this.heroId());
+      const t = me && w.pickAutoTarget(me);
+      if (me && t) this.aimAttack(t.x - me.x, t.y - me.y, Math.min(1, Math.hypot(t.x - me.x, t.y - me.y) / ATTACK_AIM_REACH), false);
+    }
   }
 
-  private attackUp() {
+  /**
+   * Point the attack arrow: direction (dx, dy), `t` 0..1 of the full reach. The target is the
+   * attackable (or deniable) unit nearest the arrow's tip: enemy heroes, creeps and buildings,
+   * your own creeps and towers when low enough to deny.
+   */
+  private aimAttack(dx: number, dy: number, t: number, cancel: boolean) {
+    const w = this.world();
+    const me = w.unit(this.heroId());
+    if (!me) return;
+    const len = Math.hypot(dx, dy);
+    const ux = len > 0.001 ? dx / len : Math.cos(me.facing);
+    const uy = len > 0.001 ? dy / len : Math.sin(me.facing);
+    const reach = Math.max(1.5, ATTACK_AIM_REACH * Math.min(1, t));
+    const tip = { x: me.x + ux * reach, y: me.y + uy * reach };
+    let best: Unit | undefined;
+    let bestD = Infinity;
+    for (const u of w.units) {
+      if (u === me || u.ward || !u.alive) continue;
+      if (!((w.canAttack(me, u) && w.canSee(me.team, u)) || w.canDeny(me, u))) continue;
+      const d = Math.hypot(u.x - tip.x, u.y - tip.y) - u.radius;
+      if (d < bestD && d < 4.5) {
+        bestD = d;
+        best = u;
+      }
+    }
+    this.aim = { slot: ATTACK_AIM, x: tip.x, y: tip.y, targetId: best?.id, cancel };
+  }
+
+  private attackUp(cancelled = false) {
     this.attackPointer = null;
+    // Release with a target under the arrow: that's the next attack (it walks over if needed).
+    const aim = this.aim?.slot === ATTACK_AIM ? this.aim : null;
+    if (aim) {
+      this.aim = null;
+      this.cancelZone.classList.remove('show');
+      if (!cancelled && !aim.cancel && aim.targetId !== undefined && this.attackDrag?.moved) this.queue.push({ type: 'attack', unitId: this.heroId(), targetId: aim.targetId });
+    }
+    this.attackDrag = null;
     // A quick tap still gets at least one swing in.
     const wait = Math.max(0, 600 - (performance.now() - this.attackSince));
     this.attackRelease = setTimeout(() => {
@@ -404,6 +456,16 @@ export class Input {
       this.camDrag.y = local.y;
       return;
     }
+    if (this.attackDrag && e.pointerId === this.attackPointer) {
+      const dx = local.x - this.attackDrag.ox;
+      const dy = local.y - this.attackDrag.oy;
+      if (!this.attackDrag.moved && Math.hypot(dx, dy) > TAP_SLOP) {
+        this.attackDrag.moved = true;
+        this.cancelZone.classList.add('show');
+      }
+      if (this.attackDrag.moved) this.aimAttack(dx, dy, Math.hypot(dx, dy) / (MAX_DRAG * 1.4), this.overCancel(e));
+      return;
+    }
     if (this.joy && e.pointerId === this.joy.id) {
       let dx = local.x - this.joy.ox;
       let dy = local.y - this.joy.oy;
@@ -432,7 +494,7 @@ export class Input {
   }
 
   private onPointerUp(e: PointerEvent, cancelled = false) {
-    if (this.attackPointer === e.pointerId) this.attackUp();
+    if (this.attackPointer === e.pointerId) this.attackUp(cancelled);
     if (this.peek === e.pointerId) {
       this.peek = null;
       const me = this.world().unit(this.heroId());

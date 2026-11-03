@@ -1,5 +1,5 @@
 import { GameEvent, groundItemExpiry, GameMap, HEROES, ITEMS, canPickUp, PING_DURATION, PingKind, RUNE_INFO, Side, Team, Unit, WARD_CAST_RANGE, WARDEN_SLAM, World, isInvisible, isNight } from '../sim';
-import type { Aim } from './input';
+import { ATTACK_AIM, type Aim } from './input';
 import { itemImage } from './icons';
 import { bakeMap } from './map-art';
 
@@ -757,8 +757,8 @@ export class Renderer {
         ctx.stroke();
       }
       const t = w.unit(c.targetId);
-      // Everyone sees where a hero is teleporting to (like in Dota), in that hero's team colour.
-      if (t) {
+      // Allies always see where a hero is teleporting; enemies only if they can see that spot.
+      if (t && (h.team === viewTeam || w.vision.seesPoint(viewTeam, t.x, t.y))) {
         ctx.fillStyle = h.team === 0 ? `rgba(110,170,255,${0.18 + 0.25 * k})` : `rgba(255,110,110,${0.18 + 0.25 * k})`;
         ctx.beginPath();
         ctx.arc(t.x, t.y, t.radius + 3 + Math.sin(w.time * 8) * 0.3, 0, Math.PI * 2);
@@ -873,6 +873,29 @@ export class Renderer {
    */
   protected drawAim(w: World, me: Unit, p: { x: number; y: number }, aim: Aim) {
     const ctx = this.ctx;
+    if (aim.slot === ATTACK_AIM) {
+      // Attack arrow: from the hero to the chosen target (or the tip), target ringed.
+      const t = aim.targetId !== undefined ? w.unit(aim.targetId) : undefined;
+      const own = t && t.team === me.team; // a deny
+      const rgb = aim.cancel ? '255,80,80' : own ? '255,210,63' : '255,120,90';
+      const ex = t ? t.x : aim.x;
+      const ey = t ? t.y : aim.y;
+      ctx.lineWidth = 0.15;
+      ctx.strokeStyle = `rgba(${rgb},0.35)`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, me.attackRange + me.radius, 0, Math.PI * 2);
+      ctx.stroke();
+      this.arrow(p.x, p.y, ex, ey, rgb);
+      if (t) {
+        const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 120);
+        ctx.strokeStyle = `rgba(${rgb},0.95)`;
+        ctx.lineWidth = 0.3;
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, t.radius + 0.6 + pulse * 0.3, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      return;
+    }
     const def = HEROES[me.hero!.defId].abilities[aim.slot];
     const rgb = aim.cancel ? '255,80,80' : '120,200,255';
     ctx.lineWidth = 0.15;
@@ -1098,11 +1121,11 @@ export class Renderer {
         ctx.stroke();
       } else ctx.fillRect(ux - 1, uy - 1, 2, 2);
     }
-    // Teleports in progress: a pulsing marker where the hero will arrive (visible to everyone).
+    // Teleports in progress: a pulsing marker where the hero will arrive (enemies see it only outside their fog).
     for (const h of w.heroes) {
       const c = h.hero!.channel;
       const t = c?.kind === 'tp' && h.alive ? w.unit(c.targetId) : undefined;
-      if (!t) continue;
+      if (!t || (h.team !== viewTeam && !w.vision.seesPoint(viewTeam, t.x, t.y))) continue;
       const pulse = (((w.time * 2) % 1) + 1) % 1; // the clock is negative during the warm-up
       ctx.strokeStyle = TEAM_COLORS[h.team];
       ctx.lineWidth = 2;

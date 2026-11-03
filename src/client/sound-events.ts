@@ -103,10 +103,11 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
         sfx.play('teleport', near(w.unit(e.unitId)));
         break;
       case 'teleportStart': {
-        // Heard at the hero (if you can see them) and at the destination (everyone).
+        // Heard at the hero (if you can see them) and at the destination (if your team can see it).
         const u = w.unit(e.unitId);
         const t = w.unit(e.targetId);
-        sfx.play('tpChannel', Math.max(near(u), t ? near(undefined, t.x, t.y) : 0));
+        const destHeard = t && (u?.team === team || w.vision.seesPoint(team, t.x, t.y)) ? near(undefined, t.x, t.y) : 0;
+        sfx.play('tpChannel', Math.max(near(u), destHeard));
         break;
       }
       case 'damage': {

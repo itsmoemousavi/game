@@ -44,6 +44,8 @@ export interface GameMap {
   trees: Tree[];
   /** River curbs: cells you can't walk over but can see across (1 = curb). */
   cliff: Uint8Array;
+  /** Ward hill tops: too high to walk onto; blinks can land there and wards can be placed. */
+  hillTop: Uint8Array;
   shrines: [Vec2, Vec2];
   fountains: [Vec2, Vec2];
   structures: StructureSpawn[];
@@ -119,7 +121,6 @@ function riverAt(t: number): Vec2 {
   const k = Math.SQRT1_2;
   return { x: c + c * t + o * k, y: c + c * t - o * k };
 }
-const RIVER_PATH: Vec2[] = Array.from({ length: 121 }, (_, i) => riverAt(-1.05 + (2.1 * i) / 120));
 
 const LANE_WIDTH = 13;
 const JUNGLE_WIDTH = 10;
@@ -150,6 +151,25 @@ const LANES: Record<LaneId, Vec2[]> = {
   bot: LANES_200.bot.map(sc),
 };
 
+/**
+ * The river ends just past the side lanes: the corners beyond them are dense forest. Walk
+ * out from the middle until the river has crossed the top lane, then stop a little beyond it.
+ */
+const RIVER_END: number = (() => {
+  const near = (p: Vec2) => LANE_IDS.some((id) => LANES[id].some((a, i) => i > 0 && distToSegment(p.x, p.y, LANES[id][i - 1], a) < LANE_WIDTH / 2 + 1));
+  let crossed = false;
+  for (let t = -0.4; t > -1.05; t -= 0.004) {
+    const n = near(riverAt(t));
+    if (n) crossed = true;
+    else if (crossed) return t;
+  }
+  return -1;
+})();
+const RIVER_PATH: Vec2[] = Array.from({ length: 101 }, (_, i) => riverAt(RIVER_END + (-2 * RIVER_END * i) / 100));
+/** Raised walkways along both banks between the mid lane and each rune spot (river t). */
+const LEDGE_T = (68 * S - MAP_SIZE / 2) / (MAP_SIZE / 2);
+const LEDGE_WIDTH = 5;
+
 const SHRINE0: Vec2 = sc({ x: 24, y: 176 });
 const FOUNTAIN0: Vec2 = sc({ x: 10, y: 190 });
 const BASE0: Vec2 = sc({ x: 26, y: 174 });
@@ -178,7 +198,7 @@ const FOREST_PATHS_200: Vec2[][] = [
   [{ x: 87, y: 128 }, { x: 90, y: 144 }],
 ];
 const FOREST_PATHS = FOREST_PATHS_200.map((p) => p.map(sc));
-const FOREST_PATH_WIDTH = 5.5;
+const FOREST_PATH_WIDTH = 8;
 /** Ward hills (height 3) on the forest paths. */
 const HILLS_200: Vec2[] = [
   { x: 34, y: 86 },
@@ -228,7 +248,7 @@ const T2_FRACTION = 0.45;
  * Towers stand just past the lane edge: they leave most of the lane open, and their reach
  * (11 m + body sizes) still covers the far side of the lane.
  */
-const TOWER_SIDE_OFFSET = LANE_WIDTH / 2 + 0.5;
+const TOWER_SIDE_OFFSET = LANE_WIDTH / 2 - 0.5;
 /** Tier-3 tower + barracks form a gate this far from where the lane leaves the base. */
 const GATE_DISTANCE = 5 * S;
 
@@ -262,7 +282,30 @@ export function createMap(): GameMap {
   for (const room of JUNGLE_ROOMS) carveCircle(room.c, room.r);
   for (const [a, b] of JUNGLE_PATHS) carveSeg(a, b, JUNGLE_WIDTH);
   for (const path of FOREST_PATHS) for (let i = 1; i < path.length; i++) carveSeg(path[i - 1], path[i], FOREST_PATH_WIDTH);
-  for (const h of HILLS) carveCircle(h, HILL_RADIUS);
+  // Ward hills sit in a small clearing you can walk around (the hilltop itself is a cliff).
+  for (const h of HILLS) carveCircle(h, HILL_RADIUS + 3);
+  // Trail mouths: a wide opening where each trail leaves a lane, so it's easy to find.
+  for (const path of [...FOREST_PATHS, ...JUNGLE_PATHS.map(([a, b]) => [a, b])]) {
+    for (const end of [path[0], path[path.length - 1]]) {
+      const onLane = LANE_IDS.some((id) => LANES[id].some((a, i) => i > 0 && distToSegment(end.x, end.y, LANES[id][i - 1], a) < LANE_WIDTH));
+      if (onLane) carveCircle(end, 7);
+    }
+  }
+  // Walkways along both river banks from the mid crossing to each rune spot (open to the woods).
+  {
+    const off = RIVER_WIDTH / 2 + 0.6 + LEDGE_WIDTH / 2;
+    const pts = Array.from({ length: 31 }, (_, i) => riverAt((LEDGE_T * i) / 30));
+    for (const side of [-1, 1]) {
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1];
+        const b = pts[i];
+        const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        const nx = (-(b.y - a.y) / l) * side * off;
+        const ny = ((b.x - a.x) / l) * side * off;
+        carveSeg({ x: a.x + nx, y: a.y + ny }, { x: b.x + nx, y: b.y + ny }, LEDGE_WIDTH);
+      }
+    }
+  }
   // The Warden's house (only on this side of the river; the mirrored pit stays an open clearing).
   for (let cy = 0; cy < GRID; cy++) {
     for (let cx = 0; cx < GRID; cx++) {
@@ -324,7 +367,7 @@ export function createMap(): GameMap {
   const toCenter = Math.atan2(-1, 1);
   // Close to the Shrine and to each other, so they cover it (and each other) together.
   for (const sign of [-1, 1]) {
-    const a = toCenter + (sign * 35 * Math.PI) / 180;
+    const a = toCenter + (sign * 24 * Math.PI) / 180;
     structures.push({
       team: 0,
       tier: 'shrineTower',
@@ -421,6 +464,16 @@ export function createMap(): GameMap {
       }
     }
   }
+  // Hilltops are cliffs: too high to walk onto (only blinks land there); wards can go on them.
+  const hillTop = new Uint8Array(GRID * GRID);
+  for (let cy = 0; cy < GRID; cy++) {
+    for (let cx = 0; cx < GRID; cx++) {
+      const i = cy * GRID + cx;
+      if (height[i] !== 3) continue;
+      hillTop[i] = 1;
+      walkable[i] = 0;
+    }
+  }
   // No trees on the curbs.
   const keptTrees = trees.filter((t) => !cliff[Math.floor(t.y / CELL) * GRID + Math.floor(t.x / CELL)]);
 
@@ -444,6 +497,7 @@ export function createMap(): GameMap {
     bridges: [],
     trees: keptTrees,
     cliff,
+    hillTop,
     shrines,
     fountains: [FOUNTAIN0, mirror(FOUNTAIN0)],
     structures,

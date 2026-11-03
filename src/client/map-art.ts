@@ -84,8 +84,8 @@ export function bakeMap(map: GameMap): HTMLCanvasElement {
   }
 
   // 3. Trails through the woods and jungle paths: worn earth, no hard edges.
-  g.strokeStyle = 'rgba(92,76,50,0.45)';
-  g.lineWidth = 2.6 * px;
+  g.strokeStyle = 'rgba(92,76,50,0.5)';
+  g.lineWidth = 5 * px;
   for (const p of map.forestPaths) {
     path(p);
     g.stroke();
