@@ -128,4 +128,6 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
 - Headless screenshots: Playwright Chromium with `--use-gl=angle --use-angle=swiftshader` renders WebGL
   (slowly; fps numbers there mean nothing).
 - Headless screenshots that hang: kill leftover browsers first (`pkill -f chrome-headless-shell`).
+- Missing iPhone home-screen icon (Nov 2026): the icon files were fine; an iOS update fixed it. Ask the owner to
+  update iOS first before changing icon files.
 - iPhone Safari keeps old builds: have the owner reopen the tab and check the build id in Settings.
