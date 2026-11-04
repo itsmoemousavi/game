@@ -102,11 +102,16 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
 ## Open items / next steps
 
 1. **Phone feedback on 3D**: frame rate / freezes, animations, unit sizes, camera. Ask for it.
-2. **Hard bots vs easy bots**: CI plays seeds 7, 8, 9 and expects ≥2 hard wins (passes).
-3. **Hero balance** on the 300 m map: all 46–54% (240 matches, 2026-11-03, `scripts/map-check.ts`).
-   Open: red (Crimson) wins ~55% in every run; blue's hard-lane T1 falls first more often. Investigate the map.
-4. 3D polish: real art/animations (asset packs with commercial licences, or an artist), spell effects in 3D.
-5. Later: multiplayer, Capacitor app builds, store release.
+2. **Hard bots (LATER, owner 2026-11-04)**: hard bots win fights (2-5x kills) but only ~half the matches vs easy
+   (12 seeds, before and after 2026-11-03 changes): they group-push and leave a lane alone, which gets pushed to the
+   barracks; the team plan flips between push and defend and walks across the map. CI test loosened to >=1 win of 3 + 2x kills.
+   Also not done: bots using walkways / blinking onto cliff hills, deliberate denies.
+3. **Hero balance** on the 300 m map: all 46–54% (240 matches, 2026-11-03). Small tweaks after that (Orin nerf etc.)
+   not re-checked. Red ~55% was mostly a biased test shuffle; tick order now alternates. Owner: don't chase it.
+4. 3D polish: real art/animations, spell effects in 3D. Courier art is a placeholder (ask owner).
+5. Living world: flowing water/foam, swaying trees, night fireflies (nothing ambient may reveal units in fog).
+6. More heroes (2–3: summoner, shield support, mobile ranged carry).
+7. Later: multiplayer (first on owner's MacBook, local only), killable courier + bounty, Capacitor app builds, store release.
 
 ## Gotchas
 
