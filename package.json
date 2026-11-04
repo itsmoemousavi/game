@@ -1,6 +1,6 @@
 {
   "name": "emberwake",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "private": true,
   "description": "Mobile 3v3 lane-strategy game (Emberwake)",
   "type": "module",

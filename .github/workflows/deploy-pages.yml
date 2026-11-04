@@ -12,8 +12,9 @@ permissions:
   pages: write
   id-token: write
 
+# One queue per branch, so a push to main never cancels a website update from the dev branch.
 concurrency:
-  group: pages
+  group: pages-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -28,13 +29,18 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      # Only the dev branch publishes the website (GitHub Pages allows only that branch).
+      # On main this workflow just checks that the tests pass and the game builds.
+      - if: github.ref_name != 'main'
+        uses: actions/configure-pages@v5
+      - if: github.ref_name != 'main'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
   deploy:
     needs: build
+    if: github.ref_name != 'main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

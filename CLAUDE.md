@@ -21,7 +21,9 @@ Offline vs bots for now; multiplayer and app-store release later (Capacitor plan
 ## Workflow
 
 - Work on branch `claude/dota-like-game-design-slf3o9`. `main` is the public showcase branch (README, patch notes,
-  playable with `npm install && npm run dev`); it was brought up to date on 2026-11-04 (v0.10.0).
+  playable with `npm install && npm run dev`; the repo's default branch); it was brought up to date on 2026-11-04 (v0.10.0).
+  On `main` the workflow only tests + builds (Pages may only deploy from the dev branch); keep `main` in sync by
+  fast-forward pushes when the owner asks.
   Don't push to other branches or merge into `main` without being asked.
 - **Patch notes:** every change gets an entry in `CHANGELOG.md` (newest first, plain player-facing language) and the
   matching `version` in `package.json` (shown in Settings). Last number = each change, middle number = milestone.
