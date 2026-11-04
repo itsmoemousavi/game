@@ -10,10 +10,10 @@ const snapshot = (w: World) =>
   JSON.stringify(w.units.map((u) => [u.id, u.x.toFixed(3), u.y.toFixed(3), u.hp.toFixed(2), u.alive]));
 
 describe('simulation', () => {
-  it('spawns 6 heroes and 26 structures', () => {
+  it('spawns 6 heroes and 38 structures', () => {
     const w = newWorld();
     expect(w.heroes.length).toBe(6);
-    expect(w.structures.length).toBe(26);
+    expect(w.structures.length).toBe(38);
   });
 
   it('spawns creep waves in all 3 lanes for both teams', () => {
@@ -28,11 +28,14 @@ describe('simulation', () => {
     }
   });
 
-  it('is deterministic for the same seed and inputs', () => {
+  it('is deterministic for the same seed and inputs', async () => {
     const a = newWorld(7);
     const b = newWorld(7);
-    run(a, 120);
-    run(b, 120);
+    for (let i = 0; i < 12; i++) {
+      run(a, 10);
+      run(b, 10);
+      await new Promise((r) => setTimeout(r, 0)); // keep the test runner's heartbeat alive
+    }
     expect(snapshot(a)).toBe(snapshot(b));
   });
 
@@ -45,31 +48,41 @@ describe('simulation', () => {
     expect(me.x).toBeGreaterThan(start.x);
     expect(me.y).toBeLessThan(start.y);
     // A jungle room in our own half: reaching it requires pathing through the maze.
-    w.enqueue({ type: 'moveTo', unitId: me.id, x: 52, y: 104 });
-    run(w, 25);
-    expect(Math.hypot(me.x - 52, me.y - 104)).toBeLessThan(2);
+    w.enqueue({ type: 'moveTo', unitId: me.id, x: 78, y: 156 });
+    run(w, 38);
+    expect(Math.hypot(me.x - 78, me.y - 156)).toBeLessThan(2);
     expect(me.hero!.order.type).toBe('idle');
   });
 
-  it('heroes gain gold and xp over time, and nothing becomes NaN', () => {
+  it('heroes gain gold and xp over time, and nothing becomes NaN', async () => {
     const w = newWorld();
-    run(w, 180);
+    for (let i = 0; i < 18; i++) {
+      run(w, 10);
+      await new Promise((r) => setTimeout(r, 0)); // keep the test runner's heartbeat alive
+    }
     for (const h of w.heroes) {
       // Bots spend gold, so count what they own too.
-      const owned = h.hero!.items.reduce((sum, it) => sum + (it ? ITEMS[it.id].cost * it.count : 0), 0) + h.hero!.tpCount * 50;
+      const owned =
+        h.hero!.items.reduce((sum, it) => sum + (it ? ITEMS[it.id].cost * it.count : 0), 0) +
+        h.hero!.tpCount * 50 +
+        h.hero!.courier.bag.reduce((sum, it) => sum + (it ? it.paid : 0), 0); // still on the courier
       expect(h.hero!.gold + owned).toBeGreaterThan(600);
       expect(Number.isFinite(h.x) && Number.isFinite(h.y)).toBe(true);
     }
     expect(w.heroes.some((h) => h.hero!.level > 1)).toBe(true);
   });
 
-  it('an all-bot match is won by destroying a shrine, bots use abilities and never get stuck', () => {
+  it('an all-bot match is won by destroying a shrine, bots use abilities and never get stuck', async () => {
     const w = newWorld();
-    // Stuck detector: a living hero that has had a move order for 10 s straight must have moved.
-    const streak = new Map<number, { x: number; y: number; t: number }>();
+    // Stuck detector: a living hero that has had a move order for 10 s straight must have got
+    // somewhere (more than 4 m from where it started at some point; turning back is fine).
+    const streak = new Map<number, { x: number; y: number; t: number; far: number }>();
     let casts = 0;
+    let n = 0;
     while (w.winner === null && w.time < 75 * 60) {
       w.step();
+      // Let the test runner breathe now and then (long synchronous runs time out its heartbeat).
+      if (++n % 600 === 0) await new Promise((r) => setTimeout(r, 0));
       casts += w.events.filter((e) => e.type === 'cast').length;
       for (const h of w.heroes) {
         const moving = h.alive && h.hero!.order.type === 'move' && h.stunTimer <= 0;
@@ -77,10 +90,13 @@ describe('simulation', () => {
         if (!moving) {
           streak.delete(h.id);
         } else if (!s) {
-          streak.set(h.id, { x: h.x, y: h.y, t: w.time });
-        } else if (w.time - s.t >= 10) {
-          expect(Math.hypot(h.x - s.x, h.y - s.y), `hero ${h.hero!.defId}${h.team} stuck at ${h.x},${h.y} t=${w.time}`).toBeGreaterThan(2);
-          streak.set(h.id, { x: h.x, y: h.y, t: w.time });
+          streak.set(h.id, { x: h.x, y: h.y, t: w.time, far: 0 });
+        } else {
+          s.far = Math.max(s.far, Math.hypot(h.x - s.x, h.y - s.y));
+          if (w.time - s.t >= 10) {
+            expect(s.far, `hero ${h.hero!.defId}${h.team} stuck at ${h.x},${h.y} t=${w.time}`).toBeGreaterThan(4);
+            streak.set(h.id, { x: h.x, y: h.y, t: w.time, far: 0 });
+          }
         }
       }
     }

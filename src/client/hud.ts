@@ -1,12 +1,14 @@
 import {
   AbilityDef,
+  HeroId,
   HEROES,
   ITEMS,
   TELEPORT,
   effectiveCooldown,
   MAX_LEVEL,
-  RUNE_INFO,
-  RuneKind,
+  STATUS_INFO,
+  Status,
+  statusEffects,
   TEAM_NAMES,
   Team,
   Unit,
@@ -19,7 +21,18 @@ import {
   maxAbilityLevel,
 } from '../sim';
 
-const fmtTime = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+import { abilityIcon, itemIcon, statusIcon } from './icons';
+
+const fmtTime = (t: number) => {
+  // Warm-up counts up from -0:30.
+  const a = t < 0 ? Math.ceil(-t) : Math.floor(t);
+  return `${t < 0 ? '-' : ''}${Math.floor(a / 60)}:${String(a % 60).padStart(2, '0')}`;
+};
+
+/** Hero headshots (image URLs), filled in by main.ts once the 3D portraits are rendered. */
+export const heroPortraits: Partial<Record<HeroId, string>> = {};
+/** Tall chest-up pictures for the draft cards. */
+export const heroCards: Partial<Record<HeroId, string>> = {};
 
 /** DOM overlay: scores, timer, hero status, ability buttons, respawn + game-over screens. */
 export class Hud {
@@ -29,10 +42,7 @@ export class Hud {
   private buttons: HTMLElement[] = [];
   private learnButtons: HTMLElement[] = [];
 
-  constructor(
-    root: HTMLElement,
-    private onRestart: () => void,
-  ) {
+  constructor(root: HTMLElement) {
     for (const id of [
       'score-0',
       'score-1',
@@ -48,13 +58,11 @@ export class Hud {
       'portrait',
       'respawn',
       'respawn-time',
-      'gameover',
-      'gameover-title',
       'daynight',
       'btn-buyback',
       'buyback-cost',
       'btn-glyph',
-      'buffs',
+      'status-row',
       'toasts',
       'killfeed',
       'killed-by',
@@ -65,23 +73,24 @@ export class Hud {
       this.buttons.push(root.querySelector(`[data-slot="${i}"]`)!);
       this.learnButtons.push(root.querySelector(`[data-learn="${i}"]`)!);
     }
-    root.querySelector('#btn-restart')!.addEventListener('click', () => this.onRestart());
   }
 
   setHero(me: Unit) {
     const def = HEROES[me.hero!.defId];
-    this.el.portrait.textContent = def.name[0];
+    const face = this.el.portrait.querySelector<HTMLElement>('.face')!;
+    const pic = heroPortraits[me.hero!.defId];
+    face.innerHTML = pic ? `<img alt="" src="${pic}">` : def.name[0];
     this.el.portrait.style.background = def.color;
     def.abilities.forEach((a, i) => {
       const b = this.buttons[i];
-      b.querySelector('.name')!.textContent = a.name;
+      b.querySelector('.pic')!.innerHTML = abilityIcon(a.id);
       b.title = `${a.name}${a.ultimate ? ' (Ultimate)' : ''}: ${a.summary}`;
       b.classList.toggle('passive', a.targeting === 'passive');
       const pips = b.querySelector('.pips')!;
       pips.innerHTML = '<i></i>'.repeat(a.manaCost.length);
     });
     this.abilityKeys = ['', '', ''];
-    this.el.gameover.style.display = 'none';
+    this.endShown = false;
   }
 
   private teamKey = '';
@@ -92,27 +101,90 @@ export class Hud {
     const bb = buybackBlocker(w, me);
     const cost = buybackCost(h.level, w.time / 60);
     const gcd = Math.ceil(w.glyphCooldown[team]);
-    const buffs = me.buffs
-      .filter((b) => b.key === 'charm' || b.key === 'rune' || b.key === 'salve')
-      .map((b) => `${b.key}:${Math.ceil(b.t)}`)
-      .join();
-    const key = `${bb}|${cost}|${Math.ceil(h.buybackCooldown)}|${gcd}|${buffs}`;
+    const key = `${bb}|${cost}|${Math.ceil(h.buybackCooldown)}|${gcd}`;
     if (key === this.teamKey) return;
     this.teamKey = key;
     this.el['buyback-cost'].textContent = bb === 'cooldown' ? `${Math.ceil(h.buybackCooldown)}s` : String(cost);
     this.el['btn-buyback'].classList.toggle('off', bb !== null);
     this.el['btn-glyph'].querySelector('.cd')!.textContent = gcd > 0 ? `${Math.floor(gcd / 60)}:${String(gcd % 60).padStart(2, '0')}` : '';
-    const chips: string[] = [];
-    for (const b of me.buffs) {
-      const secs = Math.ceil(b.t);
-      if (b.key === 'charm') chips.push(`<span style="background:#ffd23f">Revive ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}</span>`);
-      if (b.key === 'salve') chips.push(`<span style="background:#4ade80">Salve ${secs}</span>`);
-      if (b.key === 'rune') {
-        const kind: RuneKind = b.invisible ? 'invisibility' : b.damageMult ? 'doubleDamage' : b.moveSpeedPct ? 'haste' : 'regen';
-        chips.push(`<span style="background:${RUNE_INFO[kind].color}">${RUNE_INFO[kind].name} ${secs}</span>`);
-      }
+  }
+
+  private statusKey = '';
+  private statusList: Status[] = [];
+  /** Full duration of each showing effect (for the time-left sweep). */
+  private statusTotal = new Map<string, { total: number; left: number }>();
+  private statusTip: { el: HTMLElement; until: number; id: string } | null = null;
+
+  /**
+   * Status icons above the hero bar: green border = helpful, red = harmful. A dark sweep
+   * shows how much time is left; counters (Vexa's attacks) show their number, and the
+   * icon glows when the next attack will be a critical hit. Tap an icon to see what it is.
+   */
+  private updateStatus(w: World, me: Unit) {
+    const list = statusEffects(w, me);
+    const row = this.el['status-row'];
+    const key = list.map((s) => `${s.id}:${s.count ?? ''}`).join();
+    if (key !== this.statusKey) {
+      this.statusKey = key;
+      row.innerHTML = list
+        .map(
+          (s, i) =>
+            `<button class="st ${s.good ? 'good' : 'bad'}${s.id === 'rhythmCount' && s.count === 3 ? ' ready' : ''}" data-i="${i}"><span class="ic">${statusIcon(s.id)}</span><span class="tm"></span>${s.count ? `<b>${s.count}</b>` : ''}</button>`,
+        )
+        .join('');
+      row.querySelectorAll<HTMLElement>('.st').forEach((el) =>
+        el.addEventListener('pointerdown', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const s = this.statusList[Number(el.dataset.i)];
+          if (s) this.showStatusTip(s, el);
+        }),
+      );
     }
-    this.el.buffs.innerHTML = chips.join('');
+    this.statusList = list;
+    // Time-left sweep (remember each effect's full length: the longest time left we saw).
+    const seen = new Set<string>();
+    row.querySelectorAll<HTMLElement>('.st').forEach((el, i) => {
+      const s = list[i];
+      if (!s) return;
+      seen.add(s.id);
+      const tm = el.querySelector<HTMLElement>('.tm')!;
+      if (s.left === undefined) {
+        tm.style.background = '';
+        return;
+      }
+      const prev = this.statusTotal.get(s.id);
+      const rec = !prev || s.left > prev.left + 0.05 ? { total: Math.max(s.left, 0.01), left: s.left } : { total: prev.total, left: s.left };
+      this.statusTotal.set(s.id, rec);
+      const gone = Math.round((1 - s.left / rec.total) * 100);
+      tm.style.background = gone > 0 ? `conic-gradient(rgba(0,0,0,0.62) 0 ${gone}%, transparent ${gone}% 100%)` : '';
+    });
+    for (const k of [...this.statusTotal.keys()]) if (!seen.has(k)) this.statusTotal.delete(k);
+    if (this.statusTip) {
+      const s = list.find((x) => x.id === this.statusTip!.id);
+      if (!s || performance.now() > this.statusTip.until) {
+        this.statusTip.el.remove();
+        this.statusTip = null;
+      } else this.statusTip.el.textContent = this.statusText(s);
+    }
+  }
+
+  private statusText(s: Status) {
+    const t = s.left !== undefined && s.left > 0 ? Math.ceil(s.left) : null;
+    const time = t === null ? '' : t >= 60 ? ` · ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}` : ` · ${t}s`;
+    const count = s.id === 'rhythmCount' ? ` (${s.count}/4${s.count === 3 ? ': next hit crits!' : ''})` : '';
+    return STATUS_INFO[s.id].name + count + time;
+  }
+
+  private showStatusTip(s: Status, at: HTMLElement) {
+    this.statusTip?.el.remove();
+    const el = document.createElement('div');
+    el.id = 'status-tip';
+    el.className = s.good ? 'good' : 'bad';
+    el.textContent = this.statusText(s);
+    el.style.left = `${at.offsetLeft}px`;
+    this.el['status-row'].parentElement!.appendChild(el);
+    this.statusTip = { el, until: performance.now() + 2500, id: s.id };
   }
 
   /** Cooldowns, mana, levels and learn buttons. Cheap: only touches the DOM on change. */
@@ -125,12 +197,14 @@ export class Hud {
       const canLearn = h.skillPoints > 0 && st.level < maxAbilityLevel(a, h.level);
       const cd = Math.ceil(st.cooldown);
       const cost = a.manaCost[Math.max(0, st.level - 1)];
-      const key = `${st.level}|${blocker}|${cd}|${canLearn}`;
+      // Short of mana shows even while the spell is cooling down, so you know before it's ready.
+      const lowMana = st.level > 0 && a.targeting !== 'passive' && me.mana < cost;
+      const key = `${st.level}|${blocker}|${cd}|${canLearn}|${lowMana}`;
       if (key === this.abilityKeys[i]) return;
       this.abilityKeys[i] = key;
       const b = this.buttons[i];
       b.classList.toggle('unlearned', st.level === 0);
-      b.classList.toggle('nomana', blocker === 'mana');
+      b.classList.toggle('nomana', lowMana);
       b.classList.toggle('cooling', blocker === 'cooldown');
       b.querySelector('.cd')!.textContent = blocker === 'cooldown' ? String(cd) : '';
       b.querySelectorAll('.pips i').forEach((p, k) => p.classList.toggle('on', k < st.level));
@@ -246,7 +320,7 @@ export class Hud {
       for (const r of rows.filter((x) => x.u.team === team).sort((a, b) => b.worth - a.worth)) {
         const def = HEROES[r.h.defId];
         const items = r.h.items
-          .map((it) => (it ? `<i style="background:${ITEMS[it.id].icon}">${esc(ITEMS[it.id].short)}</i>` : '<i class="empty"></i>'))
+          .map((it) => (it ? `<i title="${esc(ITEMS[it.id].name)}">${itemIcon(it.id)}${it.count > 1 ? `<b>${it.count}</b>` : ''}</i>` : '<i class="empty"></i>'))
           .join('');
         const status = r.u.alive ? '' : ` <span class="dead">☠ ${Math.ceil(r.h.respawnTimer)}s</span>`;
         html += `<tr class="${r.u.id === meId ? 'me' : ''}">
@@ -254,7 +328,7 @@ export class Hud {
           <td>${r.h.kills} / ${r.h.deaths} / ${r.h.assists}</td>
           <td>${r.h.lastHits} / ${r.h.denies}</td>
           <td>${r.worth}</td>
-          <td><span class="items">${items}</span>${team === myTeam ? ` <small>TP ${r.h.tpCount}</small>` : ''}</td>
+          <td><span class="items">${items}</span>${team === myTeam ? ` <small>TP×${r.h.tpCount}</small>` : ''}</td>
         </tr>`;
       }
     }
@@ -306,6 +380,41 @@ export class Hud {
     tip.classList.remove('hidden');
   }
 
+  /** Big announcer banner: first blood, multi-kills, streaks, shutdowns. */
+  announce(w: World, e: { unitId: number; firstBlood: boolean; multi: number; streak: number; shutdown: number }, myTeam: Team): boolean {
+    const u = w.unit(e.unitId);
+    if (!u?.hero) return false;
+    const multi = ['', '', 'Double Kill!', 'Triple Kill!'][Math.min(e.multi, 3)];
+    const streak = e.streak >= 6 ? 'Legendary!' : ['', '', '', 'Hot Streak!', 'Blazing!', 'Inferno!'][e.streak] ?? '';
+    const lines: string[] = [];
+    if (e.firstBlood) lines.push('First Blood!');
+    if (multi) lines.push(e.multi >= 3 ? 'Triple Kill — Team Wipe!' : multi);
+    else if (streak) lines.push(streak);
+    if (e.shutdown > 0) lines.push(`Shutdown! +${e.shutdown}`);
+    if (!lines.length) return false;
+    const d = document.createElement('div');
+    d.style.color = u.team === myTeam ? '#8cc4ff' : '#ff8f92';
+    d.textContent = lines[0];
+    const sub = document.createElement('small');
+    sub.textContent = `${HEROES[u.hero.defId].name}${lines.length > 1 ? ' · ' + lines.slice(1).join(' · ') : ''}`;
+    d.appendChild(sub);
+    const box = this.el.toasts.ownerDocument.getElementById('announce')!;
+    box.replaceChildren(d);
+    setTimeout(() => d.remove(), 2500);
+    return true;
+  }
+
+  private endShown = false;
+  /** The match just ended (shown once per match). */
+  onGameOver: (w: World) => void = () => {};
+
+  /** End-of-match table: everyone's numbers, with the MVP highlighted. */
+  /** Show how much gold this death cost, in the respawn banner. */
+  goldLost(amount: number) {
+    const el = this.el['killed-by'];
+    el.textContent = `${el.textContent?.replace(/ ·$/, '') ?? ''} · −${amount} gold ·`;
+  }
+
   /** Short announcement under the top bar. */
   toast(text: string, color = '#fff') {
     const d = document.createElement('div');
@@ -320,6 +429,7 @@ export class Hud {
     const h = me.hero!;
     this.updateAbilities(me);
     this.updateTeamButtons(w, me, myTeam);
+    this.updateStatus(w, me);
     const key = [
       w.teamKills[0],
       w.teamKills[1],
@@ -331,6 +441,9 @@ export class Hud {
       Math.floor(h.xp),
       h.kills,
       h.deaths,
+      h.lastHits,
+      h.denies,
+      h.assists,
       me.alive,
       Math.ceil(h.respawnTimer),
       w.winner,
@@ -350,7 +463,8 @@ export class Hud {
     this.el['xp-fill'].style.width = h.level >= MAX_LEVEL ? '100%' : `${((h.xp - cur) / (next - cur)) * 100}%`;
     this.el.level.textContent = String(h.level);
     this.el.gold.textContent = String(Math.floor(h.gold));
-    this.el.kda.textContent = `${h.kills} / ${h.deaths} · LH ${h.lastHits}`;
+    const kda = `<span>K/D/A ${h.kills}/${h.deaths}/${h.assists}</span><span>LH/D ${h.lastHits}/${h.denies}</span>`;
+    if (this.el.kda.innerHTML !== kda) this.el.kda.innerHTML = kda;
 
     this.el.respawn.style.display = !me.alive && w.winner === null ? 'block' : 'none';
     const night = isNight(w.time);
@@ -360,12 +474,9 @@ export class Hud {
     this.el.daynight.title = night ? 'Night: everyone sees less' : 'Day';
     this.el['respawn-time'].textContent = String(Math.max(0, Math.ceil(h.respawnTimer)));
 
-    if (w.winner !== null) {
-      this.el.gameover.style.display = 'flex';
-      const won = w.winner === myTeam;
-      this.el['gameover-title'].textContent = won ? 'Victory' : 'Defeat';
-      this.el['gameover-title'].className = won ? 'win' : 'lose';
-      this.el.gameover.querySelector('.sub')!.textContent = `${TEAM_NAMES[w.winner]} destroyed the enemy Shrine at ${fmtTime(w.time)}`;
+    if (w.winner !== null && !this.endShown) {
+      this.endShown = true;
+      this.onGameOver(w);
     }
   }
 }

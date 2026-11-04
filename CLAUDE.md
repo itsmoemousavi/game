@@ -1,0 +1,128 @@
+# Emberwake: project notes for Claude
+
+Read this first. It carries the context of the earlier (cloud) sessions: what the game is,
+how we work, what the owner decided, and what is still open. Details live in
+`docs/DESIGN.md` (design + balance numbers), `docs/3D-PLAN.md` (3D notes) and `README.md` (controls).
+
+## The game
+
+Mobile 3v3 lane-strategy game in the spirit of Dota 2 (original names and art, no Dota assets).
+Name: **Emberwake** (was Shrinefall until 2026-11-04). Icon: split blue/red tower with an ember crack (`public/icon.svg`;
+PNGs rendered from it with headless Chromium; 1024 px store version in `docs/icon-1024.png`).
+Destroy towers → barracks → shrine towers → the enemy **Shrine**. Empty slots are bots.
+Offline vs bots for now; multiplayer and app-store release later (Capacitor planned).
+
+- **Always landscape** (on a phone held upright the whole UI is rotated, `src/client/screen.ts`).
+- The owner tests on an **iPhone** through the GitHub Pages build: https://itsmoemousavi.github.io/game/
+  Settings → Graphics shows `build <sha>`: ask them to check it (Safari caches old builds).
+- **3D is the default view** (Three.js); 2D stays as a "low graphics" setting and as the fallback
+  if WebGL fails (the reason is shown in a toast and under Settings → Graphics).
+
+## Workflow
+
+- Work on branch `claude/dota-like-game-design-slf3o9`. `main` is the public showcase branch (README, patch notes,
+  playable with `npm install && npm run dev`); it was brought up to date on 2026-11-04 (v0.10.0).
+  Don't push to other branches or merge into `main` without being asked.
+- **Patch notes:** every change gets an entry in `CHANGELOG.md` (newest first, plain player-facing language) and the
+  matching `version` in `package.json` (shown in Settings). Last number = each change, middle number = milestone.
+  Internal-only changes go in as "Behind the scenes". Never write "Dota" in README/CHANGELOG (public).
+- Every push to the branch runs tests + build and deploys Pages (`.github/workflows/deploy-pages.yml`).
+  **If any test fails or the runner errors, the site does not update**: check the Actions run after pushing.
+- Commit messages: plain English, what changed and why. Never put model names in commits/PRs.
+- The owner wants short, plain-language updates (they are not a programmer): what changed,
+  what to test on the phone, what is still open. Ask before big direction changes.
+
+## Commands
+
+```bash
+npm install
+npm run dev                      # local dev server (phone on same Wi-Fi: use the printed network URL)
+npm test                         # vitest (sim unit tests + full bot matches; ~2 min)
+npm run build
+npx tsc --noEmit
+npx vite-node scripts/simulate.ts [seed] [minutes]           # headless all-bot match log
+npx vite-node scripts/hero-winrates.ts [firstSeed] [matches] # random 3v3 bot lineups → win % per hero
+npx vite-node scripts/map-check.ts [firstSeed] [matches] > out.jsonl  # per-match JSON: winner, heroes+items, buildings fallen, stuck heroes
+# Animation close-ups (dev only): npm run dev, open /anim-preview.html, then in the console
+#   run('syl', 'attack', 0.1, 'front')  /  run('orin', 'cast', 0.8, 'game', 2)  /  area('maelstrom', 1.5)
+python3 scripts/tune-hero.py 'vexa.baseDamage=35' 'brakk.ironHide.block=[5, 8, 11, 14]'   # edit hero numbers
+```
+
+Run several `hero-winrates.ts` processes in parallel with different seeds (e.g. 12 × 6 matches) for balance checks;
+with ~100 matches a hero's win rate still swings about ±5% from luck.
+
+## Code map
+
+- `src/sim/` deterministic 30 Hz simulation, no DOM. Commands pattern (players and bots send the same `Command`s).
+  `world.ts` (units, combat, waves, structure rules), `map.ts` (layout written for 200 m and scaled by
+  `MAP_SIZE / 200`, now 300 m), `abilities.ts`, `inventory.ts` (shop, sell refund window, courier purchases), `courier.ts` (courier movement + delivery), `objectives.ts`
+  (runes, Warden boss, wards, glyph, backdoor), `vision.ts` (fog, trees block sight, high ground, day/night),
+  `ai/bots.ts` (team plans: farm / push / defend / warden; difficulty easy/normal/hard), `ai/bot-items.ts` (bot item choices from the enemy lineup), `data/*` (all numbers).
+- `src/client/` `main.ts` (menus, settings, loop), `renderer.ts` (2D; in 3D mode it draws only the ground
+  layer into a texture), `renderer3d.ts` (Three.js view, animations, overlay bars/text, picking),
+  `three/hero-anims.ts` (hand-made hero animations: idle, walk,
+  attacks, every spell, buffs, deaths), `three/spell-fx.ts` (projectile trails, area spells),
+  `three/fx.ts` (dust, sparks, slashes, roots, meteor, whirlpool, camera shake), `three/hero-models.ts` +
+  `three/models.ts` (low-poly placeholder models, baked into few meshes with animatable joints; still the fallback), `menu3d.ts` (start screen 3D hero + portraits), `hud.ts`, `input.ts`, `items-ui.ts`
+  (shop), `audio.ts` (synthesized sounds), `tutorial.ts`.
+- `tests/` vitest. Positions in tests are on the 300 m map. Long full-match tests must `await` a
+  `setTimeout(0)` now and then, or vitest's worker heartbeat times out on CI.
+
+## Decisions the owner made (keep them)
+
+- 6 heroes (Brakk, Vexa, Orin, Syl, Grom, Kaela), 3 abilities each (R = ultimate). **No talents.**
+- Balance goal: no hero is a must-pick (every hero ≈45–55% win rate in random bot lineups);
+  team play decides games. Last full check (200 m map): all 45–57%. Needs a re-check on the new map.
+- Map 1.5× bigger (300 m). Per lane: tier-1 near the river, tier-2, tier-3 at the gate with **two barracks**
+  (melee: tougher; ranged). A fallen barracks powers up only that creep type of the attackers.
+  Shrine towers 11 m from the Shrine. Glyph = invulnerable buildings + 2× tower attack speed.
+  Fountain shoots heroes anywhere in its healing area.
+- Controls: joystick moves; holding Attack while steering attacks **on the move**; holding Attack while standing still
+  only aims (attack starts on release); a chosen target is attacked until it dies or you move (auto attack off too);
+  tapping the ground does **not** walk (only while holding the minimap, or with a mouse); tap an enemy to attack it.
+- Every hero starts the match with 1 TP scroll.
+- Shop: tabs + grid + detail panel with BUY/SELL; taps only select (no accidental buys when scrolling);
+  sell = full refund within 10 s, then half; dead heroes can shop; **no quick-buy**.
+- Match start: menu has no heroes; **draft inside the match** (1 ban per team, picks 1-2-2-1, then 30 s warm-up).
+- Art style: **semi-realistic, darker, painted** (owner loved Sketchfab "Minotaur Berserker" by Yury Misiyuk).
+  All models are our own (the trial Sketchfab models were removed for good, 2026-11-03).
+  Rejected: cute kits (KayKit, Kenney), Grab3D, Mixamo realistic humans. Models must be free for commercial use
+  (CC0 / CC BY, no fan art of other games). Owner's Sketchfab API token is in `~/.sketchfab-token` (never commit it).
+- Warden: walled house on the river (bot/mid side), seen and fought only from inside, slam stun, charm anyone can grab.
+- Map look (2026-11-03): winding river is low ground (level 0) behind stone curbs (`map.cliff`: block walking, not sight),
+  with slopes at lanes (no bridges), around runes, at the Warden's house and where trails meet it; normal speed in water.
+  Only mid crosses water: the river ENDS at each side lane's inner edge with a slope (side lanes = solid ground, high
+  ground over the river). Towers sit 3 m off lane centre (inner side) with a lane bulge; hard-lane T1 near the corner + trail
+  behind it; easy-lane T1 (blue bottom, red top) on the OUTER side of the road.
+  Trees are individual (`map.trees`): thickets, open woods with walkable gaps, glades; solid forest outside the side
+  lanes and around bases. Painted ground in `src/client/map-art.ts`.
+- Item names must be our own (renamed 2026-11-03: Watcher Totem, Seer Totem, Herbal Poultice, Mystic Treads;
+  "Warden's Charm" stays). Never use "Dota" in anything public (store listing, screenshots, ads).
+- Each fountain sits in a walled yard with one doorway toward the centre; the Warden's house walls block sight
+  both ways; the Warden returns 8–11 min after dying (random, unannounced); wards die to exactly 2 attacks.
+- Courier (owner's design, 2026-11-03): 3 slots per hero, buys away from base go on it, delivers in slot order as many as fit,
+  walks lanes only until 6:00 then flies, turns back on death, invulnerable for now (killable + bounty = later).
+  Its look is a placeholder mule (walking) / winged mule (flying): ask the owner before final art.
+- Dying costs gold; buyback exists. Android build: not now. App stores: later.
+
+## Open items / next steps
+
+1. **Phone feedback on 3D**: frame rate / freezes, animations, unit sizes, camera. Ask for it.
+2. **Hard bots (LATER, owner 2026-11-04)**: hard bots win fights (2-5x kills) but only ~half the matches vs easy
+   (12 seeds, before and after 2026-11-03 changes): they group-push and leave a lane alone, which gets pushed to the
+   barracks; the team plan flips between push and defend and walks across the map. CI test loosened to >=1 win of 3 + 2x kills.
+   Also not done: bots using walkways / blinking onto cliff hills, deliberate denies.
+3. **Hero balance** on the 300 m map: all 46–54% (240 matches, 2026-11-03). Small tweaks after that (Orin nerf etc.)
+   not re-checked. Red ~55% was mostly a biased test shuffle; tick order now alternates. Owner: don't chase it.
+4. 3D polish: real art/animations, spell effects in 3D. Courier art is a placeholder (ask owner).
+5. Living world: flowing water/foam, swaying trees, night fireflies (nothing ambient may reveal units in fog).
+6. More heroes (2–3: summoner, shield support, mobile ranged carry).
+7. Later: multiplayer (first on owner's MacBook, local only), killable courier + bounty, Capacitor app builds, store release.
+
+## Gotchas
+
+- Don't `pkill -f <pattern>` where the pattern matches your own shell command (it kills the shell).
+- Headless screenshots: Playwright Chromium with `--use-gl=angle --use-angle=swiftshader` renders WebGL
+  (slowly; fps numbers there mean nothing).
+- Headless screenshots that hang: kill leftover browsers first (`pkill -f chrome-headless-shell`).
+- iPhone Safari keeps old builds: have the owner reopen the tab and check the build id in Settings.

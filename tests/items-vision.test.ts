@@ -12,12 +12,16 @@ import {
   World,
   effectiveCooldown,
   isNight,
+  heightAt,
+  CREEPS,
+  isWalkable,
   lineClear,
 } from '../src/sim';
+import { onRiver } from './helpers';
 
 function humans() {
   const slots: PlayerSlot[] = [];
-  for (const team of [0, 1] as Team[]) HERO_IDS.forEach((heroId, i) => slots.push({ team, heroId, controller: 'human', lane: LANE_IDS[i] }));
+  for (const team of [0, 1] as Team[]) HERO_IDS.slice(0, 3).forEach((heroId, i) => slots.push({ team, heroId, controller: 'human', lane: LANE_IDS[i] }));
   const w = new World({ seed: 5, slots });
   const hero = (team: Team, id: string) => w.heroes.find((h) => h.team === team && h.hero!.defId === id)!;
   return { w, hero };
@@ -47,18 +51,28 @@ describe('shop & items', () => {
     expect(v.hero!.items[1]).toBeNull();
   });
 
-  it('has 6 slots, stacks salves, sells for half price', () => {
+  it('has 6 slots, stacks salves, sells for full price right after buying and half price later', () => {
     const { w, hero } = humans();
     const b = hero(0, 'brakk');
     b.hero!.gold = 10000;
     for (let i = 0; i < 3; i++) w.applyCommand({ type: 'buy', unitId: b.id, itemId: 'healingSalve' });
-    expect(b.hero!.items[0]).toEqual({ id: 'healingSalve', count: 3 });
+    expect(b.hero!.items[0]).toMatchObject({ id: 'healingSalve', count: 3 });
     for (let i = 0; i < 6; i++) w.applyCommand({ type: 'buy', unitId: b.id, itemId: 'guardPlate' });
     expect(b.hero!.items.filter(Boolean).length).toBe(6);
-    const gold = b.hero!.gold;
-    w.applyCommand({ type: 'sell', unitId: b.id, slot: 1 });
-    expect(b.hero!.gold).toBe(gold + ITEMS.guardPlate.cost / 2);
+    let gold = b.hero!.gold;
+    w.applyCommand({ type: 'sell', unitId: b.id, slot: 1 }); // changed my mind: full refund
+    expect(b.hero!.gold).toBe(gold + ITEMS.guardPlate.cost);
     expect(b.hero!.items[1]).toBeNull();
+    w.time += 11; // later: half price
+    gold = b.hero!.gold;
+    w.applyCommand({ type: 'sell', unitId: b.id, slot: 2 });
+    expect(b.hero!.gold).toBe(gold + ITEMS.guardPlate.cost / 2);
+    // Dead heroes are back at base, so they can shop.
+    b.hp = 0;
+    b.alive = false;
+    gold = b.hero!.gold;
+    w.applyCommand({ type: 'buy', unitId: b.id, itemId: 'ironBlade' });
+    expect(b.hero!.gold).toBe(gold - ITEMS.ironBlade.cost);
   });
 
   it('Healing Salve heals over time and is consumed', () => {
@@ -95,15 +109,16 @@ describe('teleport', () => {
   it('buy as many as you like; channel 3s; lands next to the building; cooldown', () => {
     const { w, hero } = humans();
     const v = hero(0, 'vexa');
+    expect(v.hero!.tpCount).toBe(1); // every hero starts with one
     for (let i = 0; i < 4; i++) w.applyCommand({ type: 'buyTp', unitId: v.id });
-    expect(v.hero!.tpCount).toBe(4);
+    expect(v.hero!.tpCount).toBe(5);
     const t1 = w.structures.find((s) => s.team === 0 && s.structure!.tier === 'tower1' && s.structure!.lane === 'mid')!;
     w.applyCommand({ type: 'teleport', unitId: v.id, targetId: t1.id });
     run(w, TELEPORT.channel - 0.5);
     expect(Math.hypot(v.x - t1.x, v.y - t1.y)).toBeGreaterThan(50);
     run(w, 0.7);
     expect(Math.hypot(v.x - t1.x, v.y - t1.y)).toBeLessThan(10);
-    expect(v.hero!.tpCount).toBe(3);
+    expect(v.hero!.tpCount).toBe(4);
     expect(v.hero!.tpCooldown).toBeGreaterThan(50);
     w.applyCommand({ type: 'teleport', unitId: v.id, targetId: t1.id });
     expect(v.hero!.channel).toBeNull(); // on cooldown
@@ -122,11 +137,11 @@ describe('teleport', () => {
     run(w, 1);
     w.applyCommand({ type: 'moveDir', unitId: v.id, dx: 1, dy: 0 });
     expect(v.hero!.channel).toBeNull();
-    expect(v.hero!.tpCount).toBe(1);
+    expect(v.hero!.tpCount).toBe(2); // starting scroll + the one bought: none used up
     w.applyCommand({ type: 'teleport', unitId: v.id, targetId: mine.id });
     w.stun(v, 1);
     run(w, 3.5);
-    expect(v.hero!.tpCount).toBe(1);
+    expect(v.hero!.tpCount).toBe(2);
   });
 });
 
@@ -135,13 +150,13 @@ describe('fog of war & day/night', () => {
     const { w, hero } = humans();
     const me = hero(0, 'vexa');
     const foe = hero(1, 'brakk');
-    place(me, 52, 104);
-    place(foe, 136, 60); // the enemy's jungle: none of our units or buildings see it
+    place(me, 78, 156);
+    place(foe, 204, 90); // the enemy's jungle: none of our units or buildings see it
     run(w, 0.2);
     expect(w.canSee(0, foe)).toBe(false);
     w.applyCommand({ type: 'attack', unitId: me.id, targetId: foe.id });
     expect(me.hero!.order.type).not.toBe('attack');
-    place(foe, 58, 104);
+    place(foe, 84, 156);
     run(w, 0.2);
     expect(w.canSee(0, foe)).toBe(true);
   });
@@ -151,8 +166,10 @@ describe('fog of war & day/night', () => {
     const me = hero(0, 'vexa');
     const foe = hero(1, 'brakk');
     // Along the open river, 14 m apart, away from towers: inside day vision (17), outside night vision (10).
-    place(me, 40, 40);
-    place(foe, 50, 50);
+    const a = onRiver(w.map, 40);
+    const b = onRiver(w.map, 40, 14);
+    place(me, a.x, a.y);
+    place(foe, b.x, b.y);
     run(w, 0.2);
     expect(w.canSee(0, foe)).toBe(true);
     w.time = DAY_SECONDS + 1;
@@ -162,19 +179,84 @@ describe('fog of war & day/night', () => {
   });
 });
 
+describe('high ground', () => {
+  it('cannot see up onto a base plateau from below, but can see down from it', () => {
+    const { w, hero } = humans();
+    const me = hero(1, 'vexa'); // enemy approaching Azure's base
+    const foe = hero(0, 'brakk');
+    const shrine = w.map.shrines[0];
+    place(foe, shrine.x + 26, shrine.y - 26); // on Azure's plateau
+    place(me, shrine.x + 33, shrine.y - 33); // down the mid lane, ~10 m away
+    expect(heightAt(w.map, foe.x, foe.y)).toBe(2);
+    expect(heightAt(w.map, me.x, me.y)).toBe(1);
+    run(w, 0.2);
+    expect(w.canSee(1, foe)).toBe(false); // can't see up
+    expect(w.canSee(0, me)).toBe(true); // but they see down
+  });
+
+  it('a ward on a hill sees over the forest into the paths', () => {
+    const { w, hero } = humans();
+    const hill = w.map.hills[0];
+    expect(heightAt(w.map, hill.x, hill.y)).toBe(3);
+    const o = hero(0, 'orin');
+    o.hero!.gold = 500;
+    w.applyCommand({ type: 'buy', unitId: o.id, itemId: 'observerWard' });
+    place(o, hill.x, hill.y);
+    w.applyCommand({ type: 'placeWard', unitId: o.id, slot: 0, x: hill.x, y: hill.y });
+    place(o, 20, 186);
+    // Find a spot 10–14 m from the hill that a ground-level viewer couldn't see (trees in between).
+    let spot: { x: number; y: number } | null = null;
+    for (let a = 0; a < 360 && !spot; a += 7) {
+      for (const r of [10, 12, 14]) {
+        const p = { x: hill.x + Math.cos((a * Math.PI) / 180) * r, y: hill.y + Math.sin((a * Math.PI) / 180) * r };
+        if (isWalkable(w.map, p.x, p.y) && heightAt(w.map, p.x, p.y) === 1 && !lineClear(w.map, hill, p)) {
+          spot = p;
+          break;
+        }
+      }
+    }
+    expect(spot).not.toBeNull();
+    const foe = hero(1, 'vexa');
+    place(foe, spot!.x, spot!.y);
+    run(w, 0.2);
+    expect(w.canSee(0, foe)).toBe(true);
+  });
+});
+
 describe('trees block sight', () => {
   it('cannot see through the forest, but can see along an open lane at the same distance', () => {
     const { w, hero } = humans();
     const me = hero(0, 'vexa');
     const foe = hero(1, 'brakk');
-    // Jungle room (52,104) and a point 12 m north-west of it, through solid forest.
-    place(me, 52, 104);
-    place(foe, 52 - 8.5, 104 - 8.5);
+    // Stand in a jungle room on our side. Some walkable spot 12-18 m away must be hidden
+    // behind trees, while a spot at the same distance with an open view is seen.
+    const at = (x: number, y: number, r: number, deg: number) => ({ x: x + Math.cos((deg * Math.PI) / 180) * r, y: y + Math.sin((deg * Math.PI) / 180) * r });
+    let hidden: { x: number; y: number } | null = null;
+    let open: { x: number; y: number } | null = null;
+    let c = w.map.camps[0];
+    for (const camp of w.map.camps.slice(0, 3)) {
+      c = camp;
+      place(me, c.x, c.y);
+      run(w, 0.2);
+      hidden = null;
+      open = null;
+      for (let r = 12; r <= 16; r += 2) {
+        for (let deg = 0; deg < 360; deg += 5) {
+          const p = at(c.x, c.y, r, deg);
+          if (!isWalkable(w.map, p.x, p.y)) continue;
+          const lines = [-1.5, 0, 1.5].map((o) => lineClear(w.map, { x: c.x + o, y: c.y + o }, { x: p.x + o, y: p.y - o }));
+          if (lines.every((l) => !l) && !w.vision.seesPoint(0, p.x, p.y)) hidden ??= p;
+          if (lines.every((l) => l) && lineClear(w.map, c, p, 1.5)) open ??= p;
+        }
+      }
+      if (hidden && open) break;
+    }
+    expect(hidden).not.toBeNull();
+    expect(open).not.toBeNull();
+    place(foe, hidden!.x, hidden!.y);
     run(w, 0.2);
-    expect(lineClear(w.map, me, foe)).toBe(false); // trees in between
     expect(w.canSee(0, foe)).toBe(false);
-    // Same 12 m but along the open corridor toward the river.
-    place(foe, 52 + 12 * 0.41, 104 - 12 * 0.91);
+    place(foe, open!.x, open!.y);
     run(w, 0.2);
     expect(w.canSee(0, foe)).toBe(true);
   });
@@ -183,21 +265,30 @@ describe('trees block sight', () => {
 describe('movement around buildings', () => {
   it('creeps never get stuck on towers or barracks over a long game', () => {
     const slots: PlayerSlot[] = [];
-    for (const team of [0, 1] as Team[]) HERO_IDS.forEach((heroId, i) => slots.push({ team, heroId, controller: 'bot', lane: LANE_IDS[i] }));
+    for (const team of [0, 1] as Team[]) HERO_IDS.slice(0, 3).forEach((heroId, i) => slots.push({ team, heroId, controller: 'bot', lane: LANE_IDS[i] }));
     const w = new World({ seed: 9, slots });
-    const seen = new Map<number, { x: number; y: number; t: number }>();
+    // Per creep: where it was when it last had nothing to do (no fight, no crowd).
+    const idleSince = new Map<number, { x: number; y: number; t: number }>();
     for (let i = 0; i < 12 * 60 * TICK_RATE; i++) {
       w.step();
-      if (w.tick % (5 * TICK_RATE) !== 0) continue;
       for (const c of w.units) {
         if (!c.creep || !c.alive) continue;
-        const prev = seen.get(c.id);
-        // A creep with nothing to fight that hasn't reached the end of its route must be moving.
-        if (prev && c.targetId === null && c.creep.wp < c.creep.path.length && c.stunTimer <= 0) {
-          const near = w.units.some((s) => s.structure && s.alive && Math.hypot(s.x - c.x, s.y - c.y) < s.radius + 3);
-          if (near) expect(Math.hypot(c.x - prev.x, c.y - prev.y), `creep stuck at ${c.x.toFixed(1)},${c.y.toFixed(1)}`).toBeGreaterThan(1);
+        const busy =
+          c.targetId !== null ||
+          c.stunTimer > 0 ||
+          c.creep.wp >= c.creep.path.length ||
+          // Waiting behind other units (a creep queue at a fight) isn't being stuck on a building.
+          w.units.some((o) => o !== c && o.alive && !o.structure && Math.hypot(o.x - c.x, o.y - c.y) < 3);
+        const prev = idleSince.get(c.id);
+        if (busy || !prev) {
+          idleSince.set(c.id, { x: c.x, y: c.y, t: w.time });
+          continue;
         }
-        seen.set(c.id, { x: c.x, y: c.y, t: w.time });
+        if (w.time - prev.t < 5) continue;
+        // Idle for 5 s next to a building: it must have made progress.
+        const near = w.units.some((s) => s.structure && s.alive && Math.hypot(s.x - c.x, s.y - c.y) < s.radius + 3);
+        if (near) expect(Math.hypot(c.x - prev.x, c.y - prev.y), `creep stuck at ${c.x.toFixed(1)},${c.y.toFixed(1)}`).toBeGreaterThan(1);
+        idleSince.set(c.id, { x: c.x, y: c.y, t: w.time });
       }
     }
   }, 60_000);
@@ -242,5 +333,34 @@ describe('jungle camps', () => {
     for (const n of neutrals.filter((x) => x.alive)) {
       expect(Math.hypot(n.x - n.neutral!.homeX, n.y - n.neutral!.homeY)).toBeLessThan(1);
     }
+  });
+});
+
+describe('uphill attacks', () => {
+  it('attacks from low ground onto high ground sometimes miss', () => {
+    const { w, hero } = humans();
+    const v = hero(1, 'vexa');
+    const b = hero(0, 'brakk');
+    const shrine = w.map.shrines[0];
+    place(b, shrine.x + 29.5, shrine.y - 29.5); // on the plateau edge
+    place(v, shrine.x + 33.5, shrine.y - 33.5); // below, in range
+    b.maxHp = b.hp = 1e6;
+    v.maxHp = v.hp = 1e6; // (the base towers shoot at her)
+    // Vexa's team needs vision up there (a ward or a creep would provide it).
+    w.spawnUnit('creep', 1, { x: shrine.x + 30, y: shrine.y - 30 }, CREEPS.melee).hp = 1e6;
+    let misses = 0;
+    let hits = 0;
+    run(w, 0.2);
+    w.applyCommand({ type: 'attack', unitId: v.id, targetId: b.id });
+    for (let i = 0; i < 40 * TICK_RATE; i++) {
+      w.step();
+      for (const e of w.events) {
+        if (e.type === 'miss' && e.sourceId === v.id) misses++;
+        if (e.type === 'attack' && e.sourceId === v.id) hits++;
+      }
+    }
+    expect(hits).toBeGreaterThan(15);
+    expect(misses).toBeGreaterThan(0);
+    expect(misses).toBeLessThan(hits * 0.5);
   });
 });

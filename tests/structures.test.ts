@@ -26,18 +26,23 @@ describe('structure protection rules', () => {
     expect(t2.hp).toBe(t2.maxHp);
   });
 
-  it('opens tier-2 and barracks of a lane only when that lane tier-1 falls', () => {
+  it('opens a lane tower by tower: tier-2 after tier-1, then tier-3 and barracks after tier-2', () => {
     const w = newWorld();
     destroy(w, get(w, 1, 'tower1', 'top')[0]);
     expect(get(w, 1, 'tower2', 'top')[0].structure!.vulnerable).toBe(true);
-    expect(get(w, 1, 'barracks', 'top')[0].structure!.vulnerable).toBe(true);
+    expect(get(w, 1, 'tower3', 'top')[0].structure!.vulnerable).toBe(false);
+    expect(get(w, 1, 'barracks', 'top')[0].structure!.vulnerable).toBe(false);
     expect(get(w, 1, 'tower2', 'mid')[0].structure!.vulnerable).toBe(false);
+    destroy(w, get(w, 1, 'tower2', 'top')[0]);
+    expect(get(w, 1, 'tower3', 'top')[0].structure!.vulnerable).toBe(true);
+    expect(get(w, 1, 'barracks', 'top')[0].structure!.vulnerable).toBe(true);
     expect(get(w, 1, 'shrineTower')[0].structure!.vulnerable).toBe(false);
   });
 
   it('opens shrine towers after any barracks, and the shrine after both shrine towers', () => {
     const w = newWorld();
     destroy(w, get(w, 1, 'tower1', 'bot')[0]);
+    destroy(w, get(w, 1, 'tower2', 'bot')[0]);
     destroy(w, get(w, 1, 'barracks', 'bot')[0]);
     const [a, b] = get(w, 1, 'shrineTower');
     expect(a.structure!.vulnerable && b.structure!.vulnerable).toBe(true);
@@ -49,6 +54,45 @@ describe('structure protection rules', () => {
     expect(shrine.structure!.vulnerable).toBe(true);
     destroy(w, shrine);
     expect(w.winner).toBe(0);
+  });
+
+  it('each lane has a melee and a ranged barracks; each powers up its own creep type when it falls', () => {
+    const w = newWorld();
+    const rax = get(w, 1, 'barracks', 'mid');
+    expect(rax.map((r) => r.structure!.rax).sort()).toEqual(['melee', 'ranged']);
+    const melee = rax.find((r) => r.structure!.rax === 'melee')!;
+    const ranged = rax.find((r) => r.structure!.rax === 'ranged')!;
+    expect(melee.maxHp).toBeGreaterThan(ranged.maxHp);
+    expect(melee.armor).toBeGreaterThan(ranged.armor);
+    destroy(w, get(w, 1, 'tower1', 'mid')[0]);
+    destroy(w, get(w, 1, 'tower2', 'mid')[0]);
+    destroy(w, melee);
+    const before = new Set(w.units.map((u) => u.id));
+    while (w.units.every((u) => before.has(u.id) || !u.creep)) w.step();
+    const wave = w.units.filter((u) => !before.has(u.id) && u.creep && u.team === 0 && u.creep.lane === 'mid');
+    expect(wave.filter((c) => c.creep!.type === 'melee').every((c) => c.creep!.super)).toBe(true);
+    expect(wave.filter((c) => c.creep!.type === 'ranged').every((c) => !c.creep!.super)).toBe(true);
+  });
+
+  it('the tower shield also makes towers attack twice as fast', () => {
+    const w = newWorld();
+    const t1 = get(w, 0, 'tower1', 'mid')[0];
+    const foe = w.heroes.find((h) => h.team === 1)!;
+    const shots = (glyph: boolean) => {
+      t1.structure!.glyph = glyph ? 999 : 0;
+      foe.x = foe.px = t1.x + 3;
+      foe.y = foe.py = t1.y;
+      foe.maxHp = foe.hp = 1e6;
+      let n = 0;
+      for (let i = 0; i < 4 * 30; i++) {
+        w.step();
+        n += w.events.filter((e) => e.type === 'attack' && e.sourceId === t1.id).length;
+      }
+      return n;
+    };
+    const normal = shots(false);
+    const fast = shots(true);
+    expect(fast).toBeGreaterThanOrEqual(normal * 2 - 1);
   });
 
   it('never lets the fountain be damaged', () => {

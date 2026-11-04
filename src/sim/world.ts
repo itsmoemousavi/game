@@ -9,6 +9,9 @@ import {
   RANGED_PER_WAVE,
   STARTING_GOLD,
   CAMP_FIRST_SPAWN,
+  DEATH_GOLD,
+  MULTI_KILL_WINDOW,
+  UPHILL_MISS_CHANCE,
   CREEP_GROWTH_PER_5MIN,
   CHARM_DURATION,
   DENY_CREEP,
@@ -20,6 +23,9 @@ import {
   RUNE_FIRST,
   CAMP_RESPAWN,
   NEUTRAL_LEASH,
+  WARDEN_GOLD,
+  WARDEN_LEASH,
+  WARDEN_SLAM,
   Side,
   Team,
   VISION_HZ,
@@ -28,12 +34,13 @@ import {
   otherTeam,
 } from './constants';
 import { HEROES, HeroId, maxAbilityLevel } from './data/heroes';
-import { CREEPS, CombatStats, HERO_VISION, NEUTRALS, STRUCTURES, SUPER_CREEP_MULT } from './data/units';
-import { ItemId, ItemStats } from './data/items';
-import { ItemSlot, buyItem, buyTeleport, emptyInventory, itemBonuses, sellItem, startTeleport, updateChannel, useItem } from './inventory';
+import { BARRACKS, CREEPS, CombatStats, HERO_VISION, NEUTRALS, STRUCTURES, SUPER_CREEP_MULT } from './data/units';
+import { ITEMS, ItemId, ItemStats, TELEPORT } from './data/items';
+import { GroundItem, ItemSlot, charmSlot, updateItemAuras, buyItem, buyTeleport, dropItem, emptyInventory, expireGroundItems, itemBonuses, pickUpItem, sellCourierItem, sellItem, startTeleport, swapItems, updateChannel, useItem } from './inventory';
+import { CourierState, courierGround, dropCourierItem, newCourier, sendCourier, updateCouriers } from './courier';
 import { Vision, isInvisible } from './vision';
 import { Rune, activateGlyph, buyback, placeWard, spawnBoss, updateObjectives } from './objectives';
-import { GameMap, LaneId, StructureTier, createMap, fits, isWalkable, lineClear, teamLanePath } from './map';
+import { GameMap, LaneId, StructureTier, createMap, fits, heightAt, inHouse, isWalkable, lineClear, teamLanePath } from './map';
 import { Vec2, dist, distV } from './math';
 
 const distToSeg = (px: number, py: number, ax: number, ay: number, bx: number, by: number) => {
@@ -45,7 +52,7 @@ const distToSeg = (px: number, py: number, ax: number, ay: number, bx: number, b
 };
 import { findPath } from './pathfinding';
 import { Rng } from './rng';
-import { botThink, botWhileDead } from './ai/bots';
+import { BOT_THINK_INTERVAL, BotDifficulty, botThink, botWhileDead } from './ai/bots';
 import { applyAttackPassives, botLearn, castAbility, damageAfterPassives, passiveArmor, resolveCast } from './abilities';
 
 export type UnitKind = 'hero' | 'creep' | 'neutral' | 'structure' | 'ward';
@@ -57,7 +64,8 @@ export type Order =
   | { type: 'move'; x: number; y: number }
   | { type: 'attack'; targetId: number }
   | { type: 'cast'; slot: number; targetId?: number; x?: number; y?: number }
-  | { type: 'ward'; slot: number; x: number; y: number };
+  | { type: 'ward'; slot: number; x: number; y: number }
+  | { type: 'pickUp'; groundId: number };
 
 /** Every way a player (human or bot, local or remote) can influence the game. */
 export type Command =
@@ -66,8 +74,9 @@ export type Command =
   | { type: 'attack'; unitId: number; targetId: number }
   | { type: 'attackNearest'; unitId: number }
   /**
-   * Attack button held (mobile): while held, attack the best enemy in range; if nothing
-   * is in range keep following the joystick (or, with no joystick, chase the nearest enemy).
+   * Attack button held (mobile): while steering (joystick or a walk order), hit the best enemy
+   * in reach on the move. Holding it while standing still only aims (the client picks the target
+   * and sends 'attack' on release), so nothing is attacked before the player lets go.
    */
   | { type: 'attackHold'; unitId: number; held: boolean }
   /** Player setting: automatically attack enemies that come into range while idle. */
@@ -76,6 +85,8 @@ export type Command =
   | { type: 'setAutoLearn'; unitId: number; enabled: boolean }
   /** Give up: the other team wins. */
   | { type: 'surrender'; unitId: number }
+  /** Team ping on the map (bots on your team react to it). */
+  | { type: 'ping'; unitId: number; kind: PingKind; x: number; y: number }
   | { type: 'stop'; unitId: number }
   /** Use ability `slot` (0 = Q, 1 = W, 2 = R). Give targetId for unit-target abilities, x/y otherwise. */
   | { type: 'cast'; unitId: number; slot: number; targetId?: number; x?: number; y?: number }
@@ -85,14 +96,25 @@ export type Command =
   | { type: 'buy'; unitId: number; itemId: ItemId }
   | { type: 'sell'; unitId: number; slot: number }
   | { type: 'buyTp'; unitId: number }
-  /** Use a consumable in inventory slot `slot`. */
-  | { type: 'useItem'; unitId: number; slot: number }
+  /** Send your courier with its items (it fetches anything waiting at the base first). */
+  | { type: 'courier'; unitId: number }
+  /** Sell / drop an item from a courier slot. */
+  | { type: 'sellCourier'; unitId: number; slot: number }
+  | { type: 'dropCourier'; unitId: number; slot: number }
+  /** Re-order: swap two inventory slots, or two courier slots. */
+  | { type: 'swapItems'; unitId: number; courier: boolean; a: number; b: number }
+  /** Use the item in inventory slot `slot` (consumables, items with a button; blink takes x/y). */
+  | { type: 'useItem'; unitId: number; slot: number; x?: number; y?: number }
   /** Channel a teleport to an allied building. Moving or being stunned cancels it. */
   | { type: 'teleport'; unitId: number; targetId: number }
   /** Place the ward in inventory slot `slot` at (x, y); walks into range first. */
   | { type: 'placeWard'; unitId: number; slot: number; x: number; y: number }
   /** Pay gold to respawn immediately (while dead). */
   | { type: 'buyback'; unitId: number }
+  /** Drop the item in `slot` on the ground in front of the hero. */
+  | { type: 'dropItem'; unitId: number; slot: number }
+  /** Pick up a dropped item (walks there first). Only your own items, or an ally's wards. */
+  | { type: 'pickUp'; unitId: number; groundId: number }
   /** Team tower shield: every allied building invulnerable for a few seconds. */
   | { type: 'glyph'; unitId: number };
 
@@ -116,12 +138,14 @@ export interface Buff {
   damageMult?: number;
   /** Invisible until it expires or the unit attacks / casts. */
   invisible?: boolean;
+  /** Immune to abilities: no spell damage, stuns or slows. */
+  spellImmune?: boolean;
 }
 
 /** Lingering ground area that ticks damage / slow on enemies inside (Arrow Storm, burning ground). */
 export interface Zone {
   id: number;
-  kind: 'arrowStorm' | 'burn';
+  kind: 'arrowStorm' | 'burn' | 'maelstrom';
   team: Side;
   sourceId: number;
   x: number;
@@ -136,7 +160,7 @@ export interface Zone {
 /** Delayed one-shot area effect (Earthsplitter wind-up, Cataclysm meteor). */
 export interface Blast {
   id: number;
-  kind: 'earthsplitter' | 'cataclysm';
+  kind: 'earthsplitter' | 'cataclysm' | 'rootSnare' | 'overgrowth';
   team: Side;
   sourceId: number;
   x: number;
@@ -152,7 +176,7 @@ export interface Blast {
 /** Non-homing projectile travelling in a straight line (Piercing Arrow). */
 export interface Skillshot {
   id: number;
-  kind: 'piercingArrow' | 'fireball';
+  kind: 'piercingArrow' | 'fireball' | 'tidalWave';
   team: Side;
   sourceId: number;
   x: number;
@@ -168,6 +192,8 @@ export interface Skillshot {
   hit: number[];
   /** If set: stop at the first enemy hit (or at max range) and explode in this radius. */
   explode?: number;
+  /** Slow applied to everything hit. */
+  slow?: { pct: number; t: number };
 }
 
 export interface Dash {
@@ -195,6 +221,14 @@ export interface HeroState {
   denies: number;
   /** All gold earned this match (for gold-per-minute). */
   goldEarned: number;
+  /** Hero kills since this hero last died. */
+  streak: number;
+  lastPingAt: number;
+  /** Kills in quick succession (multi-kills) and when the last one happened. */
+  multi: number;
+  lastKillAt: number;
+  /** End-of-match stats. */
+  stats: { heroDamage: number; buildingDamage: number; healing: number; damageTaken: number };
   /** Auto-attack enemies in range while idle (player setting). */
   autoAttack: boolean;
   /** Spend skill points automatically (player setting). */
@@ -213,6 +247,8 @@ export interface HeroState {
   items: (ItemSlot | null)[];
   /** Teleport scrolls carried (separate slot, unlimited). */
   tpCount: number;
+  /** This hero's courier and its 3 slots. */
+  courier: CourierState;
   tpCooldown: number;
   channel: { kind: 'tp'; t: number; total: number; targetId: number } | null;
   /** Item bonuses currently applied (cooldown reduction, spell amp, lifesteal, ult upgrade...). */
@@ -222,7 +258,7 @@ export interface HeroState {
   buybackCooldown: number;
   /** Set when a revive charm saves the hero: respawn here instead of the fountain. */
   reviveAt: Vec2 | null;
-  bot: { thinkTimer: number; retreating: boolean; buildIndex: number };
+  bot: { thinkTimer: number; retreating: boolean; buildIndex: number; difficulty: BotDifficulty; holdBackUntil?: number };
 }
 
 export interface NeutralState {
@@ -231,6 +267,12 @@ export interface NeutralState {
   homeX: number;
   homeY: number;
   boss?: boolean;
+  /** Stays angry until this time (refreshed whenever it is hit). */
+  aggroUntil: number;
+  /** Warden: when its next ground slam may start. */
+  nextSlam?: number;
+  /** Warden: while winding up a ground slam, the time it lands. */
+  slamLand?: number | null;
 }
 
 export interface WardState {
@@ -258,6 +300,8 @@ export interface StructureState {
   backdoor: boolean;
   /** Last time it was hit while backdoor-protected. */
   backdoorHitAt: number;
+  /** Barracks: powers up the enemy's melee or ranged creeps when it falls. */
+  rax?: 'melee' | 'ranged';
 }
 
 export interface Unit {
@@ -323,6 +367,8 @@ export interface Projectile {
   /** Spell projectiles deal spell damage (and may explode). */
   spell?: { kind: 'fireball'; aoe: number };
   crit?: boolean;
+  /** Uphill attack that will miss. */
+  miss?: boolean;
 }
 
 export type GameEvent =
@@ -334,6 +380,8 @@ export type GameEvent =
   | { type: 'cast'; unitId: number; slot: number }
   | { type: 'heal'; unitId: number; amount: number }
   | { type: 'teleport'; unitId: number }
+  /** A hero started channelling a teleport to building `targetId` (everyone can see where). */
+  | { type: 'teleportStart'; unitId: number; targetId: number }
   | { type: 'explosion'; x: number; y: number; radius: number }
   | { type: 'deny'; unitId: number; killerId: number }
   | { type: 'rune'; unitId: number; kind: string }
@@ -343,30 +391,69 @@ export type GameEvent =
   | { type: 'bossKilled'; killerId: number | null; team: Side }
   | { type: 'revive'; unitId: number }
   | { type: 'purchase'; unitId: number }
+  | { type: 'courierSend'; unitId: number }
+  | { type: 'courierDeliver'; unitId: number }
+  | { type: 'itemDrop'; unitId: number }
+  | { type: 'itemPickUp'; unitId: number; itemId?: ItemId }
+  | { type: 'itemExpire'; unitId: number; itemId: ItemId }
+  /** The Warden's ground slam: 'windup' when it raises its arms, 'hit' when it lands. */
+  | { type: 'wardenSlam'; unitId: number; phase: 'windup' | 'hit'; x: number; y: number; radius: number }
+  | { type: 'goldLost'; unitId: number; amount: number }
+  | { type: 'ping'; ping: Ping }
+  | { type: 'blink'; unitId: number; fromX: number; fromY: number }
+  /** Announcer moments: first blood, multi-kills, kill streaks, shutdowns. */
+  | { type: 'announce'; unitId: number; victimId: number; firstBlood: boolean; multi: number; streak: number; shutdown: number }
+  | { type: 'immunity'; unitId: number }
+  /** An item button was used (Arcane Boots, Frost Horn, Stoneskin Amulet). */
+  | { type: 'itemActive'; unitId: number; kind: 'manaBurst' | 'frostNova' | 'stoneskin' }
+  | { type: 'miss'; sourceId: number; targetId: number }
   /** Notable damage (spells, critical hits) for floating numbers. */
   | { type: 'damage'; sourceId: number; targetId: number; amount: number; kind: DamageKind; crit: boolean };
 
 export type DamageKind = 'attack' | 'spell';
+
+export type PingKind = 'attack' | 'retreat' | 'defend' | 'missing' | 'gather';
+export interface Ping {
+  id: number;
+  team: Team;
+  kind: PingKind;
+  x: number;
+  y: number;
+  fromId: number;
+  at: number;
+}
+/** Pings stay on the map this long; a hero can ping at most this often. */
+export const PING_DURATION = 6;
+export const PING_COOLDOWN = 1.2;
 
 export interface PlayerSlot {
   team: Team;
   heroId: HeroId;
   controller: Controller;
   lane: LaneId;
+  /** Bot skill (default normal). */
+  difficulty?: BotDifficulty;
 }
 
 export interface WorldOptions {
   seed: number;
   slots: PlayerSlot[];
   map?: GameMap;
+  /** Seconds of warm-up before the clock reaches 0:00 (the match starts at -warmup; no creeps or passive gold before 0:00). */
+  warmup?: number;
 }
 
+/** Cleave reaches enemies this far from the attack's target (meters). */
+const CLEAVE_RADIUS = 3;
 const armorMultiplier = (armor: number) => 1 - (0.06 * armor) / (1 + 0.06 * Math.abs(armor));
 
 export class World {
   readonly map: GameMap;
   /** Map + footprints of standing structures; used for pathing and movement. */
   nav: GameMap;
+  /** Where a walking courier may go (lanes and bases, minus buildings). */
+  courierNav: GameMap;
+  private courierLand: Uint8Array;
   readonly rng: Rng;
   tick = 0;
   time = 0;
@@ -380,8 +467,14 @@ export class World {
   teamKills: [number, number] = [0, 0];
   readonly vision: Vision;
   nextId = 1;
+  firstBlood = false;
+  pings: Ping[] = [];
+  /** Set when the match ended by surrender (the team that gave up). */
+  surrendered: Team | null = null;
   private nextCampSpawn = CAMP_FIRST_SPAWN;
   runes: Rune[] = [];
+  /** Items heroes dropped on the ground. */
+  groundItems: GroundItem[] = [];
   nextRune = RUNE_FIRST;
   bossRespawnAt: number | null = null;
   glyphCooldown: [number, number] = [0, 0];
@@ -392,9 +485,16 @@ export class World {
   constructor(opts: WorldOptions) {
     this.map = opts.map ?? createMap();
     this.nav = { ...this.map, walkable: new Uint8Array(this.map.walkable) };
+    this.courierLand = courierGround(this.map);
+    this.courierNav = { ...this.map, walkable: new Uint8Array(this.map.walkable) };
     this.rng = new Rng(opts.seed);
-    this.vision = new Vision(this.map.grid, this.map.cell, this.map.walkable);
-    for (const s of this.map.structures) this.spawnStructure(s.team, s.tier, s.lane, s.pos);
+    this.time = -(opts.warmup ?? 0);
+    // River curbs and hilltops block walking but not sight.
+    const seeThrough = new Uint8Array(this.map.walkable);
+    this.map.cliff.forEach((c, i) => c && (seeThrough[i] = 1));
+    this.map.hillTop.forEach((c, i) => c && (seeThrough[i] = 1));
+    this.vision = new Vision(this.map.grid, this.map.cell, seeThrough, this.map.height, this.map.house);
+    for (const s of this.map.structures) this.spawnStructure(s.team, s.tier, s.lane, s.pos, s.rax);
     this.refreshVulnerability();
     this.rebuildNav();
     opts.slots.forEach((slot, i) => this.spawnHero(slot, i));
@@ -406,7 +506,8 @@ export class World {
   canSee(team: Side, u: Unit): boolean {
     if (team === 2) return true;
     // Attacking or casting gives away your position for a moment, even from the fog.
-    if (u.revealUntil > this.time && !isInvisible(u)) return true;
+    // Not from inside the Warden's house, though: its walls hide everything within.
+    if (u.revealUntil > this.time && !isInvisible(u) && !inHouse(this.map, u.x, u.y)) return true;
     return this.vision.sees(team, u);
   }
 
@@ -448,7 +549,7 @@ export class World {
     if (b.creep) return b.hp < b.maxHp * DENY_CREEP;
     if (b.structure) {
       const t = b.structure.tier;
-      return (t === 'tower1' || t === 'tower2' || t === 'shrineTower') && b.structure.vulnerable && b.hp < b.maxHp * DENY_TOWER;
+      return (t === 'tower1' || t === 'tower2' || t === 'tower3' || t === 'shrineTower') && b.structure.vulnerable && b.hp < b.maxHp * DENY_TOWER;
     }
     return false;
   }
@@ -491,7 +592,7 @@ export class World {
     if (!u || !u.hero) return;
     const h = u.hero;
     // Shopping works while dead (you respawn at the fountain); everything else needs a living hero.
-    const whileDead = ['buy', 'sell', 'buyTp', 'learn', 'buyback', 'glyph', 'surrender', 'setAutoAttack', 'setAutoLearn'];
+    const whileDead = ['buy', 'sell', 'buyTp', 'sellCourier', 'dropCourier', 'swapItems', 'learn', 'buyback', 'glyph', 'surrender', 'setAutoAttack', 'setAutoLearn', 'ping'];
     if (!u.alive && !whileDead.includes(cmd.type)) return;
     if (h.channel && (cmd.type === 'moveDir' || cmd.type === 'moveTo' || cmd.type === 'attack' || cmd.type === 'attackNearest' || cmd.type === 'cast' || cmd.type === 'stop')) {
       if (cmd.type !== 'moveDir' || Math.hypot(cmd.dx, cmd.dy) >= 0.15) h.channel = null;
@@ -523,22 +624,26 @@ export class World {
       case 'setAutoAttack':
         h.autoAttack = cmd.enabled;
         break;
+      case 'ping': {
+        if (this.time - h.lastPingAt < PING_COOLDOWN) break;
+        h.lastPingAt = this.time;
+        const ping: Ping = { id: this.newId(), team: u.team as Team, kind: cmd.kind, x: cmd.x, y: cmd.y, fromId: u.id, at: this.time };
+        this.pings = this.pings.filter((p) => this.time - p.at < PING_DURATION && p.fromId !== u.id).concat(ping);
+        this.events.push({ type: 'ping', ping });
+        break;
+      }
       case 'setAutoLearn':
         h.autoLearn = cmd.enabled;
         break;
       case 'surrender':
         if (this.winner === null) {
+          this.surrendered = u.team as Team;
           this.winner = otherTeam(u.team as Team);
           this.events.push({ type: 'gameOver', winner: this.winner });
         }
         break;
       case 'attackHold':
         h.attackHeld = cmd.held;
-        if (cmd.held && h.order.type !== 'dir') {
-          // Not steering: lock onto the best target right away (classic tap-to-attack).
-          const t = this.pickAutoTarget(u);
-          if (t) h.order = { type: 'attack', targetId: t.id };
-        }
         break;
       case 'stop':
         h.order = { type: 'idle' };
@@ -557,8 +662,20 @@ export class World {
       case 'buyTp':
         buyTeleport(this, u);
         break;
+      case 'courier':
+        sendCourier(this, u);
+        break;
+      case 'sellCourier':
+        sellCourierItem(this, u, cmd.slot);
+        break;
+      case 'dropCourier':
+        dropCourierItem(this, u, cmd.slot);
+        break;
+      case 'swapItems':
+        swapItems(u, cmd.courier, cmd.a, cmd.b);
+        break;
       case 'useItem':
-        useItem(this, u, cmd.slot);
+        useItem(this, u, cmd.slot, cmd.x, cmd.y);
         break;
       case 'teleport':
         startTeleport(this, u, cmd.targetId);
@@ -571,6 +688,15 @@ export class World {
         break;
       case 'buyback':
         buyback(this, u);
+        break;
+      case 'dropItem':
+        dropItem(this, u, cmd.slot);
+        break;
+      case 'pickUp':
+        if (pickUpItem(this, u, cmd.groundId) === 'approach') {
+          h.order = { type: 'pickUp', groundId: cmd.groundId };
+          u.path = null;
+        }
         break;
       case 'glyph':
         activateGlyph(this, u.team as Team);
@@ -607,15 +733,20 @@ export class World {
     return a;
   }
 
+  isSpellImmune(u: Unit) {
+    return u.buffs.some((b) => b.spellImmune);
+  }
+
   /** Add or refresh a buff (same key = refresh, keeping the strongest duration). */
   addBuff(u: Unit, b: Buff) {
+    if (b.slowPct && this.isSpellImmune(u)) return;
     const i = u.buffs.findIndex((x) => x.key === b.key);
     if (i >= 0) u.buffs[i] = { ...b, t: Math.max(b.t, u.buffs[i].t) };
     else u.buffs.push(b);
   }
 
   stun(u: Unit, seconds: number) {
-    if (!u.alive || u.kind === 'structure') return;
+    if (!u.alive || u.kind === 'structure' || this.isSpellImmune(u)) return;
     u.stunTimer = Math.max(u.stunTimer, seconds);
     u.dash = null;
   }
@@ -676,9 +807,9 @@ export class World {
       facing: team === 0 ? -Math.PI / 4 : (3 * Math.PI) / 4,
       path: null,
       pathGoal: null,
-      repathAt: 0,
+      repathAt: -1e9,
       stunTimer: 0,
-      revealUntil: -1,
+      revealUntil: -1e9, // far in the past (the clock starts below zero during the warm-up)
       castLock: 0,
       buffs: [],
       dash: null,
@@ -688,9 +819,10 @@ export class World {
     return u;
   }
 
-  private spawnStructure(team: Team, tier: StructureTier, lane: LaneId | null, pos: Vec2) {
-    const u = this.newUnit('structure', team, pos, STRUCTURES[tier]);
-    u.structure = { tier, lane, vulnerable: true, aggroId: null, aggroTimer: 0, glyph: 0, backdoor: true, backdoorHitAt: -999 };
+  private spawnStructure(team: Team, tier: StructureTier, lane: LaneId | null, pos: Vec2, rax?: 'melee' | 'ranged') {
+    const stats = rax ? { ...STRUCTURES[tier], ...BARRACKS[rax] } : STRUCTURES[tier];
+    const u = this.newUnit('structure', team, pos, stats);
+    u.structure = { tier, lane, vulnerable: true, aggroId: null, aggroTimer: 0, glyph: 0, backdoor: true, backdoorHitAt: -999, rax };
   }
 
   private spawnHero(slot: PlayerSlot, index: number) {
@@ -723,6 +855,11 @@ export class World {
       lastHits: 0,
       denies: 0,
       goldEarned: 0,
+      streak: 0,
+      lastPingAt: -99,
+      multi: 0,
+      lastKillAt: -99,
+      stats: { heroDamage: 0, buildingDamage: 0, healing: 0, damageTaken: 0 },
       autoAttack: true,
       autoLearn: false,
       lastCrit: false,
@@ -733,15 +870,17 @@ export class World {
       skillPoints: 1,
       attackCount: 0,
       items: emptyInventory(),
-      tpCount: 0,
+      tpCount: 1, // everyone starts with one teleport scroll
+      courier: null as unknown as CourierState,
       tpCooldown: 0,
       channel: null,
       bonus: itemBonuses([]),
       attackHeld: false,
       buybackCooldown: 0,
       reviveAt: null,
-      bot: { thinkTimer: (index % 6) * 0.05, retreating: false, buildIndex: 0 },
+      bot: { thinkTimer: (index % 6) * 0.05, retreating: false, buildIndex: 0, difficulty: slot.difficulty ?? 'normal' },
     };
+    u.hero.courier = newCourier(this, u);
     this.applyHeroStats(u, true);
   }
 
@@ -788,7 +927,7 @@ export class World {
       ];
       for (const [kind, ox, oy] of pack) {
         const u = this.newUnit('neutral', 2, { x: c.x + ox, y: c.y + oy }, NEUTRALS[kind]);
-        u.neutral = { camp, homeX: u.x, homeY: u.y };
+        u.neutral = { camp, homeX: u.x, homeY: u.y, aggroUntil: -1e9 };
       }
     });
   }
@@ -797,7 +936,9 @@ export class World {
     for (const team of [0, 1] as Team[]) {
       for (const lane of ['top', 'mid', 'bot'] as LaneId[]) {
         const path = teamLanePath(this.map, team, lane);
-        const enemyRaxDown = this.findStructure(otherTeam(team), 'barracks', lane).some((r) => !r.alive);
+        // Each barracks that falls powers up one kind of the attackers' creeps in that lane.
+        const raxDown = (kind: 'melee' | 'ranged') =>
+          this.findStructure(otherTeam(team), 'barracks', lane).some((r) => !r.alive && r.structure!.rax === kind);
         const start = path[0];
         const dx = path[1].x - start.x;
         const dy = path[1].y - start.y;
@@ -814,6 +955,7 @@ export class World {
             y: start.y - (dy / l) * back + (dx / l) * side,
           };
           const u = this.newUnit('creep', team, pos, CREEPS[type]);
+          const enemyRaxDown = raxDown(type);
           // Creeps grow stronger as the match goes on, so games can't stall forever.
           const grow = 1 + CREEP_GROWTH_PER_5MIN * Math.floor(this.time / 300);
           u.maxHp = u.hp = Math.round(u.hp * grow);
@@ -860,13 +1002,17 @@ export class World {
       this.nextCampSpawn += CAMP_RESPAWN;
     }
     updateObjectives(this);
+    expireGroundItems(this);
 
     for (const u of this.units) {
       if (u.attackTimer > 0) u.attackTimer -= DT;
       if (u.hero) this.updateHeroUpkeep(u);
       if (u.alive) this.updateStatus(u);
     }
-    for (const u of this.units) {
+    // Units act one after another, and the list starts with Azure's. Going through it backwards
+    // every other tick means neither team always gets the first hit (or last hit) in a close call.
+    const order = this.tick % 2 === 0 ? this.units : [...this.units].reverse();
+    for (const u of order) {
       if (!u.alive) {
         if (u.hero?.controller === 'bot' && this.tick % 15 === 0) botWhileDead(this, u);
         continue;
@@ -881,18 +1027,21 @@ export class World {
         if (u.hero.controller === 'bot') {
           u.hero.bot.thinkTimer -= DT;
           if (u.hero.bot.thinkTimer <= 0) {
-            u.hero.bot.thinkTimer = 0.25;
+            u.hero.bot.thinkTimer = BOT_THINK_INTERVAL[u.hero.bot.difficulty];
             botThink(this, u);
           }
         }
         this.updateHero(u);
       } else if (u.creep) this.updateCreep(u);
+      else if (u.neutral?.boss) this.updateWarden(u);
       else if (u.neutral) this.updateNeutral(u);
       else if (u.structure) this.updateStructure(u);
     }
     this.updateProjectiles();
     this.updateSkillshots();
     this.updateAreas();
+    updateItemAuras(this);
+    updateCouriers(this);
     this.separate();
     if (this.tick % Math.round(1 / (DT * VISION_HZ)) === 0) this.vision.update(this);
 
@@ -908,10 +1057,13 @@ export class World {
 
   private updateHeroUpkeep(u: Unit) {
     const h = u.hero!;
-    h.gold += PASSIVE_GOLD_PER_SEC * DT;
-    h.goldEarned += PASSIVE_GOLD_PER_SEC * DT;
+    if (this.time >= 0) {
+      h.gold += PASSIVE_GOLD_PER_SEC * DT;
+      h.goldEarned += PASSIVE_GOLD_PER_SEC * DT;
+    }
     for (const a of h.abilities) if (a.cooldown > 0) a.cooldown = Math.max(0, a.cooldown - DT);
     if (h.tpCooldown > 0) h.tpCooldown = Math.max(0, h.tpCooldown - DT);
+    for (const it of h.items) if (it?.cooldown) it.cooldown = Math.max(0, it.cooldown - DT);
     if (h.autoLearn && h.skillPoints > 0) botLearn(this, u);
     if (!u.alive) {
       h.respawnTimer -= DT;
@@ -942,11 +1094,56 @@ export class World {
     u.mana = Math.min(u.maxMana, u.mana + manaRegen * DT);
   }
 
+  /**
+   * Safety net: if a hero ends up inside trees or a building (pushed by a crowd, a dash or
+   * a blink), move it to the nearest open ground so it can never be trapped.
+   */
+  private unstick(u: Unit) {
+    const m = this.nav;
+    if (u.hero?.order.type === 'idle' || fits(m, u.x, u.y, u.radius)) return;
+    // First the smallest nudge that frees it (keeps it moving along its way instead of
+    // snapping back to a cell centre, which can loop next to a building).
+    for (const r of [0.15, 0.3, 0.5, 0.8]) {
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        const x = u.x + Math.cos(a) * r;
+        const y = u.y + Math.sin(a) * r;
+        if (fits(m, x, y, u.radius)) {
+          u.x = x;
+          u.y = y;
+          return;
+        }
+      }
+    }
+    const cx = Math.floor(u.x / m.cell);
+    const cy = Math.floor(u.y / m.cell);
+    for (let r = 1; r <= 6; r++) {
+      let best: { x: number; y: number; d: number } | null = null;
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const x = (cx + dx + 0.5) * m.cell;
+          const y = (cy + dy + 0.5) * m.cell;
+          if (!fits(m, x, y, u.radius)) continue;
+          const d = dist(x, y, u.x, u.y);
+          if (!best || d < best.d) best = { x, y, d };
+        }
+      }
+      if (best) {
+        u.x = best.x;
+        u.y = best.y;
+        u.path = null;
+        return;
+      }
+    }
+  }
+
   private updateHero(u: Unit) {
     const h = u.hero!;
+    this.unstick(u);
     const o = h.order;
     // Holding Attack while steering: hit whatever is in range, otherwise keep walking.
-    if (h.attackHeld && (o.type === 'dir' || o.type === 'idle' || o.type === 'move')) {
+    if (h.attackHeld && (o.type === 'dir' || o.type === 'move')) {
       let t = this.unit(u.targetId);
       if (!this.canAttack(u, t) || !this.canSee(u.team, t) || !this.inReach(u, t)) {
         const reach = u.attackRange + u.radius + 1.5;
@@ -954,18 +1151,17 @@ export class World {
           .filter((e) => this.inReach(u, e))
           .sort((a, b) => Number(!!b.hero) - Number(!!a.hero) || dist(u.x, u.y, a.x, a.y) - dist(u.x, u.y, b.x, b.y))[0];
       }
+      if (o.type === 'dir') {
+        // Steering with the joystick: keep walking and shoot on the move whenever the
+        // attack is ready and something is in reach (the hero doesn't stop to fight).
+        if (t && this.inReach(u, t) && u.attackTimer <= 0) this.tryAttack(u, t);
+        u.targetId = t?.id ?? null;
+        this.stepMove(u, o.dx, o.dy, this.speedOf(u) * DT);
+        return;
+      }
       if (t && this.tryAttack(u, t)) {
         u.targetId = t.id;
         return;
-      }
-      if (o.type === 'idle') {
-        // Holding attack without steering: walk to the nearest enemy and hit it.
-        const chase = this.pickAutoTarget(u);
-        if (chase) {
-          u.targetId = chase.id;
-          if (!this.tryAttack(u, chase)) this.navigate(u, chase.x, chase.y, 0);
-          return;
-        }
       }
     }
     switch (o.type) {
@@ -995,6 +1191,13 @@ export class World {
       case 'ward': {
         const r = placeWard(this, u, o.slot, o.x, o.y);
         if (r === 'approach') this.navigate(u, o.x, o.y, 0);
+        else h.order = { type: 'idle' };
+        break;
+      }
+      case 'pickUp': {
+        const r = pickUpItem(this, u, o.groundId);
+        const g = this.groundItems.find((x) => x.id === o.groundId);
+        if (r === 'approach' && g) this.navigate(u, g.x, g.y, 0);
         else h.order = { type: 'idle' };
         break;
       }
@@ -1056,27 +1259,93 @@ export class World {
       );
       const byDist = (a: Unit, b: Unit) => dist(u.x, u.y, a.x, a.y) - dist(u.x, u.y, b.x, b.y);
       // Towers prefer creeps; heroes are hit when alone or when they attack an allied hero.
-      t = near.filter((e) => e.kind === 'creep').sort(byDist)[0] ?? near.sort(byDist)[0];
+      // The fountain shoots heroes first (no camping in the enemy's healing area).
+      const first = s.tier === 'fountain' ? 'hero' : 'creep';
+      t = near.filter((e) => e.kind === first).sort(byDist)[0] ?? near.sort(byDist)[0];
     }
     u.targetId = t ? t.id : null;
     if (t) this.tryAttack(u, t);
   }
 
   /** Neutrals idle at camp; when attacked they fight back, but never stray far from home. */
+  /**
+   * Neutrals idle at camp. When hit they fight back for a while: they chase within their
+   * leash range (waiting at the edge if the attacker stands further out), and only heal
+   * up once they've been left alone at home.
+   */
   private updateNeutral(u: Unit) {
     const n = u.neutral!;
-    const home = dist(u.x, u.y, n.homeX, n.homeY);
+    const angry = this.time < n.aggroUntil;
     let t = this.unit(u.targetId);
-    if (t && (!t.alive || home > NEUTRAL_LEASH || dist(t.x, t.y, n.homeX, n.homeY) > NEUTRAL_LEASH + 3)) {
-      u.targetId = null;
-      t = undefined;
-    }
+    if (t && (!t.alive || !angry)) t = undefined;
+    u.targetId = t?.id ?? null;
     if (t) {
-      if (!this.tryAttack(u, t)) this.steerTo(u, t.x, t.y);
+      if (this.tryAttack(u, t)) return;
+      // Chase, but never further than the leash from home.
+      const d = dist(t.x, t.y, n.homeX, n.homeY);
+      if (d <= NEUTRAL_LEASH) this.steerTo(u, t.x, t.y);
+      else {
+        const k = NEUTRAL_LEASH / d;
+        this.steerTo(u, n.homeX + (t.x - n.homeX) * k, n.homeY + (t.y - n.homeY) * k);
+      }
       return;
     }
+    const home = dist(u.x, u.y, n.homeX, n.homeY);
     if (home > 0.3) this.steerTo(u, n.homeX, n.homeY);
-    else u.hp = Math.min(u.maxHp, u.hp + u.maxHp * 0.1 * DT); // regenerate quickly at camp
+    else if (this.time > n.aggroUntil + 2) u.hp = Math.min(u.maxHp, u.hp + u.maxHp * 0.1 * DT); // heal at camp
+  }
+
+  /**
+   * The Warden guards its house. When hurt it fights back against anyone (it hits from
+   * anywhere), chases up to WARDEN_LEASH from home and then gives up, and every few
+   * seconds slams the ground, stunning everyone close by after a short wind-up.
+   */
+  private updateWarden(u: Unit) {
+    const n = u.neutral!;
+    if (n.slamLand != null) {
+      if (this.time < n.slamLand) return; // arms raised: stands still
+      n.slamLand = null;
+      n.nextSlam = this.time + WARDEN_SLAM.interval;
+      for (const e of this.units) {
+        if (!e.alive || (e.kind !== 'hero' && e.kind !== 'creep')) continue;
+        if (dist(e.x, e.y, u.x, u.y) > WARDEN_SLAM.radius + e.radius) continue;
+        this.dealDamage(u.id, e, WARDEN_SLAM.damage, 'spell');
+        this.stun(e, WARDEN_SLAM.stun);
+      }
+      this.events.push({ type: 'wardenSlam', unitId: u.id, phase: 'hit', x: u.x, y: u.y, radius: WARDEN_SLAM.radius });
+      return;
+    }
+    const angry = this.time < n.aggroUntil;
+    if (!angry) n.nextSlam = this.time + 3; // the first slam comes a few seconds into a fight
+    let t = this.unit(u.targetId);
+    if (t && (!t.alive || !angry || t.team === 2)) t = undefined;
+    // Gave chase too far: give up and go home.
+    if (t && dist(t.x, t.y, n.homeX, n.homeY) > WARDEN_LEASH) {
+      t = undefined;
+      n.aggroUntil = -1e9;
+    }
+    // Still angry but its target is gone: anyone in the house will do.
+    if (!t && this.time < n.aggroUntil) {
+      t = this.units
+        .filter((e) => e.alive && (e.kind === 'hero' || e.kind === 'creep') && inHouse(this.map, e.x, e.y))
+        .sort((a, b) => dist(u.x, u.y, a.x, a.y) - dist(u.x, u.y, b.x, b.y))[0];
+    }
+    u.targetId = t?.id ?? null;
+    if (t) {
+      const near = this.units.some((e) => e.alive && e.team !== 2 && (e.kind === 'hero' || e.kind === 'creep') && dist(e.x, e.y, u.x, u.y) <= WARDEN_SLAM.radius + e.radius - 0.5);
+      if (near && this.time >= (n.nextSlam ?? 0)) {
+        n.slamLand = this.time + WARDEN_SLAM.windup;
+        u.path = null;
+        this.events.push({ type: 'wardenSlam', unitId: u.id, phase: 'windup', x: u.x, y: u.y, radius: WARDEN_SLAM.radius });
+        return;
+      }
+      if (this.tryAttack(u, t)) return;
+      this.steerTo(u, t.x, t.y);
+      return;
+    }
+    const home = dist(u.x, u.y, n.homeX, n.homeY);
+    if (home > 0.3) this.steerTo(u, n.homeX, n.homeY);
+    else if (this.time > n.aggroUntil + 2) u.hp = Math.min(u.maxHp, u.hp + u.maxHp * 0.05 * DT); // heals at home
   }
 
   private updateProjectiles() {
@@ -1093,7 +1362,8 @@ export class World {
               this.dealDamage(p.sourceId, e, p.damage, 'spell');
             }
           }
-        } else this.dealDamage(p.sourceId, t, p.damage, 'attack', { crit: p.crit });
+        } else if (p.miss) this.events.push({ type: 'miss', sourceId: p.sourceId, targetId: t.id });
+        else this.dealDamage(p.sourceId, t, p.damage, 'attack', { crit: p.crit });
         continue;
       }
       p.x += ((t.x - p.x) / d) * step;
@@ -1111,7 +1381,12 @@ export class World {
     if (!u.buffs.length) return;
     for (const b of u.buffs) {
       b.t -= DT;
-      if (b.healPerSec) this.heal(u, b.healPerSec * DT);
+      if (b.healPerSec) {
+        const before = u.hp;
+        this.heal(u, b.healPerSec * DT);
+        const healer = this.unit(b.sourceId);
+        if (healer?.hero) healer.hero.stats.healing += u.hp - before;
+      }
       if (b.manaPerSec) u.mana = Math.min(u.maxMana, u.mana + b.manaPerSec * DT);
       if (b.damagePerSec && b.sourceId !== undefined) this.dealDamage(b.sourceId, u, b.damagePerSec * DT, 'spell', { dot: true });
       if (!u.alive) return;
@@ -1163,6 +1438,7 @@ export class World {
         }
         s.hit.push(e.id);
         this.dealDamage(s.sourceId, e, s.damage, 'spell');
+        if (s.slow) this.addBuff(e, { key: `slow:${s.kind}`, t: s.slow.t, slowPct: s.slow.pct });
       }
       if (s.explode && (exploded || s.remaining <= 0)) {
         for (const e of this.units) {
@@ -1226,6 +1502,8 @@ export class World {
   // ---------------------------------------------------------------- combat
 
   inReach(a: Unit, b: Unit): boolean {
+    // The Warden can only be fought from inside its house.
+    if (b.neutral?.boss && !inHouse(this.map, a.x, a.y)) return false;
     return dist(a.x, a.y, b.x, b.y) <= a.attackRange + a.radius + b.radius;
   }
 
@@ -1235,12 +1513,15 @@ export class World {
     u.facing = Math.atan2(t.y - u.y, t.x - u.x);
     u.path = null;
     if (u.attackTimer > 0) return true;
-    u.attackTimer = u.attackInterval;
+    // The team shield (glyph) also doubles tower attack speed while it lasts.
+    u.attackTimer = u.attackInterval * (u.structure && u.structure.glyph > 0 ? 0.5 : 1);
     this.events.push({ type: 'attack', sourceId: u.id, targetId: t.id });
     this.breakInvisibility(u);
     this.reveal(u);
-    let damage = applyAttackPassives(this, u);
+    let damage = applyAttackPassives(this, u, t);
     const crit = !!u.hero?.lastCrit;
+    // High ground: ranged attacks from lower ground onto higher ground miss 25% of the time (melee never does).
+    const miss = u.projectileSpeed > 0 && heightAt(this.map, u.x, u.y) < heightAt(this.map, t.x, t.y) && this.rng.next() < UPHILL_MISS_CHANCE;
     for (const b of u.buffs) if (b.damageMult) damage *= b.damageMult;
     if (u.projectileSpeed > 0) {
       this.projectiles.push({
@@ -1255,9 +1536,21 @@ export class World {
         speed: u.projectileSpeed,
         damage,
         crit,
+        miss,
       });
+    } else if (miss) {
+      this.events.push({ type: 'miss', sourceId: u.id, targetId: t.id });
     } else {
       this.dealDamage(u.id, t, damage, 'attack', { crit });
+      // Cleave (melee heroes): a share of the hit splashes onto enemies around the target.
+      const cleave = u.hero?.bonus.cleavePct ?? 0;
+      if (cleave > 0 && u.projectileSpeed === 0 && t.kind !== 'structure') {
+        for (const e of this.units) {
+          if (e === t || !e.alive || e.team === u.team || e.kind === 'structure' || e.ward) continue;
+          if (dist(e.x, e.y, t.x, t.y) > CLEAVE_RADIUS + e.radius) continue;
+          this.dealDamage(u.id, e, (damage * cleave) / 100, 'attack', { cleave: true });
+        }
+      }
     }
     return true;
   }
@@ -1265,13 +1558,21 @@ export class World {
   /**
    * Attacks are reduced by armor. Spells ignore armor but cannot hurt structures.
    */
-  dealDamage(sourceId: number, target: Unit, raw: number, kind: DamageKind = 'attack', opts: { crit?: boolean; dot?: boolean } = {}) {
+  dealDamage(sourceId: number, target: Unit, raw: number, kind: DamageKind = 'attack', opts: { crit?: boolean; dot?: boolean; cleave?: boolean } = {}) {
     if (!target.alive) return;
     if (target.structure && (!target.structure.vulnerable || kind === 'spell' || target.structure.glyph > 0)) return;
+    if (kind === 'spell' && this.isSpellImmune(target)) return;
     const src = this.unit(sourceId);
-    let amount = kind === 'attack' ? raw * armorMultiplier(this.armorOf(target)) : raw;
+    // Nothing from outside the Warden's house hurts it (spells and arrows included).
+    if (target.neutral?.boss && src && src !== target && !inHouse(this.map, src.x, src.y)) return;
+    // Wards ignore spells and splash; every direct attack takes exactly half, so two hits kill one.
+    if (target.ward) {
+      if (kind !== 'attack' || opts.cleave || opts.dot) return;
+      raw = target.maxHp / 2;
+    }
+    let amount = target.ward ? raw : kind === 'attack' ? raw * armorMultiplier(this.armorOf(target)) : raw;
     if (kind === 'spell' && src?.hero) amount *= 1 + src.hero.bonus.spellAmpPct / 100;
-    amount = damageAfterPassives(this, target, amount, kind);
+    if (!target.ward) amount = damageAfterPassives(this, target, amount, kind);
     // Backdoor protection: buildings shrug off damage when no enemy creeps are pushing them.
     if (target.structure?.backdoor && src?.team !== target.team) {
       amount *= BACKDOOR_DAMAGE_MULT;
@@ -1280,16 +1581,27 @@ export class World {
     if (amount <= 0) return;
     target.hp -= amount;
     if (target.hero && src?.hero && src.team !== target.team) target.hero.damagedBy.set(src.id, this.time);
+    if (src?.hero && src.team !== target.team) {
+      if (target.hero) src.hero.stats.heroDamage += Math.min(amount, target.hp + amount);
+      else if (target.structure) src.hero.stats.buildingDamage += amount;
+    }
+    if (target.hero) target.hero.stats.damageTaken += amount;
     if ((kind === 'spell' && !opts.dot) || opts.crit) {
       this.events.push({ type: 'damage', sourceId, targetId: target.id, amount, kind, crit: !!opts.crit });
     }
-    if (kind === 'attack' && src?.hero && src.hero.bonus.lifestealPct > 0) {
+    if (kind === 'attack' && !opts.cleave && src?.hero && src.hero.bonus.lifestealPct > 0) {
       this.heal(src, (amount * src.hero.bonus.lifestealPct) / 100);
     }
-    // Wake the whole camp when a neutral is hit.
-    if (target.neutral && src && src.team !== 2) {
+    if (kind === 'spell' && src?.hero && src.team !== target.team && src.hero.bonus.spellLifestealPct > 0) {
+      this.heal(src, (amount * src.hero.bonus.spellLifestealPct * (target.hero ? 1 : 1 / 3)) / 100);
+    }
+    // Wake the whole camp when a neutral is hit (and keep it angry while it's being hit).
+    if (target.neutral && src && src.team !== 2 && src.kind !== 'structure') {
       for (const n of this.units) {
-        if (n.neutral?.camp === target.neutral.camp && n.alive && n.targetId === null) n.targetId = src.id;
+        if (n.neutral?.camp !== target.neutral.camp || !n.alive) continue;
+        n.neutral.aggroUntil = this.time + 5;
+        const cur = this.unit(n.targetId);
+        if (!cur || !cur.alive || n === target) n.targetId = src.id;
       }
     }
 
@@ -1307,7 +1619,8 @@ export class World {
   }
 
   private kill(u: Unit, killer: Unit | undefined) {
-    const charm = u.hero && u.buffs.some((b) => b.key === 'charm');
+    const charmAt = u.hero ? charmSlot(u) : -1;
+    const charm = u.hero && (charmAt >= 0 || u.buffs.some((b) => b.key === 'charm'));
     u.hp = 0;
     u.alive = false;
     u.targetId = null;
@@ -1327,19 +1640,42 @@ export class World {
     if (u.hero) {
       const h = u.hero;
       h.deaths++;
-      h.respawnTimer = 4 + h.level * 2;
+      h.respawnTimer = 3 + h.level * 1.5;
       h.order = { type: 'idle' };
       h.channel = null;
       if (charm) {
-        // Revive charm: get back up on the spot after a short delay.
+        // Revive charm: get back up on the spot after a short delay (the charm is used up).
+        if (charmAt >= 0) {
+          h.items[charmAt] = null;
+          this.applyHeroStats(u);
+        }
         h.respawnTimer = REVIVE_DELAY;
         h.reviveAt = { x: u.x, y: u.y };
+      } else if (killer && killer.team !== u.team) {
+        // Dying costs gold: 25 + 2.5% of net worth, only from gold in your pocket.
+        let worth = h.gold + h.tpCount * TELEPORT.cost;
+        for (const it of h.items) if (it) worth += ITEMS[it.id].cost * it.count;
+        const lost = Math.min(Math.floor(h.gold), Math.round(DEATH_GOLD.base + worth * DEATH_GOLD.share));
+        if (lost > 0) {
+          h.gold -= lost;
+          this.events.push({ type: 'goldLost', unitId: u.id, amount: lost });
+        }
       }
       this.teamKills[otherTeam(u.team as Team)]++;
       if (killerHero) {
-        killerHero.hero!.kills++;
-        this.giveGold(killerHero, 150 + h.level * 10);
+        const k = killerHero.hero!;
+        k.kills++;
+        k.streak++;
+        k.multi = this.time - k.lastKillAt <= MULTI_KILL_WINDOW ? k.multi + 1 : 1;
+        k.lastKillAt = this.time;
+        // Shutdown bounty for ending a streak, and a first blood bonus.
+        const shutdown = Math.min(400, Math.max(0, h.streak - 2) * 60);
+        const firstBlood = !this.firstBlood;
+        this.firstBlood = true;
+        this.giveGold(killerHero, 150 + h.level * 10 + shutdown + (firstBlood ? 100 : 0));
+        this.events.push({ type: 'announce', unitId: killerHero.id, victimId: u.id, firstBlood, multi: k.multi, streak: k.streak, shutdown });
       }
+      h.streak = 0;
       // Assists: every other enemy hero that hurt this hero in the last 12 seconds.
       for (const [id, at] of h.damagedBy) {
         const a = this.unit(id);
@@ -1359,15 +1695,23 @@ export class World {
       if (killerHero) this.giveGold(killerHero, u.bountyGold);
     } else if (u.neutral?.boss) {
       const team = killer && killer.team !== 2 ? killer.team : null;
-      this.bossRespawnAt = this.time + BOSS_RESPAWN;
+      this.bossRespawnAt = this.time + BOSS_RESPAWN[0] + this.rng.next() * (BOSS_RESPAWN[1] - BOSS_RESPAWN[0]);
       this.events.push({ type: 'bossKilled', killerId: killer?.id ?? null, team: team ?? 2 });
       if (team !== null) {
-        for (const ally of this.units) if (ally.hero && ally.team === team) this.giveGold(ally, 150);
+        // The killing blow takes the full reward, teammates get half.
+        for (const ally of this.units) if (ally.hero && ally.team === team) this.giveGold(ally, ally === killerHero ? WARDEN_GOLD : WARDEN_GOLD / 2);
         this.shareXp(u, u.bountyXp, team);
-        // The killer (or the team's most valuable living hero if a creep got it) carries the charm.
-        const holder = killerHero ?? this.units.find((a) => a.hero && a.alive && a.team === team);
-        if (holder) this.addBuff(holder, { key: 'charm', t: CHARM_DURATION });
       }
+      // The revive charm drops where the Warden fell: whoever grabs it first (either team) keeps it.
+      this.groundItems.push({
+        id: this.newId(),
+        item: { id: 'wardenCharm', count: 1, expiresAt: this.time + CHARM_DURATION },
+        x: u.x,
+        y: u.y,
+        ownerId: -1,
+        team: 2,
+        droppedAt: this.time,
+      });
     } else if (u.neutral) {
       if (killerHero) {
         killerHero.hero!.lastHits++;
@@ -1378,7 +1722,7 @@ export class World {
       const tier = u.structure.tier;
       for (const h of this.units) {
         // A denied tower only pays the enemy half.
-        if (h.hero && h.team !== u.team) this.giveGold(h, Math.round(STRUCTURES[tier].teamGold * (denied ? 0.5 : 1)));
+        if (h.hero && h.team !== u.team) this.giveGold(h, Math.round((u.structure!.rax ? BARRACKS[u.structure!.rax].teamGold : STRUCTURES[tier].teamGold) * (denied ? 0.5 : 1)));
       }
       this.refreshVulnerability();
       this.rebuildNav();
@@ -1422,7 +1766,8 @@ export class World {
   /**
    * Structure protection rules (Dota-style):
    *  - Tier 1 towers: always attackable.
-   *  - Tier 2 tower + barracks of a lane: after that lane's tier 1 falls.
+   *  - Tier 2 tower of a lane: after that lane's tier 1 falls.
+   *  - Tier 3 tower + barracks of a lane: after that lane's tier 2 falls.
    *  - The two shrine towers: after any barracks of that team falls.
    *  - Shrine: after both shrine towers fall.
    *  - Fountain: never.
@@ -1436,8 +1781,11 @@ export class World {
           st.vulnerable = true;
           break;
         case 'tower2':
-        case 'barracks':
           st.vulnerable = this.findStructure(s.team, 'tower1', st.lane).every((t) => !t.alive);
+          break;
+        case 'tower3':
+        case 'barracks':
+          st.vulnerable = this.findStructure(s.team, 'tower2', st.lane).every((t) => !t.alive);
           break;
         case 'shrineTower':
           st.vulnerable = this.findStructure(s.team, 'barracks').some((r) => !r.alive);
@@ -1472,6 +1820,8 @@ export class World {
         }
       }
     }
+    const cw = this.courierNav.walkable;
+    for (let i = 0; i < cw.length; i++) cw[i] = this.nav.walkable[i] & this.courierLand[i];
   }
 
   /**
@@ -1499,12 +1849,27 @@ export class World {
       return;
     }
     // Slide along the wall: keep whichever axis component is free.
+    const x0 = u.x;
+    const y0 = u.y;
     if (Math.abs(dx) >= Math.abs(dy)) {
       if (ok(nx, u.y)) u.x = nx;
       else if (ok(u.x, ny)) u.y = ny;
     } else {
       if (ok(u.x, ny)) u.y = ny;
       else if (ok(nx, u.y)) u.x = nx;
+    }
+    if (Math.abs(u.x - x0) + Math.abs(u.y - y0) > 1e-6) return;
+    // Still blocked (e.g. heading straight along a building's edge): try angled directions.
+    for (const a of [0.6, -0.6, 1.1, -1.1]) {
+      const c = Math.cos(a);
+      const sn = Math.sin(a);
+      const tx = u.x + (dx * c - dy * sn) * d;
+      const ty = u.y + (dx * sn + dy * c) * d;
+      if (ok(tx, ty)) {
+        u.x = tx;
+        u.y = ty;
+        return;
+      }
     }
   }
 
@@ -1570,6 +1935,9 @@ export class World {
         const b = movers[j];
         // Jungle monsters only bump into each other, so they never wall off a corridor.
         if ((a.kind === 'neutral') !== (b.kind === 'neutral')) continue;
+        // Allied heroes walk through each other: one standing by a wall could otherwise block a
+        // teammate for good in a narrow spot.
+        if (a.hero && b.hero && a.team === b.team) continue;
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const min = (a.radius + b.radius) * 0.9;

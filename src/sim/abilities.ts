@@ -246,6 +246,112 @@ function execute(w: World, u: Unit, slot: number, def: AbilityDef, x: number, y:
       w.events.push({ type: 'heal', unitId: target!.id, amount: val(def, 'heal', lvl) });
       break;
     }
+    case 'shadowLunge': {
+      // Land right next to the target (on our side of it) and strike.
+      const t = target!;
+      const d = Math.hypot(t.x - u.x, t.y - u.y) || 1;
+      const off = t.radius + u.radius + 0.2;
+      const lx = t.x - ((t.x - u.x) / d) * off;
+      const ly = t.y - ((t.y - u.y) / d) * off;
+      w.events.push({ type: 'blink', unitId: u.id, fromX: u.x, fromY: u.y });
+      u.x = u.px = lx;
+      u.y = u.py = ly;
+      u.facing = Math.atan2(t.y - u.y, t.x - u.x);
+      w.dealDamage(u.id, t, val(def, 'damage', lvl), 'spell');
+      u.hero!.order = { type: 'attack', targetId: t.id };
+      break;
+    }
+    case 'veil': {
+      const dur = val(def, 'duration', lvl);
+      // Cast first, then vanish (casting itself would reveal).
+      u.revealUntil = 0;
+      w.addBuff(u, { key: 'veil', t: dur, invisible: true, moveSpeedPct: val(def, 'speedPct', lvl) });
+      break;
+    }
+    case 'execution': {
+      const t = target!;
+      const missing = t.maxHp - t.hp;
+      w.dealDamage(u.id, t, val(def, 'damage', lvl) * m + (missing * val(def, 'missingPct', lvl)) / 100, 'spell');
+      w.events.push({ type: 'explosion', x: t.x, y: t.y, radius: 1.5 });
+      break;
+    }
+    case 'rootSnare':
+      w.blasts.push({
+        id: w.newId(),
+        kind: 'rootSnare',
+        team: u.team,
+        sourceId: u.id,
+        x,
+        y,
+        radius: def.radius,
+        t: 0,
+        delay: 0.4,
+        damage: val(def, 'damage', lvl),
+        stun: val(def, 'stun', lvl),
+      });
+      break;
+    case 'barkSkin':
+      w.addBuff(u, { key: 'barkSkin', t: val(def, 'duration', lvl), armor: val(def, 'armor', lvl), healPerSec: val(def, 'regen', lvl) });
+      break;
+    case 'overgrowth':
+      w.blasts.push({
+        id: w.newId(),
+        kind: 'overgrowth',
+        team: u.team,
+        sourceId: u.id,
+        x: u.x,
+        y: u.y,
+        radius: def.radius,
+        t: 0,
+        delay: 0.1,
+        damage: 0,
+        stun: val(def, 'stun', lvl),
+        burn: { dps: val(def, 'dps', lvl) * m, duration: val(def, 'duration', lvl) },
+      });
+      break;
+    case 'tidalWave':
+      w.skillshots.push({
+        id: w.newId(),
+        kind: 'tidalWave',
+        team: u.team,
+        sourceId: u.id,
+        x: u.x,
+        y: u.y,
+        px: u.x,
+        py: u.y,
+        dx: dx / len,
+        dy: dy / len,
+        speed: 22,
+        remaining: def.castRange,
+        width: def.radius * 2,
+        damage: val(def, 'damage', lvl),
+        hit: [],
+        slow: { pct: val(def, 'slowPct', lvl), t: 2 },
+      });
+      break;
+    case 'brineVeil': {
+      const t = target!;
+      w.heal(t, val(def, 'heal', lvl));
+      u.hero!.stats.healing += val(def, 'heal', lvl);
+      w.addBuff(t, { key: 'brineVeil', t: 5, armor: val(def, 'armor', lvl), moveSpeedPct: val(def, 'speedPct', lvl) });
+      w.events.push({ type: 'heal', unitId: t.id, amount: val(def, 'heal', lvl) });
+      break;
+    }
+    case 'maelstrom':
+      w.zones.push({
+        id: w.newId(),
+        kind: 'maelstrom',
+        team: u.team,
+        sourceId: u.id,
+        x,
+        y,
+        radius: def.radius,
+        t: 0,
+        duration: val(def, 'duration', lvl),
+        dps: val(def, 'dps', lvl) * m,
+        slowPct: val(def, 'slowPct', lvl),
+      });
+      break;
     case 'cataclysm':
       w.blasts.push({
         id: w.newId(),
@@ -271,15 +377,22 @@ function execute(w: World, u: Unit, slot: number, def: AbilityDef, x: number, y:
 // ------------------------------------------------------------------ passives
 
 /** Called on every attack; returns the damage this attack deals. */
-export function applyAttackPassives(w: World, u: Unit): number {
+export function applyAttackPassives(w: World, u: Unit, target?: Unit): number {
   if (!u.hero) return u.damage;
   u.hero.attackCount++;
   const lvl = abilityLevel(u, 'huntersRhythm');
-  if (lvl > 0 && u.hero.attackCount % 4 === 0) {
+  // Critical hits don't work on buildings (keeps Vexa from out-pushing everyone).
+  if (lvl > 0 && u.hero.attackCount % 4 === 0 && target?.kind !== 'structure') {
     const def = HEROES.vexa.abilities[1];
     w.addBuff(u, { key: 'huntersRhythm', t: 1.5, moveSpeedPct: val(def, 'speedPct', lvl) });
     u.hero.lastCrit = true;
     return u.damage * val(def, 'critMult', lvl);
+  }
+  // Critical hit items (Keen Edge, Reaper's Edge); not on buildings.
+  const b = u.hero.bonus;
+  if (b.critChance > 0 && target?.kind !== 'structure' && w.rng.next() * 100 < b.critChance) {
+    u.hero.lastCrit = true;
+    return u.damage * b.critMult;
   }
   u.hero.lastCrit = false;
   return u.damage;

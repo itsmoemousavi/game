@@ -1,5 +1,7 @@
-import { GameEvent, GameMap, HEROES, LANE_IDS, RUNE_INFO, Side, Team, Unit, WARD_CAST_RANGE, World, isInvisible, isNight } from '../sim';
-import type { Aim } from './input';
+import { GameEvent, groundItemExpiry, GameMap, HEROES, ITEMS, canPickUp, PING_DURATION, PingKind, RUNE_INFO, Side, Team, Unit, WARD_CAST_RANGE, WARDEN_SLAM, World, isInvisible, isNight } from '../sim';
+import { ATTACK_AIM, type Aim } from './input';
+import { itemImage } from './icons';
+import { bakeMap } from './map-art';
 
 /**
  * 2D top-down renderer. It only READS the simulation; swapping it for a 3D renderer
@@ -8,31 +10,43 @@ import type { Aim } from './input';
  */
 export const TEAM_COLORS: Record<Side, string> = { 0: '#3d8bfd', 1: '#e5484d', 2: '#b08a55' };
 const TEAM_DARK: Record<Side, string> = { 0: '#1d4f9e', 1: '#8f2226', 2: '#6b5232' };
-const PX_PER_UNIT_BAKED = 6;
+export const PING_STYLE: Record<PingKind, { color: string; icon: string; label: string }> = {
+  attack: { color: '#ef4444', icon: '⚔', label: 'Attack!' },
+  defend: { color: '#3b82f6', icon: '⛨', label: 'Defend!' },
+  gather: { color: '#22c55e', icon: '⚑', label: 'Gather here!' },
+  retreat: { color: '#facc15', icon: '⟲', label: 'Retreat!' },
+  missing: { color: '#c084fc', icon: '?', label: 'Enemy missing!' },
+};
 
 export class Renderer {
-  readonly ctx: CanvasRenderingContext2D;
-  private mapImage: HTMLCanvasElement;
-  camX = 100;
-  camY = 100;
+  ctx: CanvasRenderingContext2D;
+  /** true: draw everything top-down (2D). false: draw only the ground layer (the 3D view adds the rest). */
+  protected flat = true;
+  protected mapImage: HTMLCanvasElement;
+  camX = 150;
+  camY = 150;
   /** CSS pixels per world meter. */
   zoom = 10;
   zoomFactor = 1;
-  private dpr = 1;
-  private cssW = 0;
-  private cssH = 0;
+  protected dpr = 1;
+  protected cssW = 0;
+  protected cssH = 0;
   /** Melee swing arcs (attacker position, direction, reach). */
-  private swings: { x: number; y: number; ang: number; reach: number; t: number; color: string }[] = [];
-  private lunges = new Map<number, { ang: number; t: number }>();
-  private blasts: { x: number; y: number; r: number; t: number; color: string }[] = [];
+  protected swings: { x: number; y: number; ang: number; reach: number; t: number; color: string }[] = [];
+  protected lunges = new Map<number, { ang: number; t: number }>();
+  protected blasts: { x: number; y: number; r: number; t: number; color: string }[] = [];
+  /** Ground cracks left by Earthsplitter (drawn on the ground in both views). */
+  protected cracks: { x: number; y: number; r: number; t: number; seed: number }[] = [];
   /** Floating text: "Denied!", "+38" gold... */
-  private floaters: { x: number; y: number; t: number; text: string; color: string; big?: boolean }[] = [];
+  protected floaters: { x: number; y: number; t: number; text: string; color: string; big?: boolean }[] = [];
   /** Inventory slot of a ward being placed (shows the placement range). */
   wardMode: number | null = null;
+  /** Tutorial highlight on the map. */
+  marker: { x: number; y: number } | null = null;
   /** Free camera: set while dead, or while the player holds the minimap. */
-  private lookTarget: { x: number; y: number } | null = null;
-  private fogCanvas: HTMLCanvasElement;
-  private fogData: ImageData;
+  protected lookTarget: { x: number; y: number } | null = null;
+  protected fogCanvas: HTMLCanvasElement;
+  protected fogData: ImageData;
 
   constructor(
     readonly canvas: HTMLCanvasElement,
@@ -75,13 +89,19 @@ export class Renderer {
     for (const e of events) {
       if (e.type === 'deny') {
         const u = w.unit(e.unitId);
-        if (u) this.floaters.push({ x: u.x, y: u.y - 1, t: 1, text: '!', color: '#ffffff' });
-        if (u && e.killerId === meId) this.floaters.push({ x: u.x, y: u.y - 2.2, t: 1.2, text: 'Denied!', color: '#e5e7eb' });
+        // "!" over every denied creep; a big "DENIED" when you did it, so it reads at a glance.
+        if (u) this.floaters.push({ x: u.x, y: u.y - 1, t: 1.1, text: '!', color: '#7dd3fc', big: true });
+        if (u && e.killerId === meId) this.floaters.push({ x: u.x, y: u.y - 2.4, t: 1.4, text: 'DENIED', color: '#7dd3fc', big: true });
         continue;
       }
       if (e.type === 'gold' && e.unitId === meId && e.amount >= 20) {
         const u = w.unit(meId);
         if (u) this.floaters.push({ x: u.x, y: u.y - 2.4, t: 1, text: `+${Math.round(e.amount)}`, color: '#ffd23f' });
+        continue;
+      }
+      if (e.type === 'miss') {
+        const t = w.unit(e.targetId);
+        if (t && (e.sourceId === meId || e.targetId === meId)) this.floaters.push({ x: t.x, y: t.y - 1.6, t: 0.8, text: 'miss', color: '#d1d5db' });
         continue;
       }
       if (e.type === 'damage') {
@@ -91,6 +111,12 @@ export class Renderer {
         const text = `${Math.round(e.amount)}${e.crit ? '!' : ''}`;
         const jitter = ((e.targetId * 7 + this.floaters.length * 13) % 10) / 10 - 0.5;
         this.floaters.push({ x: t.x + jitter, y: t.y - 1.6, t: 0.9, text, color, big: e.crit });
+        continue;
+      }
+      if (e.type === 'blink') {
+        const u = w.unit(e.unitId);
+        this.blasts.push({ x: e.fromX, y: e.fromY, r: 1.6, t: 0.35, color: '165,180,252' });
+        if (u) this.blasts.push({ x: u.x, y: u.y, r: 2, t: 0.4, color: '165,180,252' });
         continue;
       }
       if (e.type === 'revive') {
@@ -107,6 +133,11 @@ export class Renderer {
         const color = '#ffffff';
         this.swings.push({ x: src.x, y: src.y, ang, reach: src.radius + src.attackRange + tgt.radius * 0.5, t: 0.2, color });
         this.lunges.set(src.id, { ang, t: 0.16 });
+      } else if (e.type === 'cast' && e.slot === -1 && w.unit(e.unitId)?.hero?.defId === 'brakk') {
+        const u = w.unit(e.unitId)!;
+        this.cracks.push({ x: u.x, y: u.y, r: 7, t: 0, seed: (u.x * 7 + u.y * 13) | 0 });
+      } else if (e.type === 'wardenSlam' && e.phase === 'hit') {
+        this.blasts.push({ x: e.x, y: e.y, r: e.radius * 1.4, t: 0.45, color: '196,181,253' });
       } else if (e.type === 'explosion') {
         this.blasts.push({ x: e.x, y: e.y, r: e.radius, t: 0.35, color: '255,140,40' });
       } else if (e.type === 'teleport') {
@@ -135,6 +166,11 @@ export class Renderer {
     return { x: this.camX + (sx - this.cssW / 2) / this.zoom, y: this.camY + (sy - this.cssH / 2) / this.zoom };
   }
 
+  /** Screen position (CSS pixels) of a world point `h` meters above the ground. */
+  screenOf(x: number, y: number, _h = 0) {
+    return { x: (x - this.camX) * this.zoom + this.cssW / 2, y: (y - this.camY) * this.zoom + this.cssH / 2 };
+  }
+
   minimapRect() {
     const size = Math.round(Math.min(170, this.cssH * 0.34));
     return { x: 8, y: 8, size };
@@ -155,16 +191,7 @@ export class Renderer {
     const sees = (u: Unit) => w.canSee(viewTeam, u);
     const seesPoint = (team: Side, x: number, y: number) => team === viewTeam || w.vision.seesPoint(viewTeam, x, y);
 
-    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    ctx.fillStyle = '#0d150f';
-    ctx.fillRect(0, 0, this.cssW, this.cssH);
-
-    ctx.save();
-    ctx.translate(this.cssW / 2, this.cssH / 2);
-    ctx.scale(this.zoom, this.zoom);
-    ctx.translate(-this.camX, -this.camY);
-    ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(this.mapImage, 0, 0, w.map.size, w.map.size);
+    this.beginWorld(w);
 
     if (focus && focus.alive) {
       const p = lerp(focus);
@@ -189,9 +216,12 @@ export class Renderer {
       return p;
     };
 
-    for (const s of structures) this.drawStructure(s, w.time);
+    if (this.flat) for (const s of structures) this.drawStructure(s, w.time);
     this.drawAreas(w, seesPoint);
+    this.drawCracks();
     this.drawRunes(w, viewTeam);
+    this.drawGroundItems(w, viewTeam, focus);
+    this.drawWardenSlam(w, sees);
     for (const u of w.units) if (u.ward && u.alive && sees(u)) this.drawWard(u, viewTeam);
     if (this.wardMode !== null && focus?.alive) {
       const p = lerp(focus);
@@ -199,12 +229,14 @@ export class Renderer {
       ctx.setLineDash([0.6, 0.4]);
       ctx.lineWidth = 0.18;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, WARD_CAST_RANGE, 0, Math.PI * 2);
+      const it = focus.hero!.items[this.wardMode];
+      const range = it ? (ITEMS[it.id].active?.range ?? WARD_CAST_RANGE) : WARD_CAST_RANGE;
+      ctx.arc(p.x, p.y, range, 0, Math.PI * 2);
       ctx.stroke();
       ctx.setLineDash([]);
     }
     this.drawTeleports(w, viewTeam);
-    for (const c of creeps) {
+    for (const c of this.flat ? creeps : []) {
       const p = at(c);
       if (c.neutral) {
         this.drawNeutral(c, p);
@@ -241,12 +273,35 @@ export class Renderer {
       const isMe = h === focus;
       // Invisible allies (incl. you) are drawn see-through; enemies wouldn't be drawn at all.
       ctx.globalAlpha = isInvisible(h) ? 0.4 : 1;
+      if (h.buffs.some((b) => b.spellImmune)) {
+        ctx.fillStyle = `rgba(250,204,21,${0.25 + Math.sin(w.time * 9) * 0.08})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, h.radius + 0.9, 0, Math.PI * 2);
+        ctx.fill();
+      }
       if (h.buffs.some((b) => b.key === 'charm')) {
         ctx.strokeStyle = 'rgba(255,215,90,0.8)';
         ctx.lineWidth = 0.2;
         ctx.beginPath();
         ctx.arc(p.x, p.y, h.radius + 0.75 + Math.sin(w.time * 4) * 0.08, 0, Math.PI * 2);
         ctx.stroke();
+      }
+      if (!this.flat) {
+        // 3D view: only the rings on the ground (team ring, and yours in yellow).
+        ctx.strokeStyle = TEAM_COLORS[h.team];
+        ctx.lineWidth = 0.22;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, h.radius + 0.15, 0, Math.PI * 2);
+        ctx.stroke();
+        if (isMe) {
+          ctx.strokeStyle = '#ffe066';
+          ctx.lineWidth = 0.15;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, h.radius + 0.5, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        continue;
       }
       ctx.fillStyle = 'rgba(0,0,0,0.35)';
       ctx.beginPath();
@@ -296,7 +351,7 @@ export class Renderer {
       ctx.setLineDash([]);
     }
 
-    for (const pr of w.projectiles) {
+    for (const pr of this.flat ? w.projectiles : []) {
       const p = lerp(pr);
       if (!seesPoint(pr.team, p.x, p.y)) continue;
       if (pr.spell) {
@@ -335,13 +390,14 @@ export class Renderer {
         ctx.fill();
         continue;
       }
-      ctx.strokeStyle = '#d9fff0';
-      ctx.lineWidth = 0.35;
+      const wave = sk.kind === 'tidalWave';
+      ctx.strokeStyle = wave ? '#cffafe' : '#d9fff0';
+      ctx.lineWidth = wave ? 0.8 : 0.35;
       ctx.beginPath();
       ctx.moveTo(p.x - sk.dx * 2.5, p.y - sk.dy * 2.5);
       ctx.lineTo(p.x + sk.dx * 0.8, p.y + sk.dy * 0.8);
       ctx.stroke();
-      ctx.strokeStyle = 'rgba(63,191,127,0.4)';
+      ctx.strokeStyle = wave ? 'rgba(6,182,212,0.45)' : 'rgba(63,191,127,0.4)';
       ctx.lineWidth = sk.width;
       ctx.beginPath();
       ctx.moveTo(p.x - sk.dx * 4, p.y - sk.dy * 4);
@@ -360,7 +416,7 @@ export class Renderer {
 
     this.floaters = this.floaters.filter((f) => (f.t -= 1 / 60) > 0);
     ctx.textAlign = 'center';
-    for (const f of this.floaters) {
+    for (const f of this.flat ? this.floaters : []) {
       ctx.globalAlpha = Math.min(1, f.t * 2);
       ctx.fillStyle = f.color;
       ctx.font = `bold ${f.big ? 1.5 : 1.05}px system-ui, sans-serif`;
@@ -371,9 +427,28 @@ export class Renderer {
     }
     ctx.globalAlpha = 1;
 
-    this.drawFog(w, viewTeam);
+    if (this.flat) this.drawFog(w, viewTeam);
+    this.drawPings(w, viewTeam);
+    if (this.marker) {
+      const pulse = (((w.time * 1.2) % 1) + 1) % 1;
+      ctx.strokeStyle = '#ffd23f';
+      ctx.lineWidth = 0.35;
+      ctx.globalAlpha = 1 - pulse * 0.7;
+      ctx.beginPath();
+      ctx.arc(this.marker.x, this.marker.y, 1.5 + pulse * 3, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      if (focus?.alive) {
+        // Arrow from the hero toward the marker when it's further away.
+        const dx = this.marker.x - focus.x;
+        const dy = this.marker.y - focus.y;
+        const d = Math.hypot(dx, dy);
+        if (d > 6) this.arrow(focus.x + (dx / d) * 2, focus.y + (dy / d) * 2, focus.x + (dx / d) * 5, focus.y + (dy / d) * 5, '255,210,63');
+      }
+    }
     if (aim && focus && focus.alive) this.drawAim(w, focus, lerp(focus), aim);
     ctx.restore();
+    if (!this.flat) return;
     if (isNight(w.time)) {
       ctx.fillStyle = 'rgba(10,20,60,0.22)';
       ctx.fillRect(0, 0, this.cssW, this.cssH);
@@ -382,7 +457,21 @@ export class Renderer {
     this.drawMinimap(w, focus, viewTeam);
   }
 
-  private oneHitKills(w: World, me: Unit, c: Unit): boolean {
+  /** Clear the screen and set the world → screen transform (the 3D renderer overrides this). */
+  protected beginWorld(w: World) {
+    const ctx = this.ctx;
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.fillStyle = '#0d150f';
+    ctx.fillRect(0, 0, this.cssW, this.cssH);
+    ctx.save();
+    ctx.translate(this.cssW / 2, this.cssH / 2);
+    ctx.scale(this.zoom, this.zoom);
+    ctx.translate(-this.camX, -this.camY);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(this.mapImage, 0, 0, w.map.size, w.map.size);
+  }
+
+  protected oneHitKills(w: World, me: Unit, c: Unit): boolean {
     if (c.team === me.team && !w.canDeny(me, c)) return false;
     let dmg = me.damage;
     for (const b of me.buffs) if (b.damageMult) dmg *= b.damageMult;
@@ -393,7 +482,7 @@ export class Renderer {
   }
 
   /** Darken everything outside the team's vision (smoothly upscaled from the vision grid). */
-  private drawFog(w: World, team: Team) {
+  protected drawFog(w: World, team: Team) {
     const g = w.vision.grids[team];
     const d = this.fogData.data;
     const a = isNight(w.time) ? 175 : 140;
@@ -409,7 +498,31 @@ export class Renderer {
     ctx.drawImage(this.fogCanvas, 0, 0, w.map.size, w.map.size);
   }
 
-  private drawSwings() {
+  protected drawPings(w: World, team: Team) {
+    const ctx = this.ctx;
+    for (const p of w.pings) {
+      if (p.team !== team) continue;
+      const age = w.time - p.at;
+      if (age > PING_DURATION) continue;
+      const st = PING_STYLE[p.kind];
+      const pulse = (age * 1.6) % 1;
+      ctx.strokeStyle = st.color;
+      ctx.globalAlpha = 1 - pulse;
+      ctx.lineWidth = 0.35;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 1 + pulse * 4, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = st.color;
+      ctx.font = 'bold 2.2px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(st.icon, p.x, p.y);
+      ctx.textBaseline = 'alphabetic';
+    }
+  }
+
+  protected drawSwings() {
     const ctx = this.ctx;
     this.swings = this.swings.filter((s) => (s.t -= 1 / 60) > 0);
     for (const [id, l] of this.lunges) if ((l.t -= 1 / 60) <= 0) this.lunges.delete(id);
@@ -446,8 +559,71 @@ export class Renderer {
     }
   }
 
-  private drawRunes(w: World, team: Team) {
+  /**
+   * Dropped items: the item's icon flat on the ground. A gold ring marks items you can
+   * pick up (yours, or an ally's ward); the ring empties as the item's 2 minutes run out.
+   */
+  protected drawGroundItems(w: World, team: Team, me: Unit | undefined) {
     const ctx = this.ctx;
+    for (const g of w.groundItems) {
+      if (g.team !== team && !w.vision.seesPoint(team, g.x, g.y)) continue;
+      const mine = !!me && canPickUp(me, g);
+      const left = (groundItemExpiry(g) - w.time) / (groundItemExpiry(g) - g.droppedAt);
+      const r = 1.25;
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.beginPath();
+      ctx.arc(g.x, g.y, r + 0.25, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = mine ? '#facc15' : 'rgba(200,200,200,0.6)';
+      ctx.lineWidth = 0.16;
+      ctx.beginPath();
+      ctx.arc(g.x, g.y, r + 0.12, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * left);
+      ctx.stroke();
+      const img = itemImage(g.item.id);
+      if (img.complete) ctx.drawImage(img, g.x - r * 0.8, g.y - r * 0.8, r * 1.6, r * 1.6);
+      if (g.item.count > 1) {
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 0.6px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(String(g.item.count), g.x + r * 0.55, g.y + r * 0.8);
+      }
+    }
+  }
+
+  /** The Warden winding up its ground slam: a red circle that fills until it lands. */
+  protected drawWardenSlam(w: World, sees: (u: Unit) => boolean) {
+    const ctx = this.ctx;
+    for (const u of w.units) {
+      const n = u.neutral;
+      if (!n?.boss || !u.alive || n.slamLand == null || !sees(u)) continue;
+      const k = Math.max(0, Math.min(1, 1 - (n.slamLand - w.time) / WARDEN_SLAM.windup));
+      ctx.fillStyle = `rgba(239,68,68,${0.12 + 0.2 * k})`;
+      ctx.beginPath();
+      ctx.arc(u.x, u.y, WARDEN_SLAM.radius * k, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(248,113,113,0.9)';
+      ctx.lineWidth = 0.22;
+      ctx.beginPath();
+      ctx.arc(u.x, u.y, WARDEN_SLAM.radius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  protected drawRunes(w: World, team: Team) {
+    const ctx = this.ctx;
+    // Couriers: a small brown body with saddlebags in the team colour (yours always, enemies' in vision).
+    for (const hu of w.heroes) {
+      const c = hu.hero!.courier;
+      if (hu.team !== team && !w.vision.seesPoint(team, c.x, c.y)) continue;
+      ctx.fillStyle = '#7a6248';
+      ctx.beginPath();
+      ctx.ellipse(c.x, c.y, 0.75, 0.5, c.facing, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = TEAM_COLORS[hu.team];
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, 0.32, 0, Math.PI * 2);
+      ctx.fill();
+    }
     for (const r of w.runes) {
       if (!w.vision.seesPoint(team, r.x, r.y)) continue;
       const info = RUNE_INFO[r.kind];
@@ -471,7 +647,7 @@ export class Renderer {
     }
   }
 
-  private drawWard(u: Unit, viewTeam: Team) {
+  protected drawWard(u: Unit, viewTeam: Team) {
     const ctx = this.ctx;
     const sentry = u.ward!.kind === 'sentry';
     const own = u.team === viewTeam;
@@ -492,7 +668,7 @@ export class Renderer {
     ctx.globalAlpha = 1;
   }
 
-  private drawNeutral(c: Unit, p: { x: number; y: number }) {
+  protected drawNeutral(c: Unit, p: { x: number; y: number }) {
     const ctx = this.ctx;
     if (c.neutral?.boss) {
       // The river boss: big, purple, crowned.
@@ -540,7 +716,47 @@ export class Renderer {
   }
 
   /** Channelling teleports: ring around the hero and a marker on the destination. */
-  private drawTeleports(w: World, viewTeam: Team) {
+  /** Jagged cracks radiating from Earthsplitter: glowing at first, then dark scars that fade. */
+  protected drawCracks() {
+    const ctx = this.ctx;
+    this.cracks = this.cracks.filter((c) => (c.t += 1 / 60) < 3.2);
+    for (const c of this.cracks) {
+      let r = c.seed;
+      const rnd = () => ((r = (r * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+      const fade = Math.min(1, (3.2 - c.t) / 1.2);
+      const hot = Math.max(0, 1 - c.t / 1.1);
+      const grow = Math.min(1, c.t / 0.18);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      for (let i = 0; i < 11; i++) {
+        const a0 = (i / 11) * Math.PI * 2 + rnd() * 0.4;
+        const len = c.r * (0.55 + rnd() * 0.45) * grow;
+        const pts: [number, number][] = [[c.x, c.y]];
+        let a = a0;
+        for (let s = 1; s <= 5; s++) {
+          a += (rnd() - 0.5) * 0.7;
+          const d = (len * s) / 5;
+          pts.push([c.x + Math.cos(a) * d, c.y + Math.sin(a) * d]);
+        }
+        const path = () => {
+          ctx.beginPath();
+          pts.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+        };
+        ctx.strokeStyle = `rgba(20,14,8,${0.75 * fade})`;
+        ctx.lineWidth = 0.42;
+        path();
+        ctx.stroke();
+        if (hot > 0) {
+          ctx.strokeStyle = `rgba(255,150,40,${0.95 * hot})`;
+          ctx.lineWidth = 0.16;
+          path();
+          ctx.stroke();
+        }
+      }
+    }
+  }
+
+  protected drawTeleports(w: World, viewTeam: Team) {
     const ctx = this.ctx;
     for (const h of w.units) {
       const c = h.hero?.channel;
@@ -555,8 +771,9 @@ export class Renderer {
         ctx.stroke();
       }
       const t = w.unit(c.targetId);
-      if (t && (h.team === viewTeam || visible)) {
-        ctx.fillStyle = `rgba(140,200,255,${0.15 + 0.2 * k})`;
+      // Allies always see where a hero is teleporting; enemies only if they can see that spot.
+      if (t && (h.team === viewTeam || w.vision.seesPoint(viewTeam, t.x, t.y))) {
+        ctx.fillStyle = h.team === 0 ? `rgba(110,170,255,${0.18 + 0.25 * k})` : `rgba(255,110,110,${0.18 + 0.25 * k})`;
         ctx.beginPath();
         ctx.arc(t.x, t.y, t.radius + 3 + Math.sin(w.time * 8) * 0.3, 0, Math.PI * 2);
         ctx.fill();
@@ -564,7 +781,7 @@ export class Renderer {
     }
   }
 
-  private drawAreas(w: World, seesPoint: (team: Side, x: number, y: number) => boolean) {
+  protected drawAreas(w: World, seesPoint: (team: Side, x: number, y: number) => boolean) {
     const ctx = this.ctx;
     for (const z of w.zones) {
       if (!seesPoint(z.team, z.x, z.y)) continue;
@@ -573,6 +790,9 @@ export class Renderer {
       if (z.kind === 'arrowStorm') {
         ctx.fillStyle = 'rgba(63,191,127,0.18)';
         ctx.strokeStyle = 'rgba(160,255,200,0.7)';
+      } else if (z.kind === 'maelstrom') {
+        ctx.fillStyle = 'rgba(6,182,212,0.22)';
+        ctx.strokeStyle = 'rgba(165,243,252,0.8)';
       } else {
         ctx.fillStyle = 'rgba(255,110,30,0.25)';
         ctx.strokeStyle = 'rgba(255,170,60,0.7)';
@@ -596,21 +816,22 @@ export class Renderer {
     for (const b of w.blasts) {
       if (!seesPoint(b.team, b.x, b.y)) continue;
       const k = Math.min(1, b.t / b.delay);
-      ctx.strokeStyle = b.kind === 'cataclysm' ? 'rgba(255,90,40,0.9)' : 'rgba(230,190,90,0.9)';
+      const green = b.kind === 'rootSnare' || b.kind === 'overgrowth';
+      ctx.strokeStyle = b.kind === 'cataclysm' ? 'rgba(255,90,40,0.9)' : green ? 'rgba(132,204,22,0.9)' : 'rgba(230,190,90,0.9)';
       ctx.lineWidth = 0.25;
       ctx.beginPath();
       ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.fillStyle = b.kind === 'cataclysm' ? 'rgba(255,90,40,0.3)' : 'rgba(230,190,90,0.3)';
+      ctx.fillStyle = b.kind === 'cataclysm' ? 'rgba(255,90,40,0.3)' : green ? 'rgba(132,204,22,0.3)' : 'rgba(230,190,90,0.3)';
       ctx.beginPath();
       ctx.arc(b.x, b.y, b.radius * k, 0, Math.PI * 2);
       ctx.fill();
     }
   }
 
-  private drawStatus(u: Unit, p: { x: number; y: number }, time: number) {
+  protected drawStatus(u: Unit, p: { x: number; y: number }, time: number) {
     const ctx = this.ctx;
-    if (u.stunTimer > 0) {
+    if (u.stunTimer > 0 && this.flat) {
       ctx.fillStyle = '#ffe066';
       for (let i = 0; i < 3; i++) {
         const a = time * 5 + (i * Math.PI * 2) / 3;
@@ -631,6 +852,21 @@ export class Renderer {
         ctx.fillStyle = 'rgba(80,255,120,0.25)';
         ctx.beginPath();
         ctx.arc(p.x, p.y, u.radius + 0.5 + Math.sin(time * 6) * 0.15, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (b.key === 'stoneskin') {
+        ctx.strokeStyle = 'rgba(168,162,158,0.9)';
+        ctx.lineWidth = 0.35;
+        ctx.setLineDash([0.5, 0.25]);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, u.radius + 0.45, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (b.damageMult) {
+        ctx.fillStyle = `rgba(255,77,77,${0.22 + Math.sin(time * 8) * 0.08})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, u.radius + 0.7, 0, Math.PI * 2);
         ctx.fill();
       }
       if (b.moveSpeedPct) {
@@ -664,8 +900,31 @@ export class Renderer {
    * hero toward the aim (works in any direction, including backwards), and the
    * ability's footprint (line width, area, or the ally that will be targeted).
    */
-  private drawAim(w: World, me: Unit, p: { x: number; y: number }, aim: Aim) {
+  protected drawAim(w: World, me: Unit, p: { x: number; y: number }, aim: Aim) {
     const ctx = this.ctx;
+    if (aim.slot === ATTACK_AIM) {
+      // Attack arrow: from the hero to the chosen target (or the tip), target ringed.
+      const t = aim.targetId !== undefined ? w.unit(aim.targetId) : undefined;
+      const own = t && t.team === me.team; // a deny
+      const rgb = aim.cancel ? '255,80,80' : own ? '255,210,63' : '255,120,90';
+      const ex = t ? t.x : aim.x;
+      const ey = t ? t.y : aim.y;
+      ctx.lineWidth = 0.15;
+      ctx.strokeStyle = `rgba(${rgb},0.35)`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, me.attackRange + me.radius, 0, Math.PI * 2);
+      ctx.stroke();
+      this.arrow(p.x, p.y, ex, ey, rgb);
+      if (t) {
+        const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 120);
+        ctx.strokeStyle = `rgba(${rgb},0.95)`;
+        ctx.lineWidth = 0.3;
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, t.radius + 0.6 + pulse * 0.3, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      return;
+    }
     const def = HEROES[me.hero!.defId].abilities[aim.slot];
     const rgb = aim.cancel ? '255,80,80' : '120,200,255';
     ctx.lineWidth = 0.15;
@@ -736,7 +995,7 @@ export class Renderer {
     }
   }
 
-  private arrow(x0: number, y0: number, x1: number, y1: number, rgb: string) {
+  protected arrow(x0: number, y0: number, x1: number, y1: number, rgb: string) {
     const ctx = this.ctx;
     const dx = x1 - x0;
     const dy = y1 - y0;
@@ -763,7 +1022,7 @@ export class Renderer {
     ctx.lineCap = 'butt';
   }
 
-  private drawStructure(s: Unit, time: number) {
+  protected drawStructure(s: Unit, time: number) {
     const ctx = this.ctx;
     const st = s.structure!;
     const r = s.radius;
@@ -822,7 +1081,7 @@ export class Renderer {
         ctx.font = 'bold 1.1px system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(st.tier === 'tower1' ? '1' : st.tier === 'tower2' ? '2' : 'S', s.x, s.y + 0.05);
+        ctx.fillText(st.tier === 'tower1' ? '1' : st.tier === 'tower2' ? '2' : st.tier === 'tower3' ? '3' : 'S', s.x, s.y + 0.05);
         ctx.textBaseline = 'alphabetic';
       }
     }
@@ -854,7 +1113,7 @@ export class Renderer {
     this.hpBar(s.x, s.y - r - 1, r * 2.2, 0.5, s.hp / s.maxHp, color);
   }
 
-  private hpBar(x: number, y: number, w: number, h: number, ratio: number, color: string) {
+  protected hpBar(x: number, y: number, w: number, h: number, ratio: number, color: string) {
     const ctx = this.ctx;
     ctx.fillStyle = 'rgba(0,0,0,0.7)';
     ctx.fillRect(x - w / 2 - 0.05, y - h / 2 - 0.05, w + 0.1, h + 0.1);
@@ -862,7 +1121,7 @@ export class Renderer {
     ctx.fillRect(x - w / 2, y - h / 2, w * Math.max(0, ratio), h);
   }
 
-  private drawMinimap(w: World, focus: Unit | undefined, viewTeam: Team) {
+  protected drawMinimap(w: World, focus: Unit | undefined, viewTeam: Team) {
     const ctx = this.ctx;
     const { x, y, size } = this.minimapRect();
     const k = size / w.map.size;
@@ -891,6 +1150,31 @@ export class Renderer {
         ctx.stroke();
       } else ctx.fillRect(ux - 1, uy - 1, 2, 2);
     }
+    // Teleports in progress: a pulsing marker where the hero will arrive (enemies see it only outside their fog).
+    for (const h of w.heroes) {
+      const c = h.hero!.channel;
+      const t = c?.kind === 'tp' && h.alive ? w.unit(c.targetId) : undefined;
+      if (!t || (h.team !== viewTeam && !w.vision.seesPoint(viewTeam, t.x, t.y))) continue;
+      const pulse = (((w.time * 2) % 1) + 1) % 1; // the clock is negative during the warm-up
+      ctx.strokeStyle = TEAM_COLORS[h.team];
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x + t.x * k, y + t.y * k, 4 + pulse * 6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = TEAM_COLORS[h.team];
+      ctx.beginPath();
+      ctx.arc(x + t.x * k, y + t.y * k, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    for (const p of w.pings) {
+      if (p.team !== viewTeam || w.time - p.at > PING_DURATION) continue;
+      const pulse = ((w.time - p.at) * 1.6) % 1;
+      ctx.strokeStyle = PING_STYLE[p.kind].color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x + p.x * k, y + p.y * k, 3 + pulse * 7, 0, Math.PI * 2);
+      ctx.stroke();
+    }
     const vw = (this.cssW / this.zoom) * k;
     const vh = (this.cssH / this.zoom) * k;
     ctx.strokeStyle = this.lookTarget ? '#ffe066' : 'rgba(255,255,255,0.8)';
@@ -900,62 +1184,3 @@ export class Renderer {
   }
 }
 
-/** Pre-render static terrain once to an offscreen canvas. */
-function bakeMap(map: GameMap): HTMLCanvasElement {
-  const c = document.createElement('canvas');
-  const px = PX_PER_UNIT_BAKED;
-  c.width = c.height = map.size * px;
-  const g = c.getContext('2d')!;
-  // Team territory tint (diagonal split).
-  g.fillStyle = '#25321f';
-  g.fillRect(0, 0, c.width, c.height);
-  g.fillStyle = 'rgba(61,139,253,0.06)';
-  g.beginPath();
-  g.moveTo(0, 0);
-  g.lineTo(0, c.height);
-  g.lineTo(c.width, c.height);
-  g.fill();
-  g.fillStyle = 'rgba(229,72,77,0.06)';
-  g.beginPath();
-  g.moveTo(0, 0);
-  g.lineTo(c.width, 0);
-  g.lineTo(c.width, c.height);
-  g.fill();
-
-  // River.
-  g.strokeStyle = '#2b5f7c';
-  g.lineCap = 'round';
-  g.lineWidth = 9 * px;
-  g.beginPath();
-  g.moveTo(map.river[0].x * px, map.river[0].y * px);
-  g.lineTo(map.river[1].x * px, map.river[1].y * px);
-  g.stroke();
-
-  // Lanes.
-  g.strokeStyle = '#6b5a3e';
-  g.lineJoin = 'round';
-  g.lineWidth = 7 * px;
-  for (const id of LANE_IDS) {
-    g.beginPath();
-    map.lanes[id].forEach((p, i) => (i ? g.lineTo(p.x * px, p.y * px) : g.moveTo(p.x * px, p.y * px)));
-    g.stroke();
-  }
-
-  // Walls (the maze): dark forest with deterministic "tree" speckles.
-  const cs = map.cell * px;
-  for (let cy = 0; cy < map.grid; cy++) {
-    for (let cx = 0; cx < map.grid; cx++) {
-      if (map.walkable[cy * map.grid + cx]) continue;
-      g.fillStyle = '#0f1a10';
-      g.fillRect(cx * cs, cy * cs, cs + 0.5, cs + 0.5);
-      const hsh = ((cx * 73856093) ^ (cy * 19349663)) >>> 0;
-      if (hsh % 3 === 0) {
-        g.fillStyle = hsh % 2 ? '#1a2e18' : '#16261a';
-        g.beginPath();
-        g.arc(cx * cs + cs / 2, cy * cs + cs / 2, cs * 0.6, 0, Math.PI * 2);
-        g.fill();
-      }
-    }
-  }
-  return c;
-}

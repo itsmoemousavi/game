@@ -68,21 +68,30 @@ const tower = (hp: number, damage: number): CombatStats => ({
 });
 
 export const STRUCTURES: Record<StructureTier, CombatStats & { teamGold: number }> = {
-  tower1: { ...tower(1800, 100), teamGold: 120 },
-  tower2: { ...tower(2200, 120), teamGold: 160 },
-  shrineTower: { ...tower(2600, 140), teamGold: 200 },
-  barracks: { ...tower(2000, 0), attackInterval: 0, attackRange: 0, acquireRange: 0, armor: 10, radius: 3, teamGold: 200 },
-  shrine: { ...tower(4500, 0), attackInterval: 0, attackRange: 0, acquireRange: 0, armor: 13, radius: 4.5, teamGold: 0 },
+  // Each tier is tougher than the one before it (health, armor and damage), but kept within reach
+  // so pushing stays possible: check average match length with scripts/match-length.ts.
+  tower1: { ...tower(1150, 95), armor: 10, teamGold: 140 },
+  tower2: { ...tower(1350, 110), armor: 12, teamGold: 160 },
+  tower3: { ...tower(1550, 125), armor: 14, teamGold: 190 },
+  shrineTower: { ...tower(1700, 140), armor: 15, teamGold: 220 },
+  barracks: { ...tower(1500, 0), attackInterval: 0, attackRange: 0, acquireRange: 0, armor: 10, radius: 3, teamGold: 200 },
+  shrine: { ...tower(3000, 0), attackInterval: 0, attackRange: 0, acquireRange: 0, armor: 13, radius: 4.5, teamGold: 0 },
   fountain: {
     ...tower(99999, 300),
     attackInterval: 0.25,
-    attackRange: 14,
-    acquireRange: 14,
+    attackRange: 19, // covers its whole healing area
+    acquireRange: 19,
     radius: 3,
     projectileSpeed: 40,
     vision: [20, 20],
     teamGold: 0,
   },
+};
+
+/** The two barracks of a lane: melee is the tougher one. */
+export const BARRACKS: Record<'melee' | 'ranged', { hp: number; armor: number; teamGold: number }> = {
+  melee: { hp: 1800, armor: 13, teamGold: 160 },
+  ranged: { hp: 1200, armor: 8, teamGold: 120 },
 };
 
 /** Jungle monsters: passive until attacked, then fight and leash back to camp. */
@@ -115,19 +124,19 @@ export const NEUTRALS: Record<'brute' | 'imp', CombatStats> = {
   },
 };
 
-/** The river boss: tough, hits hard, drops a revive charm for the team that kills it. */
+/** The river boss (the Warden): very tough, hits hard, drops a revive charm anyone can grab. */
 export const BOSS: CombatStats = {
-  hp: 6500,
-  armor: 8,
-  damage: 80,
+  hp: 14000,
+  armor: 12,
+  damage: 110,
   attackInterval: 1.3,
   attackRange: 1.8,
   projectileSpeed: 0,
   moveSpeed: 5,
   radius: 2,
   acquireRange: 0,
-  bountyGold: 250,
-  bountyXp: 400,
+  bountyGold: 300,
+  bountyXp: 600,
 };
 
 export const WARDS: Record<'observer' | 'sentry', CombatStats> = {

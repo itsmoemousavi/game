@@ -6,22 +6,38 @@
     <meta name="theme-color" content="#0d150f" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <title>Shrinefall</title>
+    <title>Emberwake</title>
+    <meta name="apple-mobile-web-app-title" content="Emberwake" />
+    <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="manifest" href="./manifest.webmanifest" />
   </head>
   <body>
     <div id="root">
     <section id="select">
-      <h1>Shrinefall <small>prototype</small></h1>
-      <p class="tag">3v3 · Destroy the enemy Shrine · Empty slots are filled by bots</p>
-      <div id="hero-cards"></div>
-      <div class="row">
-        <span>Your lane</span>
-        <div id="lane-pick"></div>
-        <button id="btn-play">Play vs Bots</button>
+      <header class="menu-top">
+        <div class="logo">EMBER<span>WAKE</span></div>
+        <div class="menu-tag">3v3 · Break the towers · Destroy the enemy Shrine</div>
+      </header>
+      <div class="menu-main">
+        <div class="menu-side">
+          <div class="opt"><span>Lane</span><div id="lane-pick" class="seg"></div></div>
+          <div class="opt"><span>Bots</span><div id="diff-pick" class="seg"></div></div>
+          <button id="btn-play"><b>PLAY</b><small>vs Bots</small></button>
+          <div class="menu-minor">
+            <button id="btn-practice" class="alt">Practice</button>
+            <button id="btn-tutorial" class="alt">Tutorial</button>
+          </div>
+        </div>
       </div>
+      <canvas id="menu3d"></canvas>
     </section>
 
+    <section id="draft" class="hidden"></section>
+
     <div id="app" class="hidden">
+      <canvas id="game3d"></canvas>
       <canvas id="game"></canvas>
 
       <div id="topbar" title="Scoreboard">
@@ -31,41 +47,54 @@
         <span class="team t1" id="score-1">0</span>
       </div>
 
-      <div id="herobar">
-        <div id="portrait" title="Hero stats">B<i>i</i></div>
-        <div class="bars">
-          <div class="bar hp"><div id="hp-fill"></div><span id="hp-text"></span></div>
-          <div class="bar mana"><div id="mana-fill"></div><span id="mana-text"></span></div>
-          <div class="bar xp"><div id="xp-fill"></div></div>
+      <div id="bottom-hud">
+        <div id="status-row"></div>
+        <div id="hud-panel">
+          <div id="herobar">
+            <div id="portrait" title="Hero stats"><span class="face"></span><span id="level">1</span><i>i</i></div>
+            <div class="bars">
+              <div class="bar hp"><div id="hp-fill"></div><span id="hp-text"></span></div>
+              <div class="bar mana"><div id="mana-fill"></div><span id="mana-text"></span></div>
+              <div class="bar xp"><div id="xp-fill"></div></div>
+              <div id="kda" title="Kills / deaths / assists, last hits / denies"><span>K/D/A 0/0/0</span><span>LH/D 0/0</span></div>
+            </div>
+          </div>
+        <div id="itembar">
+          <button class="item empty" data-item="0"><span class="lbl"></span><span class="cnt"></span><span class="cd"></span></button>
+          <button class="item empty" data-item="1"><span class="lbl"></span><span class="cnt"></span><span class="cd"></span></button>
+          <button class="item empty" data-item="2"><span class="lbl"></span><span class="cnt"></span><span class="cd"></span></button>
+          <button class="item empty" data-item="3"><span class="lbl"></span><span class="cnt"></span><span class="cd"></span></button>
+          <button class="item empty" data-item="4"><span class="lbl"></span><span class="cnt"></span><span class="cd"></span></button>
+          <button class="item empty" data-item="5"><span class="lbl"></span><span class="cnt"></span><span class="cd"></span></button>
+          <button class="item tp none" id="tp-slot"><span class="lbl">TP</span><span class="cnt">0</span><span class="cd"></span></button>
+          <button id="btn-courier" title="Courier: tap to send it with its items"></button>
+          <div id="courier-slots">
+            <button class="cslot empty" data-cslot="0"><span class="lbl"></span><span class="cnt"></span></button>
+            <button class="cslot empty" data-cslot="1"><span class="lbl"></span><span class="cnt"></span></button>
+            <button class="cslot empty" data-cslot="2"><span class="lbl"></span><span class="cnt"></span></button>
+          </div>
+          <div id="pstats"><svg class="coin" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="#f5b800" stroke="#7a5600" stroke-width="1.2"/><circle cx="8" cy="8" r="4.3" fill="none" stroke="#ffe27a" stroke-width="1.1"/></svg><b id="gold">0</b></div>
         </div>
-        <div class="stats">
-          <div>Lv <b id="level">1</b></div>
-          <div class="gold"><b id="gold">0</b></div>
-          <div id="kda">0 / 0</div>
+          <button id="btn-shop" title="Shop">🛒</button>
         </div>
-      </div>
-
-      <div id="itembar">
-        <button class="item empty" data-item="0"><span class="lbl"></span><span class="cnt"></span></button>
-        <button class="item empty" data-item="1"><span class="lbl"></span><span class="cnt"></span></button>
-        <button class="item empty" data-item="2"><span class="lbl"></span><span class="cnt"></span></button>
-        <button class="item empty" data-item="3"><span class="lbl"></span><span class="cnt"></span></button>
-        <button class="item empty" data-item="4"><span class="lbl"></span><span class="cnt"></span></button>
-        <button class="item empty" data-item="5"><span class="lbl"></span><span class="cnt"></span></button>
-        <button class="item tp none" id="tp-slot"><span class="lbl">TP</span><span class="cnt">0</span><span class="cd"></span></button>
-        <button id="btn-shop" title="Shop">🛒</button>
-        <button id="btn-quickbuy" title="Quick-buy the next recommended item"><span class="lbl"></span><span class="cost"></span></button>
       </div>
 
       <div id="shop" class="hidden">
         <div class="shop-head">
           <b>Shop</b>
           <span class="gold"><b id="shop-gold">0</b> gold</span>
-          <button id="shop-tp" title="Buy a teleport scroll">+ TP (50)</button>
+          <span id="shop-note"></span>
+          <button id="shop-tp" title="Buy a teleport scroll">+ TP <small>50</small></button>
           <button id="shop-close">✕</button>
         </div>
-        <p id="shop-note"></p>
-        <div id="shop-items"></div>
+        <div class="shop-body">
+          <div id="shop-tabs"></div>
+          <div class="shop-mid">
+            <div id="shop-items"></div>
+            <div id="shop-own"></div>
+          </div>
+          <div id="shop-detail"></div>
+        </div>
       </div>
 
       <div id="tp-picker" class="hidden">
@@ -76,9 +105,9 @@
       <div id="joy-base"><div id="joy-knob"></div></div>
 
       <div id="actions">
-        <button id="btn-q" class="ability" data-slot="0"><b>Q</b><span class="name"></span><span class="pips"></span><span class="mana"></span><span class="cd"></span></button>
-        <button id="btn-w" class="ability" data-slot="1"><b>W</b><span class="name"></span><span class="pips"></span><span class="mana"></span><span class="cd"></span></button>
-        <button id="btn-r" class="ability ult" data-slot="2"><b>R</b><span class="name"></span><span class="pips"></span><span class="mana"></span><span class="cd"></span></button>
+        <button id="btn-q" class="ability" data-slot="0"><span class="pic"></span><span class="pips"></span><span class="mana"></span><span class="cd"></span></button>
+        <button id="btn-w" class="ability" data-slot="1"><span class="pic"></span><span class="pips"></span><span class="mana"></span><span class="cd"></span></button>
+        <button id="btn-r" class="ability ult" data-slot="2"><span class="pic"></span><span class="pips"></span><span class="mana"></span><span class="cd"></span></button>
         <button class="learn" id="learn-q" data-learn="0">+</button>
         <button class="learn" id="learn-w" data-learn="1">+</button>
         <button class="learn" id="learn-r" data-learn="2">+</button>
@@ -89,6 +118,14 @@
       <div id="hint">Arrows / right-click: move · click enemy or Space: attack · Q W R: cast at cursor · Ctrl+Q/W/R or "+": learn · hold minimap: look · right-click minimap: walk · wheel: zoom</div>
 
       <div id="respawn"><span id="killed-by"></span>Respawning in <b id="respawn-time">0</b> <button id="btn-buyback">Buy back <b id="buyback-cost">0</b></button></div>
+      <button id="btn-ping" title="Ping your team">📍</button>
+      <div id="ping-menu" class="hidden">
+        <button data-ping="attack">⚔ Attack</button>
+        <button data-ping="defend">⛨ Defend</button>
+        <button data-ping="gather">⚑ Gather</button>
+        <button data-ping="retreat">⟲ Retreat</button>
+        <button data-ping="missing">? Enemy missing</button>
+      </div>
       <button id="btn-glyph" title="Tower shield: all your buildings invulnerable for 5 seconds (team cooldown 5 min)">🛡<span class="cd"></span></button>
       <button id="btn-settings" title="Settings">⚙</button>
       <button id="btn-pause" title="Pause">⏸</button>
@@ -112,21 +149,24 @@
         <label class="toggle"><span>Left-handed layout<small>Joystick on the right, buttons on the left</small></span><input type="checkbox" id="set-lefty" /></label>
         <label class="toggle"><span>Vibration<small>Buzz when you're hit, get a kill or die (Android)</small></span><input type="checkbox" id="set-vibrate" checked /></label>
         <div class="toggle"><span>Joystick size</span><span class="seg" id="set-joy"><button data-v="S">S</button><button data-v="M">M</button><button data-v="L">L</button></span></div>
+        <div class="toggle"><span>Graphics quality<small>Low saves the most battery (no shadows, 30 frames per second)</small></span><span class="seg" id="set-quality"><button data-v="low">Low</button><button data-v="medium">Medium</button><button data-v="high">High</button></span></div>
+        <div class="toggle"><span>View<small>2D is a flat top-down map: lightest on battery and older phones</small><small id="gfx-status"></small></span><span class="seg" id="set-gfx"><button data-v="3d">3D</button><button data-v="2d">2D</button></span></div>
         <div class="toggle"><span>Camera zoom<small>Drag to see more or less of the map</small></span><input type="range" id="set-zoom" min="0.7" max="1.4" step="0.05" value="1" /></div>
       </div>
       <div id="stats" class="panel hidden">
         <div class="panel-head"><b id="stats-title">Stats</b><button class="close" data-close="stats">✕</button></div>
         <div id="stats-body"></div>
       </div>
-      <div id="buffs"></div>
       <div id="toasts"></div>
       <div id="killfeed"></div>
-      <div id="gameover" class="overlay">
-        <div class="box">
-          <h2 id="gameover-title">Victory</h2>
-          <p class="sub"></p>
-          <button id="btn-restart">Back to hero select</button>
-        </div>
+      <div id="announce"></div>
+      <div id="tutorial" class="hidden"></div>
+      <div id="practice" class="hidden">
+        <b>Practice</b>
+        <button data-cheat="level">+1 level</button>
+        <button data-cheat="gold">+1000 gold</button>
+        <button data-cheat="refresh">Refresh</button>
+        <button data-cheat="dummy">Dummy</button>
       </div>
     </div>
     </div>

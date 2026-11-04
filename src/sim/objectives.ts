@@ -13,7 +13,7 @@ import {
   buybackCost,
 } from './constants';
 import { BOSS, WARDS } from './data/units';
-import { isWalkable } from './map';
+import { inHouse, isWalkable } from './map';
 import { dist } from './math';
 import type { Unit, World } from './world';
 
@@ -123,16 +123,26 @@ function pickRune(w: World, h: Unit, r: Rune) {
 export function spawnBoss(w: World) {
   const p = w.map.bossPit;
   const u = w.spawnUnit('neutral', 2, p, BOSS);
-  u.neutral = { camp: -1, homeX: p.x, homeY: p.y, boss: true };
+  u.neutral = { camp: -1, homeX: p.x, homeY: p.y, boss: true, aggroUntil: -1e9 };
 }
 
 // ------------------------------------------------------------------ wards
+
+/** True on a ward hill's top (too high to walk onto; wards and blinks can go there). */
+export function onHillTop(w: World, x: number, y: number): boolean {
+  const m = w.map;
+  const cx = Math.floor(x / m.cell);
+  const cy = Math.floor(y / m.cell);
+  return cx >= 0 && cy >= 0 && cx < m.grid && cy < m.grid && m.hillTop[cy * m.grid + cx] === 1;
+}
 
 export function placeWard(w: World, u: Unit, slot: number, x: number, y: number): 'placed' | 'approach' | 'fail' {
   const h = u.hero!;
   const s = h.items[slot];
   if (!s || (s.id !== 'observerWard' && s.id !== 'sentryWard') || !u.alive) return 'fail';
-  if (!isWalkable(w.map, x, y)) return 'fail';
+  if (!isWalkable(w.map, x, y) && !onHillTop(w, x, y)) return 'fail';
+  // No wards inside the Warden's house (you need someone outside for outside vision).
+  if (inHouse(w.map, x, y)) return 'fail';
   if (dist(u.x, u.y, x, y) > WARD_CAST_RANGE) return 'approach';
   const kind = s.id === 'observerWard' ? 'observer' : 'sentry';
   const ward = w.spawnUnit('ward', u.team, { x, y }, WARDS[kind]);

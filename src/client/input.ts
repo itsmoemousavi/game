@@ -1,9 +1,10 @@
-import { Command, HEROES, Unit, World, abilityDef, castBlocker } from '../sim';
+import { Command, HEROES, ITEMS, PingKind, Unit, World, abilityDef, canPickUp, castBlocker } from '../sim';
 import type { Renderer } from './renderer';
 import { toLocal } from './screen';
 
 /** What the player is currently aiming (drawn by the renderer). */
 export interface Aim {
+  /** Ability slot, or ATTACK_AIM for the attack button's target arrow. */
   slot: number;
   /** Aimed world point. */
   x: number;
@@ -14,6 +15,10 @@ export interface Aim {
 }
 
 const MAX_DRAG = 90;
+/** `Aim.slot` while aiming the Attack button at a target. */
+export const ATTACK_AIM = -1;
+/** How far the attack arrow reaches (meters): well past attack range, the hero walks over. */
+const ATTACK_AIM_REACH = 18;
 const TAP_SLOP = 12;
 
 /**
@@ -32,7 +37,7 @@ const TAP_SLOP = 12;
 export class Input {
   aim: Aim | null = null;
   private keys = new Set<string>();
-  private joy: { id: number; ox: number; oy: number; dx: number; dy: number } | null = null;
+  private joy: { id: number; ox: number; oy: number; dx: number; dy: number; at: number; moved: boolean } | null = null;
   private drag: { id: number; slot: number; ox: number; oy: number; moved: boolean } | null = null;
   /** Finger/mouse held on the minimap: camera peeks there until released. */
   private peek: number | null = null;
@@ -42,6 +47,10 @@ export class Input {
   /** Long-press info card for an ability (null hides it). */
   onTip: (slot: number | null) => void = () => {};
   private tip: { pointer: number; timer: ReturnType<typeof setTimeout> | null; shown: boolean } | null = null;
+
+  /** A ping waiting to be placed: the next tap on the map or minimap places it. */
+  pingKind: PingKind | null = null;
+  onPingPlaced: () => void = () => {};
 
   /** Inventory slot of a ward waiting to be placed: the next tap on the field places it. */
   wardSlot: number | null = null;
@@ -58,7 +67,7 @@ export class Input {
 
   constructor(
     private canvas: HTMLCanvasElement,
-    private renderer: Renderer,
+    public renderer: Renderer,
     private world: () => World,
     private heroId: () => number,
     root: HTMLElement,
@@ -96,7 +105,7 @@ export class Input {
       );
     // Attack: press-and-hold. Works together with the joystick (multi-touch):
     // hold Attack while steering to hit anything in range and keep walking otherwise.
-    press(root.querySelector('#btn-attack')!, (e) => this.attackDown(e.pointerId));
+    press(root.querySelector('#btn-attack')!, (e) => this.attackDown(e.pointerId, toLocal(e.clientX, e.clientY)));
     root.querySelectorAll<HTMLElement>('[data-slot]').forEach((btn) => {
       const slot = Number(btn.dataset.slot);
       press(btn, (e) => this.onAbilityDown(e, slot));
@@ -114,15 +123,72 @@ export class Input {
   private attackSince = 0;
   private attackRelease: ReturnType<typeof setTimeout> | null = null;
 
-  private attackDown(pointerId: number) {
+  /** Attack button held: where it was pressed (for aiming by dragging) and whether it moved. */
+  private attackDrag: { ox: number; oy: number; moved: boolean } | null = null;
+
+  private attackDown(pointerId: number, at?: { x: number; y: number }) {
     if (this.attackRelease) clearTimeout(this.attackRelease);
     this.attackPointer = pointerId;
     this.attackSince = performance.now();
     this.queue.push({ type: 'attackHold', unitId: this.heroId(), held: true });
+    // Holding Attack shows an arrow at the best target; drag it to pick another one.
+    if (at) {
+      this.attackDrag = { ox: at.x, oy: at.y, moved: false };
+      const w = this.world();
+      const me = w.unit(this.heroId());
+      const t = me && w.pickAutoTarget(me);
+      if (me && t) this.aimAttack(t.x - me.x, t.y - me.y, Math.min(1, Math.hypot(t.x - me.x, t.y - me.y) / ATTACK_AIM_REACH), false);
+    }
   }
 
-  private attackUp() {
+  /**
+   * Point the attack arrow: direction (dx, dy), `t` 0..1 of the full reach. The target is the
+   * attackable (or deniable) unit nearest the arrow's tip: enemy heroes, creeps and buildings,
+   * your own creeps and towers when low enough to deny.
+   */
+  private aimAttack(dx: number, dy: number, t: number, cancel: boolean) {
+    const w = this.world();
+    const me = w.unit(this.heroId());
+    if (!me) return;
+    const len = Math.hypot(dx, dy);
+    const ux = len > 0.001 ? dx / len : Math.cos(me.facing);
+    const uy = len > 0.001 ? dy / len : Math.sin(me.facing);
+    const reach = Math.max(1.5, ATTACK_AIM_REACH * Math.min(1, t));
+    const tip = { x: me.x + ux * reach, y: me.y + uy * reach };
+    let best: Unit | undefined;
+    let bestD = Infinity;
+    for (const u of w.units) {
+      if (u === me || u.ward || !u.alive) continue;
+      if (!((w.canAttack(me, u) && w.canSee(me.team, u)) || w.canDeny(me, u))) continue;
+      const d = Math.hypot(u.x - tip.x, u.y - tip.y) - u.radius;
+      if (d < bestD && d < 4.5) {
+        bestD = d;
+        best = u;
+      }
+    }
+    this.aim = { slot: ATTACK_AIM, x: tip.x, y: tip.y, targetId: best?.id, cancel };
+  }
+
+  private attackUp(cancelled = false) {
     this.attackPointer = null;
+    // Release with a target under the arrow: that's the next attack (it walks over if needed).
+    // Holding only aims; the attack starts on release. Standing still: the target under the arrow
+    // (a plain tap = the best target nearby) is attacked until it dies or you walk away.
+    // While steering, a tap still gets a swing on the move (see the timer below).
+    const aim = this.aim?.slot === ATTACK_AIM ? this.aim : null;
+    const steering = Math.hypot(this.lastDir.dx, this.lastDir.dy) > 0.15;
+    this.aim = null;
+    this.cancelZone.classList.remove('show');
+    if (!cancelled && !aim?.cancel && !steering) {
+      let targetId = aim?.targetId;
+      if (targetId === undefined && !this.attackDrag?.moved) {
+        const w = this.world();
+        const me = w.unit(this.heroId());
+        targetId = me ? w.pickAutoTarget(me)?.id : undefined;
+      }
+      if (targetId !== undefined) this.queue.push({ type: 'attack', unitId: this.heroId(), targetId });
+    }
+    this.attackDrag = null;
     // A quick tap still gets at least one swing in.
     const wait = Math.max(0, 600 - (performance.now() - this.attackSince));
     this.attackRelease = setTimeout(() => {
@@ -225,7 +291,17 @@ export class Input {
     const { x: sx, y: sy } = toLocal(e.clientX, e.clientY);
 
     const mm = this.renderer.minimapRect();
-    if (sx >= mm.x && sy >= mm.y && sx <= mm.x + mm.size && sy <= mm.y + mm.size) {
+    const onMinimap = sx >= mm.x && sy >= mm.y && sx <= mm.x + mm.size && sy <= mm.y + mm.size;
+    // Placing a ping: this tap (on the map or the minimap) chooses where.
+    if (this.pingKind) {
+      const k = this.world().map.size / mm.size;
+      const p = onMinimap ? { x: (sx - mm.x) * k, y: (sy - mm.y) * k } : this.renderer.screenToWorld(sx, sy);
+      this.queue.push({ type: 'ping', unitId: this.heroId(), kind: this.pingKind, x: p.x, y: p.y });
+      this.pingKind = null;
+      this.onPingPlaced();
+      return;
+    }
+    if (onMinimap) {
       const k = this.world().map.size / mm.size;
       const wx = (sx - mm.x) * k;
       const wy = (sy - mm.y) * k;
@@ -241,7 +317,12 @@ export class Input {
     // Placing a ward: this tap chooses the spot (the hero walks into range if needed).
     if (this.wardSlot !== null) {
       const p = this.renderer.screenToWorld(sx, sy);
-      this.queue.push({ type: 'placeWard', unitId: this.heroId(), slot: this.wardSlot, x: p.x, y: p.y });
+      const item = this.world().unit(this.heroId())?.hero?.items[this.wardSlot];
+      if (item && ITEMS[item.id].active?.kind === 'blink') {
+        this.queue.push({ type: 'useItem', unitId: this.heroId(), slot: this.wardSlot, x: p.x, y: p.y });
+      } else {
+        this.queue.push({ type: 'placeWard', unitId: this.heroId(), slot: this.wardSlot, x: p.x, y: p.y });
+      }
       this.wardSlot = null;
       this.renderer.wardMode = null;
       this.onWardPlaced();
@@ -256,16 +337,28 @@ export class Input {
     }
 
     if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+      // Looking around with the minimap: the joystick is off and taps on the map are orders
+      // (walk there / attack that). Letting go of the minimap brings the joystick back.
+      if (this.peek !== null) {
+        this.commandAt(sx, sy, true);
+        return;
+      }
       const onJoySide = this.leftHanded ? sx > this.canvas.clientWidth * 0.5 : sx < this.canvas.clientWidth * 0.5;
+      // A tap right on a dropped item picks it up, even on the joystick side.
+      const item = me ? this.groundItemAt(this.world(), me, sx, sy, Math.max(26, 1.1 * this.renderer.zoom)) : undefined;
+      if (item && me) {
+        this.queue.push({ type: 'pickUp', unitId: me.id, groundId: item.id });
+        return;
+      }
       if (onJoySide && !this.joy) {
-        this.joy = { id: e.pointerId, ox: sx, oy: sy, dx: 0, dy: 0 };
+        this.joy = { id: e.pointerId, ox: sx, oy: sy, dx: 0, dy: 0, at: performance.now(), moved: false };
         this.showJoystick(sx, sy, 0, 0);
       } else {
         this.commandAt(sx, sy);
       }
       return;
     }
-    if (e.button === 2 || e.button === 0) this.commandAt(sx, sy);
+    if (e.button === 2 || e.button === 0) this.commandAt(sx, sy, true);
   }
 
   private onAbilityDown(e: PointerEvent, slot: number) {
@@ -320,17 +413,40 @@ export class Input {
     return { x: me.x + Math.cos(me.facing) * range, y: me.y + Math.sin(me.facing) * range };
   }
 
-  /** Tap/click on an enemy = attack it; on ground = walk there. */
-  private commandAt(sx: number, sy: number) {
+  /**
+   * Tap/click on an enemy = attack it. Tapping the ground only walks there when that's
+   * clearly meant: while looking around with the minimap, or with a mouse (right/left click).
+   * On a touch screen the joystick moves the hero, so stray taps don't send it walking.
+   */
+  /** A dropped item you may take (yours, or an ally's ward) under the finger. */
+  private groundItemAt(w: World, me: Unit, sx: number, sy: number, reach: number) {
+    const tapDist = (g: { x: number; y: number }) => {
+      const s = this.renderer.screenOf(g.x, g.y, 0);
+      return Math.hypot(s.x - sx, s.y - sy);
+    };
+    return w.groundItems.filter((g) => canPickUp(me, g) && tapDist(g) < reach).sort((a, b) => tapDist(a) - tapDist(b))[0];
+  }
+
+  private commandAt(sx: number, sy: number, walk = false) {
     const w = this.world();
-    const p = this.renderer.screenToWorld(sx, sy);
     const me = w.unit(this.heroId());
     if (!me) return;
+    // Pick by what's under the finger on screen (3D models stand up off the ground).
+    const near = (u: Unit) => {
+      const s = this.renderer.screenOf(u.x, u.y, u.kind === 'structure' ? 2.5 : 1.2);
+      return Math.hypot(s.x - sx, s.y - sy);
+    };
+    const reach = (u: Unit) => Math.max(34, (u.radius + 0.8) * this.renderer.zoom);
     const enemy = w.units
-      .filter((u) => u.alive && w.canAttack(me, u) && Math.hypot(u.x - p.x, u.y - p.y) < u.radius + 1)
-      .sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
+      .filter((u) => u.alive && w.canAttack(me, u) && near(u) < reach(u))
+      .sort((a, b) => near(a) - near(b))[0];
+    const item = this.groundItemAt(w, me, sx, sy, Math.max(34, 1.3 * this.renderer.zoom));
     if (enemy) this.queue.push({ type: 'attack', unitId: me.id, targetId: enemy.id });
-    else this.queue.push({ type: 'moveTo', unitId: me.id, x: p.x, y: p.y });
+    else if (item) this.queue.push({ type: 'pickUp', unitId: me.id, groundId: item.id });
+    else if (walk) {
+      const p = this.renderer.screenToWorld(sx, sy);
+      this.queue.push({ type: 'moveTo', unitId: me.id, x: p.x, y: p.y });
+    }
   }
 
   private onPointerMove(e: PointerEvent) {
@@ -350,11 +466,22 @@ export class Input {
       this.camDrag.y = local.y;
       return;
     }
+    if (this.attackDrag && e.pointerId === this.attackPointer) {
+      const dx = local.x - this.attackDrag.ox;
+      const dy = local.y - this.attackDrag.oy;
+      if (!this.attackDrag.moved && Math.hypot(dx, dy) > TAP_SLOP) {
+        this.attackDrag.moved = true;
+        this.cancelZone.classList.add('show');
+      }
+      if (this.attackDrag.moved) this.aimAttack(dx, dy, Math.hypot(dx, dy) / (MAX_DRAG * 1.4), this.overCancel(e));
+      return;
+    }
     if (this.joy && e.pointerId === this.joy.id) {
       let dx = local.x - this.joy.ox;
       let dy = local.y - this.joy.oy;
       const max = this.joyRadius;
       const l = Math.hypot(dx, dy);
+      if (l > 10) this.joy.moved = true;
       if (l > max) {
         dx = (dx / l) * max;
         dy = (dy / l) * max;
@@ -377,7 +504,7 @@ export class Input {
   }
 
   private onPointerUp(e: PointerEvent, cancelled = false) {
-    if (this.attackPointer === e.pointerId) this.attackUp();
+    if (this.attackPointer === e.pointerId) this.attackUp(cancelled);
     if (this.peek === e.pointerId) {
       this.peek = null;
       const me = this.world().unit(this.heroId());
@@ -385,8 +512,12 @@ export class Input {
     }
     if (this.camDrag?.id === e.pointerId) this.camDrag = null;
     if (this.joy && e.pointerId === this.joy.id) {
+      // A quick tap (no drag) on the joystick side is a tap-to-move / tap-to-attack.
+      const tap = !this.joy.moved && performance.now() - this.joy.at < 260;
+      const { ox, oy } = this.joy;
       this.joy = null;
       this.joyBase.style.display = 'none';
+      if (tap && !cancelled) this.commandAt(ox, oy);
     }
     let tipWasShown = false;
     if (this.tip && this.tip.pointer === e.pointerId) {

@@ -1,14 +1,43 @@
 import { GameEvent, HEROES, Team, Unit, World } from '../sim';
 import { Sfx, SoundName } from './audio';
 
+/** When each Brakk last started a Shield Charge (to give its hits a shield-bash sound). */
+const chargeAt = new Map<number, number>();
+
 const CAST_SOUNDS: Record<string, SoundName> = {
-  shieldCharge: 'charge',
-  earthsplitter: 'cast',
-  piercingArrow: 'arrow',
-  arrowStorm: 'storm',
-  fireball: 'fire',
-  mendingFlame: 'heal',
-  cataclysm: 'meteor',
+  shieldCharge: 'shieldCharge',
+  earthsplitter: 'quakeCharge',
+  piercingArrow: 'piercingShot',
+  arrowStorm: 'arrowRain',
+  fireball: 'fireballCast',
+  mendingFlame: 'mendFlame',
+  cataclysm: 'meteorFall',
+  shadowLunge: 'shadowStep',
+  veil: 'vanish',
+  execution: 'execute',
+  rootSnare: 'rootSnare',
+  barkSkin: 'barkSkin',
+  overgrowth: 'overgrowth',
+  tidalWave: 'tidalWave',
+  brineVeil: 'brineVeil',
+  maelstrom: 'maelstrom',
+};
+
+/** Each hero's basic attack. */
+const ATTACK_SOUNDS: Record<string, SoundName> = {
+  brakk: 'hammerAttack',
+  vexa: 'bowShot',
+  orin: 'fireBolt',
+  syl: 'daggerSlash',
+  grom: 'woodPunch',
+  kaela: 'waterBolt',
+};
+
+/** A hero's delayed blast landing (Earthsplitter, Cataclysm, Root Snare / Overgrowth). */
+const BLAST_SOUNDS: Record<string, SoundName> = {
+  brakk: 'earthsplitter',
+  orin: 'meteorImpact',
+  grom: 'rootsErupt',
 };
 
 /**
@@ -31,8 +60,12 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
         if (!s) break;
         const involvesMe = s.id === meId || t?.id === meId;
         if (s.kind === 'structure') sfx.play('tower', near(s) * (involvesMe ? 1 : 0.5));
-        else if (s.kind === 'hero') sfx.play(s.projectileSpeed ? 'shoot' : 'swing', near(s));
-        else if (s.kind === 'neutral' && s.neutral?.boss) sfx.play('hit', near(s));
+        else if (s.hero) {
+          sfx.play(ATTACK_SOUNDS[s.hero.defId] ?? 'swing', near(s));
+          if (s.hero.defId === 'vexa' && s.hero.lastCrit) sfx.play('critPing', near(s));
+        }
+        else if (s.kind === 'neutral' && s.neutral?.boss) sfx.play('wardenPunch', near(s));
+        else if (s.kind === 'neutral') sfx.play(s.radius > 0.9 ? 'woodPunch' : 'impStab', near(s) * (involvesMe ? 0.9 : 0.5));
         else sfx.play('creep', near(s) * (involvesMe ? 1 : 0.4));
         if (t && t.id === meId && s.projectileSpeed === 0) sfx.play('hit', 0.6);
         break;
@@ -41,15 +74,18 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
         const u = w.unit(e.unitId);
         if (!u?.hero) break;
         if (e.slot < 0) {
-          sfx.play('slam', near(u)); // delayed blast landed (Earthsplitter / Cataclysm)
+          // Delayed blast landed (Earthsplitter / Cataclysm / roots), heard where it lands.
+          sfx.play(BLAST_SOUNDS[u.hero.defId] ?? 'slam', u.team === team || u.id === meId ? near(u) : near(undefined, u.x, u.y));
           break;
         }
         const id = HEROES[u.hero.defId].abilities[e.slot]?.id;
+        if (id === 'shieldCharge') chargeAt.set(u.id, w.time);
         sfx.play(CAST_SOUNDS[id] ?? 'cast', near(u));
         break;
       }
       case 'explosion':
-        sfx.play('explosion', near(undefined, e.x, e.y) * 0.8);
+        // Fireball bursting (Execution has its own sound when cast).
+        if (e.radius >= 2) sfx.play('fireBlast', near(undefined, e.x, e.y) * 0.9);
         break;
       case 'death': {
         const u = w.unit(e.unitId);
@@ -67,6 +103,20 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
       case 'teleport':
         sfx.play('teleport', near(w.unit(e.unitId)));
         break;
+      case 'teleportStart': {
+        // Heard at the hero (if you can see them) and at the destination (if your team can see it).
+        const u = w.unit(e.unitId);
+        const t = w.unit(e.targetId);
+        const destHeard = t && (u?.team === team || w.vision.seesPoint(team, t.x, t.y)) ? near(undefined, t.x, t.y) : 0;
+        sfx.play('tpChannel', Math.max(near(u), destHeard));
+        break;
+      }
+      case 'damage': {
+        // Shield Charge connecting with someone.
+        const s = w.unit(e.sourceId);
+        if (e.kind === 'spell' && s?.hero?.defId === 'brakk' && w.time - (chargeAt.get(s.id) ?? -9) < 0.6) sfx.play('shieldBash', near(s));
+        break;
+      }
       case 'deny':
         sfx.play('deny', e.killerId === meId ? 1 : near(w.unit(e.killerId)) * 0.6);
         break;
@@ -90,8 +140,34 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
       case 'revive':
         sfx.play('revive', near(w.unit(e.unitId)));
         break;
+      case 'blink':
+        sfx.play('teleport', near(w.unit(e.unitId)) * 0.7);
+        break;
+      case 'itemActive':
+        sfx.play(e.kind === 'manaBurst' ? 'brineVeil' : e.kind === 'frostNova' ? 'frostNova' : 'ironClang', near(w.unit(e.unitId)));
+        break;
+      case 'immunity':
+        sfx.play('glyph', near(w.unit(e.unitId)));
+        break;
       case 'purchase':
         if (e.unitId === meId) sfx.play('purchase');
+        break;
+      case 'courierSend':
+        if (e.unitId === meId) sfx.play('click');
+        break;
+      case 'courierDeliver':
+        if (e.unitId === meId) sfx.play('itemPickUp');
+        break;
+      case 'wardenSlam': {
+        const b = w.unit(e.unitId);
+        if (b && w.canSee(team, b)) sfx.play(e.phase === 'hit' ? 'earthsplitter' : 'roar', near(b) * (e.phase === 'hit' ? 0.85 : 0.6));
+        break;
+      }
+      case 'itemDrop':
+        if (e.unitId === meId) sfx.play('itemDrop');
+        break;
+      case 'itemPickUp':
+        if (e.unitId === meId) sfx.play('itemPickUp');
         break;
       case 'gameOver':
         sfx.play(e.winner === team ? 'victory' : 'defeat');
