@@ -1,6 +1,6 @@
-# Shrinefall — Game Design & Technical Plan
+# Emberwake — Game Design & Technical Plan
 
-> Working title. A mobile 3v3 lane-strategy game in the spirit of Dota 2, with original heroes, names and art.
+> A mobile 3v3 lane-strategy game in the spirit of Dota 2, with original heroes, names and art.
 
 ## 1. Decisions so far
 

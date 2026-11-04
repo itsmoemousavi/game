@@ -1,24 +1,68 @@
-# Shrinefall (prototype)
+<p align="center">
+  <img src="public/icon-512.png" alt="Emberwake icon" width="140" />
+</p>
 
-Mobile 3v3 lane-strategy game in the spirit of Dota 2. Destroy the enemy towers, break a barracks, take down the two shrine towers, then destroy the enemy **Shrine**. Empty slots are filled with bots.
+<h1 align="center">Emberwake</h1>
 
-See **[docs/DESIGN.md](docs/DESIGN.md)** for the full design, tech plan and roadmap, and **[docs/3D-PLAN.md](docs/3D-PLAN.md)** for how the 3D version will work.
+<p align="center">
+  <b>A 3v3 lane-strategy game for phones.</b><br/>
+  Push down the lanes, break the towers and barracks, then destroy the enemy <b>Shrine</b>.
+</p>
 
-**Branches:** `main` is the stable 2D game. New work happens on a working branch and arrives through a pull request; every push to that branch redeploys the test build below.
+<p align="center">
+  <a href="https://itsmoemousavi.github.io/game/"><b>▶ Play it in your browser</b></a> ·
+  <a href="CHANGELOG.md">Patch notes</a> ·
+  <a href="docs/DESIGN.md">Design notes</a>
+</p>
 
-## Play it
+<p align="center">
+  <img src="docs/screenshot-gameplay.png" alt="Brakk fighting at the mid-lane tower" width="800" />
+</p>
 
-**On your phone (or any browser):** https://itsmoemousavi.github.io/game/ (turn the phone to landscape).
-Every push to the main development branch is tested, built and redeployed automatically by `.github/workflows/deploy-pages.yml`.
+> **Status:** in development, version **0.10.0** (see the [patch notes](CHANGELOG.md)). You play against bots for now; online multiplayer and app-store releases come later.
 
-## Run it locally
+## What's in the game
+
+- **3v3 matches** on three lanes, against bots that play as a team (they farm, push, defend and hunt the boss). Choose Easy, Normal or Hard bots.
+- **Draft inside the match:** each team bans one hero, then picks go 1-2-2-1, followed by a 30-second warm-up.
+- **Six heroes**, each with three abilities (R is the ultimate):
+
+  | Hero | Role | Abilities |
+  |---|---|---|
+  | **Brakk** the Bulwark | Tank / Initiator | Shield Charge · Iron Hide · Earthsplitter |
+  | **Vexa** the Gale Archer | Ranged Carry | Piercing Arrow · Hunter's Rhythm · Arrow Storm |
+  | **Orin** the Emberseer | Mage / Support | Fireball · Mending Flame · Cataclysm |
+  | **Syl** the Shadeblade | Melee Assassin | Shadow Lunge · Veil · Execution |
+  | **Grom** the Ironroot | Bruiser / Controller | Root Snare · Bark Skin · Overgrowth |
+  | **Kaela** the Tidecaller | Support / Controller | Tidal Wave · Brine Veil · Maelstrom |
+
+- **A real map:** towers, two barracks per lane, shrine towers, a winding river, woods that block sight, high ground, fog of war, day and night, runes, jungle camps, and the **Warden** boss in its walled house.
+- **Items and a shop** with combined items, wards, teleport scrolls, selling and dropping items, plus a **courier** that brings your items to you.
+- **Made for phones:** joystick and buttons, drag to aim spells, always landscape. Works with mouse and keyboard on a computer too.
+- **3D view** (Three.js), with a light 2D view for older phones.
+- Practice mode and a tutorial.
+
+## Play on your own computer
+
+You need **[Node.js](https://nodejs.org/)** version 22 or newer (the "LTS" download).
 
 ```bash
+git clone https://github.com/itsmoemousavi/game.git emberwake
+cd emberwake
 npm install
-npm run dev        # http://localhost:5173 (also reachable from a phone on the same Wi-Fi)
-npm test           # unit + full bot-match tests
-npm run build      # production bundle in dist/
-npx vite-node scripts/simulate.ts [seed] [minutes]   # headless all-bot match log
+npm run dev
+```
+
+Open **http://localhost:5173** in your browser. To play on your phone, connect it to the same Wi-Fi and open the "Network" address that `npm run dev` prints, then turn the phone sideways.
+
+Other commands:
+
+```bash
+npm test           # automatic tests (rules + full bot matches, about 2 minutes)
+npm run build      # build the website into dist/
+npm run preview    # serve the built website locally
+npx vite-node scripts/simulate.ts [seed] [minutes]           # watch an all-bot match as a text log
+npx vite-node scripts/hero-winrates.ts [firstSeed] [matches] # win rate of each hero over many bot matches
 ```
 
 ## Controls
@@ -43,18 +87,26 @@ Start screen: **Play vs Bots** (pick bot difficulty), **Practice** (alone, with 
 
 The game always plays in landscape: on a phone held upright the game is shown sideways, so just turn the phone.
 
-## Layout
+## How it's built
+
+- **TypeScript** + **Vite**, tests with **Vitest**, 3D with **Three.js**. No game engine.
+- The game rules run in a separate simulation (`src/sim/`) at a fixed 30 ticks per second, without any graphics. That keeps it testable and ready for an online server later. Players and bots send the same commands.
+- Every change is tested automatically and published to GitHub Pages (`.github/workflows/deploy-pages.yml`).
 
 ```
-src/sim/        deterministic game simulation (no rendering), reusable on a future server
-  data/         heroes, creeps, structures (all balance numbers)
-  abilities.ts  how every ability works (numbers live in data/heroes.ts)
-  inventory.ts  shop, items, teleport (numbers live in data/items.ts)
-  vision.ts     fog of war (trees block sight), day/night, invisibility
-  objectives.ts power-ups, boss, wards, buyback, tower shield, backdoor protection
-  ai/bots.ts    bot heroes
-  map.ts        map, lanes, maze, structure placement
-  world.ts      units, combat, creep waves, protection rules, win condition
-src/client/     3D renderer (renderer3d.ts + three/ models), 2D renderer, touch/keyboard input, HUD, sound effects (audio.ts), landscape lock (renderer to be replaced by 3D later)
-tests/          vitest suites
+src/sim/        game simulation (no graphics)
+  data/         heroes, items, creeps, buildings: all balance numbers
+  abilities.ts  how every ability works
+  inventory.ts  shop, items, teleport     courier.ts  the courier
+  vision.ts     fog of war, high ground, day/night
+  objectives.ts runes, the Warden, wards, tower shield, backdoor protection
+  ai/           bot heroes and their item choices
+  map.ts        map layout                world.ts    units, combat, creep waves, win condition
+src/client/     3D view (renderer3d.ts + three/), 2D view, controls, HUD, shop, sounds, tutorial
+tests/          automatic tests
+scripts/        bot-match tools for balance and testing
 ```
+
+## License and credits
+
+All code, models, names and sounds were made for this project. Copyright © 2026 Mohammad Mousavi. All rights reserved.

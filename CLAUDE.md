@@ -1,4 +1,4 @@
-# Shrinefall: project notes for Claude
+# Emberwake: project notes for Claude
 
 Read this first. It carries the context of the earlier (cloud) sessions: what the game is,
 how we work, what the owner decided, and what is still open. Details live in
@@ -7,6 +7,8 @@ how we work, what the owner decided, and what is still open. Details live in
 ## The game
 
 Mobile 3v3 lane-strategy game in the spirit of Dota 2 (original names and art, no Dota assets).
+Name: **Emberwake** (was Shrinefall until 2026-11-04). Icon: split blue/red tower with an ember crack (`public/icon.svg`;
+PNGs rendered from it with headless Chromium; 1024 px store version in `docs/icon-1024.png`).
 Destroy towers → barracks → shrine towers → the enemy **Shrine**. Empty slots are bots.
 Offline vs bots for now; multiplayer and app-store release later (Capacitor planned).
 
@@ -18,8 +20,12 @@ Offline vs bots for now; multiplayer and app-store release later (Capacitor plan
 
 ## Workflow
 
-- Work on branch `claude/dota-like-game-design-slf3o9`; PR #1 merges it into `main`
-  (`main` = last stable 2D version). Don't push to other branches or merge without being asked.
+- Work on branch `claude/dota-like-game-design-slf3o9`. `main` is the public showcase branch (README, patch notes,
+  playable with `npm install && npm run dev`); it was brought up to date on 2026-11-04 (v0.10.0).
+  Don't push to other branches or merge into `main` without being asked.
+- **Patch notes:** every change gets an entry in `CHANGELOG.md` (newest first, plain player-facing language) and the
+  matching `version` in `package.json` (shown in Settings). Last number = each change, middle number = milestone.
+  Internal-only changes go in as "Behind the scenes". Never write "Dota" in README/CHANGELOG (public).
 - Every push to the branch runs tests + build and deploys Pages (`.github/workflows/deploy-pages.yml`).
   **If any test fails or the runner errors, the site does not update**: check the Actions run after pushing.
 - Commit messages: plain English, what changed and why. Never put model names in commits/PRs.

@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Emberwake app icon: one tower split between the blue and red teams, embers bursting from the crack. -->
+  <defs>
+    <radialGradient id="sky" cx="50%" cy="42%" r="70%">
+      <stop offset="0" stop-color="#3a1d12"/>
+      <stop offset="0.45" stop-color="#1a0f0c"/>
+      <stop offset="1" stop-color="#07070a"/>
+    </radialGradient>
+    <linearGradient id="skySplitL" x1="0" x2="1">
+      <stop offset="0" stop-color="#1c4fa8" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#1c4fa8" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="skySplitR" x1="1" x2="0">
+      <stop offset="0" stop-color="#b3261e" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#b3261e" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="stoneBlue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6f8fc4"/>
+      <stop offset="0.5" stop-color="#2f4f86"/>
+      <stop offset="1" stop-color="#14233f"/>
+    </linearGradient>
+    <linearGradient id="stoneRed" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c9675a"/>
+      <stop offset="0.5" stop-color="#8a2a22"/>
+      <stop offset="1" stop-color="#3a0f0c"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffd27a" stop-opacity="0.95"/>
+      <stop offset="0.35" stop-color="#ff7a1f" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#ff4a00" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b1310"/>
+      <stop offset="1" stop-color="#050404"/>
+    </linearGradient>
+    <filter id="blur8"><feGaussianBlur stdDeviation="8"/></filter>
+    <filter id="blur3"><feGaussianBlur stdDeviation="3"/></filter>
+    <filter id="paint" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.22 0" result="grain"/>
+      <feComposite in="grain" in2="SourceGraphic" operator="in" result="g"/>
+      <feBlend in="SourceGraphic" in2="g" mode="multiply"/>
+    </filter>
+    <clipPath id="left"><polygon points="0,0 512,0 498,250 522,420 492,600 516,760 500,1024 0,1024"/></clipPath>
+    <clipPath id="right"><polygon points="1024,0 512,0 498,250 522,420 492,600 516,760 500,1024 1024,1024"/></clipPath>
+    <!-- tower silhouette -->
+    <path id="tower" d="M300 870 L352 470 L322 470 L322 360 L372 360 L372 400 L422 400 L422 360 L472 360 L472 400 L552 400 L552 360 L602 360 L602 400 L652 400 L652 360 L702 360 L702 470 L672 470 L724 870 Z"/>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#sky)"/>
+  <rect width="512" height="1024" fill="url(#skySplitL)"/>
+  <rect x="512" width="512" height="1024" fill="url(#skySplitR)"/>
+
+  <!-- distant embers in the sky -->
+  <g fill="#ff9a3c" opacity="0.5">
+    <circle cx="180" cy="210" r="4"/><circle cx="830" cy="160" r="5"/><circle cx="760" cy="300" r="3"/>
+    <circle cx="250" cy="120" r="3"/><circle cx="880" cy="420" r="3"/><circle cx="130" cy="380" r="2.5"/>
+  </g>
+
+  <!-- glow behind the crack -->
+  <ellipse cx="512" cy="520" rx="210" ry="420" fill="url(#glow)" opacity="0.55"/>
+
+  <!-- ground -->
+  <path d="M0 860 Q260 800 512 830 Q770 800 1024 860 L1024 1024 L0 1024 Z" fill="url(#ground)"/>
+
+  <!-- tower, two halves pushed slightly apart -->
+  <g filter="url(#paint)">
+    <g clip-path="url(#left)" transform="translate(-14 4) rotate(-1.2 512 870)">
+      <use href="#tower" fill="url(#stoneBlue)"/>
+      <g stroke="#0b1428" stroke-width="5" opacity="0.55" fill="none">
+        <path d="M345 520 H520 M338 590 H520 M330 660 H520 M322 730 H520 M314 800 H520"/>
+        <path d="M420 470 V520 M380 520 V590 M460 590 V660 M400 660 V730 M470 730 V800 M360 800 V870"/>
+      </g>
+      <rect x="430" y="470" width="44" height="90" rx="22" fill="#0a1226"/>
+      <path d="M300 870 L352 470 L322 470 L322 360 L372 360" fill="none" stroke="#9fc0ff" stroke-width="6" opacity="0.6"/>
+    </g>
+    <g clip-path="url(#right)" transform="translate(14 4) rotate(1.2 512 870)">
+      <use href="#tower" fill="url(#stoneRed)"/>
+      <g stroke="#2a0806" stroke-width="5" opacity="0.55" fill="none">
+        <path d="M500 520 H676 M500 590 H684 M500 660 H692 M500 730 H700 M500 800 H708"/>
+        <path d="M600 470 V520 M640 520 V590 M560 590 V660 M620 660 V730 M550 730 V800 M660 800 V870"/>
+      </g>
+      <rect x="550" y="470" width="44" height="90" rx="22" fill="#260806"/>
+      <path d="M724 870 L672 470 L702 470 L702 360 L652 360" fill="none" stroke="#ffb0a0" stroke-width="6" opacity="0.6"/>
+    </g>
+  </g>
+
+  <!-- the burning crack -->
+  <polyline points="512,330 498,420 522,520 492,610 516,720 500,850" fill="none" stroke="#ff6a00" stroke-width="34" filter="url(#blur8)" opacity="0.9"/>
+  <polyline points="512,330 498,420 522,520 492,610 516,720 500,850" fill="none" stroke="#ffb347" stroke-width="12" stroke-linejoin="round"/>
+  <polyline points="512,330 498,420 522,520 492,610 516,720 500,850" fill="none" stroke="#fff3c4" stroke-width="4" stroke-linejoin="round"/>
+
+  <!-- ember flame on top -->
+  <g transform="translate(512 300)">
+    <ellipse cx="0" cy="-40" rx="120" ry="150" fill="url(#glow)"/>
+    <path d="M0 -170 C40 -110 70 -70 52 -20 C42 10 20 26 0 26 C-20 26 -44 10 -52 -20 C-64 -64 -30 -100 -10 -130 C-6 -100 6 -86 16 -82 C20 -110 12 -140 0 -170 Z" fill="#ff7a1f"/>
+    <path d="M0 -110 C22 -76 34 -50 24 -22 C18 -4 10 6 0 6 C-12 6 -24 -4 -28 -22 C-32 -46 -14 -68 0 -110 Z" fill="#ffd27a"/>
+    <path d="M0 -60 C10 -44 14 -30 10 -16 C6 -8 -6 -8 -10 -16 C-14 -30 -8 -44 0 -60 Z" fill="#fff6d8"/>
+  </g>
+
+  <!-- sparks flying out of the crack -->
+  <g fill="#ffcf6b">
+    <circle cx="560" cy="430" r="7"/><circle cx="600" cy="380" r="5"/><circle cx="640" cy="330" r="3.5"/>
+    <circle cx="455" cy="560" r="6"/><circle cx="410" cy="520" r="4"/><circle cx="372" cy="470" r="3"/>
+    <circle cx="566" cy="650" r="5"/><circle cx="612" cy="620" r="3.5"/>
+    <circle cx="452" cy="760" r="5"/><circle cx="414" cy="730" r="3"/>
+    <circle cx="540" cy="250" r="4"/><circle cx="470" cy="210" r="3.5"/>
+  </g>
+  <g fill="#ffcf6b" filter="url(#blur3)" opacity="0.9">
+    <circle cx="560" cy="430" r="12"/><circle cx="455" cy="560" r="11"/><circle cx="566" cy="650" r="10"/><circle cx="452" cy="760" r="10"/>
+  </g>
+
+  <!-- vignette -->
+  <radialGradient id="vig" cx="50%" cy="50%" r="72%">
+    <stop offset="0.6" stop-color="#000" stop-opacity="0"/>
+    <stop offset="1" stop-color="#000" stop-opacity="0.6"/>
+  </radialGradient>
+  <rect width="1024" height="1024" fill="url(#vig)"/>
+</svg>

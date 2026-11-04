@@ -23,6 +23,7 @@ const canvas = $<HTMLCanvasElement>('#game');
 const canvas3d = $<HTMLCanvasElement>('#game3d');
 const screenFx = new ScreenFx(canvas); // after both canvases (#game3d comes first in the page)
 declare const __BUILD__: string;
+declare const __VERSION__: string;
 const app = $<HTMLElement>('#app');
 const select = $<HTMLElement>('#select');
 
@@ -271,7 +272,7 @@ function makeRenderer(map: World['map']): Renderer {
   return new Renderer(canvas, map);
 }
 function showGfx(view: string) {
-  $<HTMLElement>('#gfx-status').textContent = `Showing: ${view}${gfxNote ? ` (${gfxNote})` : ''} · build ${__BUILD__}`;
+  $<HTMLElement>('#gfx-status').textContent = `Showing: ${view}${gfxNote ? ` (${gfxNote})` : ''} · v${__VERSION__} build ${__BUILD__}`;
 }
 /** 3D couldn't start or crashed: carry on in 2D and say why. */
 function gfx3dFailed(err: unknown) {
