@@ -14,7 +14,7 @@ Destroy towers → barracks → shrine towers → the enemy **Shrine**. Empty sl
 Offline vs bots for now; multiplayer and app-store release later (Capacitor planned).
 
 - **Always landscape** (on a phone held upright the whole UI is rotated, `src/client/screen.ts`).
-- The owner tests on an **iPhone** through the GitHub Pages build: https://itsmoemousavi.github.io/game/
+- The owner tests on an **iPhone** through the GitHub Pages build: https://itsmoemousavi.github.io/ovra-game/
   Settings → Graphics shows `build <sha>`: ask them to check it (Safari caches old builds).
 - **3D is the default view** (Three.js); 2D stays as a "low graphics" setting and as the fallback
   if WebGL fails (the reason is shown in a toast and under Settings → Graphics).

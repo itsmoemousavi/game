@@ -42,7 +42,7 @@ So everything we build and test in 2D (rules, balance, bots, UI) carries over to
 ## Workflow
 
 1. `main` = the stable 2D game.
-2. All features, fixes and tuning continue in 2D on the working branch through a pull request. Every push redeploys the test build to https://itsmoemousavi.github.io/game/ for phone testing. When a batch is good, it is merged into `main`.
+2. All features, fixes and tuning continue in 2D on the working branch through a pull request. Every push redeploys the test build to https://itsmoemousavi.github.io/ovra-game/ for phone testing. When a batch is good, it is merged into `main`.
 3. Once gameplay is settled, a separate `3d` branch replaces only the renderer. The 2D renderer can stay as a "low graphics" option for weak phones.
 4. Ship the Capacitor app with the 3D renderer.
 
