@@ -3,28 +3,25 @@
   "short_name": "Ovra",
   "description": "3v3 lane-strategy game for phones",
   "start_url": "./",
-  "display": "fullscreen",
+  "display": "standalone",
   "orientation": "landscape",
   "background_color": "#07070a",
   "theme_color": "#0d150f",
   "icons": [
     {
-      "src": "icon-180.png?v=2",
+      "src": "ovra-touch-icon.png",
       "sizes": "180x180",
-      "type": "image/png",
-      "purpose": "any"
+      "type": "image/png"
     },
     {
-      "src": "icon-192.png?v=2",
+      "src": "ovra-icon-192.png",
       "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
+      "type": "image/png"
     },
     {
-      "src": "icon-512.png?v=2",
+      "src": "ovra-icon-512.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
+      "type": "image/png"
     }
   ]
 }
