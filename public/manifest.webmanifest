@@ -1,6 +1,6 @@
 {
-  "name": "Emberwake",
-  "short_name": "Emberwake",
+  "name": "Ovra",
+  "short_name": "Ovra",
   "description": "3v3 lane-strategy game for phones",
   "start_url": "./",
   "display": "fullscreen",

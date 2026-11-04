@@ -1,8 +1,8 @@
 {
-  "name": "emberwake",
-  "version": "0.10.1",
+  "name": "ovra",
+  "version": "0.10.2",
   "private": true,
-  "description": "Mobile 3v3 lane-strategy game (Emberwake)",
+  "description": "Mobile 3v3 lane-strategy game (Ovra)",
   "type": "module",
   "scripts": {
     "dev": "vite --host",

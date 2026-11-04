@@ -1,4 +1,4 @@
-# Emberwake: patch notes
+# Ovra: patch notes
 
 Every change to the game, newest first. Each change has its own version number:
 
@@ -9,7 +9,7 @@ The version you're playing is shown in **Settings → View** in the game.
 
 | Version | Milestone | Date |
 |---|---|---|
-| [0.10.x](#010x--emberwake) | Emberwake: new name, app icon, patch notes | 2026-11-04 |
+| [0.10.x](#010x--ovra) | Ovra: new name, app icon, patch notes | 2026-11-04 |
 | [0.9.x](#09x--courier-and-polish) | Courier and polish | 2026-11-03 |
 | [0.8.x](#08x--new-map-look) | New map look: winding river, woods, painted ground | 2026-11-02 to 11-03 |
 | [0.7.x](#07x--animated-heroes) | Animated heroes and spell effects | 2026-11-02 |
@@ -22,7 +22,12 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ---
 
-## 0.10.x · Emberwake
+## 0.10.x · Ovra
+
+### 0.10.2
+*2026-11-04*
+- The game's final name is **Ovra** (the name Emberwake was already taken).
+- New logo on the start screen. The app icon stays the same.
 
 ### 0.10.1
 *2026-11-04*
@@ -32,7 +37,7 @@ The version you're playing is shown in **Settings → View** in the game.
 ### 0.10.0
 *2026-11-04*
 
-- The game has a name: **Emberwake** (it was called Shrinefall while in development).
+- The game got its first name, **Emberwake** (it was called Shrinefall while in development).
 - New app icon: one tower split between the blue and red teams, with embers bursting from the crack.
 - The icon shows in the browser tab and on the iPhone home screen ("Add to Home Screen").
 - The version number now shows in Settings, next to the build id.

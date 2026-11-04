@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <!-- Emberwake app icon: one tower split between the blue and red teams, embers bursting from the crack. -->
+  <!-- Ovra app icon: one tower split between the blue and red teams, embers bursting from the crack. -->
   <defs>
     <radialGradient id="sky" cx="50%" cy="42%" r="70%">
       <stop offset="0" stop-color="#3a1d12"/>

@@ -1,4 +1,4 @@
-# Emberwake — Game Design & Technical Plan
+# Ovra — Game Design & Technical Plan
 
 > A mobile 3v3 lane-strategy game in the spirit of Dota 2, with original heroes, names and art.
 

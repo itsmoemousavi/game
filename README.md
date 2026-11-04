@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="public/icon-512.png" alt="Emberwake icon" width="140" />
+  <img src="public/icon-512.png" alt="Ovra icon" width="140" />
 </p>
 
-<h1 align="center">Emberwake</h1>
+<h1 align="center">Ovra</h1>
 
 <p align="center">
   <b>A 3v3 lane-strategy game for phones.</b><br/>
@@ -19,7 +19,7 @@
   <img src="docs/screenshot-gameplay.png" alt="Brakk fighting at the mid-lane tower" width="800" />
 </p>
 
-> **Status:** in development, version **0.10.1** (see the [patch notes](CHANGELOG.md)). You play against bots for now; online multiplayer and app-store releases come later.
+> **Status:** in development, version **0.10.2** (see the [patch notes](CHANGELOG.md)). You play against bots for now; online multiplayer and app-store releases come later.
 
 ## What's in the game
 
@@ -47,8 +47,8 @@
 You need **[Node.js](https://nodejs.org/)** version 22 or newer (the "LTS" download).
 
 ```bash
-git clone https://github.com/itsmoemousavi/game.git emberwake
-cd emberwake
+git clone https://github.com/itsmoemousavi/game.git ovra
+cd ovra
 npm install
 npm run dev
 ```

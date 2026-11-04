@@ -1,4 +1,4 @@
-# Emberwake: project notes for Claude
+# Ovra: project notes for Claude
 
 Read this first. It carries the context of the earlier (cloud) sessions: what the game is,
 how we work, what the owner decided, and what is still open. Details live in
@@ -7,7 +7,8 @@ how we work, what the owner decided, and what is still open. Details live in
 ## The game
 
 Mobile 3v3 lane-strategy game in the spirit of Dota 2 (original names and art, no Dota assets).
-Name: **Emberwake** (was Shrinefall until 2026-11-04). Icon: split blue/red tower with an ember crack (`public/icon.svg`;
+Name: **Ovra** (an invented word with no meaning, like "Dota"; was Shrinefall, then briefly Emberwake, renamed 2026-11-04
+because Emberwake was taken). Icon: split blue/red tower with an ember crack (`public/icon.svg`;
 PNGs rendered from it with headless Chromium; 1024 px store version in `docs/icon-1024.png`).
 Destroy towers → barracks → shrine towers → the enemy **Shrine**. Empty slots are bots.
 Offline vs bots for now; multiplayer and app-store release later (Capacitor planned).
