@@ -24,6 +24,10 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.10.x · Ovra
 
+### 0.10.6
+*2026-11-04*
+- Behind the scenes: a small test page (`icon-test.html`) to find out why the iPhone home-screen icon is missing.
+
 ### 0.10.5
 *2026-11-04*
 - Fix, second try: iPhone home-screen icon. The icon files have new names so the phone can't reuse an old saved copy.
