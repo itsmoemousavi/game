@@ -19,7 +19,7 @@
   <img src="docs/screenshot-gameplay.png" alt="Brakk fighting at the mid-lane tower" width="800" />
 </p>
 
-> **Status:** in development, version **0.10.3** (see the [patch notes](CHANGELOG.md)). You play against bots for now; online multiplayer and app-store releases come later.
+> **Status:** in development, version **0.10.4** (see the [patch notes](CHANGELOG.md)). You play against bots for now; online multiplayer and app-store releases come later.
 
 ## What's in the game
 

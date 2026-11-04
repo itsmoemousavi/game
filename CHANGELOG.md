@@ -24,6 +24,10 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.10.x · Ovra
 
+### 0.10.4
+*2026-11-04*
+- Fix: "Add to Home Screen" on iPhone now uses the Ovra icon.
+
 ### 0.10.3
 *2026-11-04*
 - The project moved to a new address: **https://github.com/itsmoemousavi/ovra-game**.
