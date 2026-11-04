@@ -189,6 +189,54 @@ describe('walk + attack (multi-touch)', () => {
     w.applyCommand({ type: 'attackHold', unitId: b.id, held: false });
     expect(b.hero!.attackHeld).toBe(false);
   });
+
+  it('holding attack while standing still only aims: nothing is hit until a target is chosen', () => {
+    const { w, hero } = humans();
+    const b = hero(1, 'brakk');
+    const foe = hero(0, 'vexa');
+    const a = onRiver(w.map, 40);
+    place(b, a.x, a.y);
+    place(foe, a.x, a.y + 2);
+    foe.maxHp = foe.hp = 1e5;
+    w.applyCommand({ type: 'setAutoAttack', unitId: b.id, enabled: false });
+    w.applyCommand({ type: 'attackHold', unitId: b.id, held: true });
+    run(w, 1.5);
+    expect(foe.hp).toBe(foe.maxHp);
+    expect(b.hero!.order.type).toBe('idle');
+  });
+
+  it('with auto attack off, a chosen target is attacked until the hero walks away', () => {
+    const { w, hero } = humans();
+    const b = hero(1, 'brakk');
+    const foe = hero(0, 'vexa');
+    const a = onRiver(w.map, 40);
+    place(b, a.x, a.y);
+    place(foe, a.x, a.y + 2);
+    foe.maxHp = foe.hp = 1e5;
+    w.applyCommand({ type: 'setAutoAttack', unitId: b.id, enabled: false });
+    run(w, 0.2); // vision updates on the next tick
+    w.applyCommand({ type: 'attack', unitId: b.id, targetId: foe.id });
+    run(w, 4);
+    const hit = foe.maxHp - foe.hp;
+    expect(hit).toBeGreaterThan(0);
+    expect(b.hero!.order.type).toBe('attack');
+    run(w, 3);
+    expect(foe.maxHp - foe.hp).toBeGreaterThan(hit); // still attacking the same target
+    w.applyCommand({ type: 'moveDir', unitId: b.id, dx: 1, dy: 0 });
+    run(w, 0.3);
+    w.applyCommand({ type: 'moveDir', unitId: b.id, dx: 0, dy: 0 });
+    expect(b.hero!.order.type).toBe('idle');
+    place(foe, b.x, b.y + 2);
+    const hp = foe.hp;
+    run(w, 3);
+    expect(foe.hp).toBeGreaterThanOrEqual(hp); // walked away: stopped attacking (only its own regen)
+  });
+
+  it('every hero starts the match with one teleport scroll', () => {
+    const { w, hero } = humans();
+    expect(hero(0, 'brakk').hero!.tpCount).toBe(1);
+    expect(w.heroes.every((h) => h.hero!.tpCount === 1)).toBe(true);
+  });
 });
 
 describe('visibility & auto attack', () => {
@@ -355,7 +403,7 @@ describe('death costs gold', () => {
     const foe = hero(1, 'brakk');
     v.hero!.gold = 2000;
     w.dealDamage(foe.id, v, 1e6, 'spell');
-    expect(v.hero!.gold).toBe(2000 - Math.round(25 + 2000 * 0.025));
+    expect(v.hero!.gold).toBe(2000 - Math.round(25 + (2000 + 50) * 0.025)); // net worth includes the starting TP scroll
     // Broke heroes can't go below zero.
     const o = hero(0, 'orin');
     o.hero!.gold = 10;

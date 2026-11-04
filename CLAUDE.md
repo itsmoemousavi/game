@@ -71,8 +71,10 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
   (melee: tougher; ranged). A fallen barracks powers up only that creep type of the attackers.
   Shrine towers 11 m from the Shrine. Glyph = invulnerable buildings + 2× tower attack speed.
   Fountain shoots heroes anywhere in its healing area.
-- Controls: joystick moves; holding Attack while steering attacks **on the move**; tapping the ground does
-  **not** walk (only while holding the minimap, or with a mouse); tap an enemy to attack it.
+- Controls: joystick moves; holding Attack while steering attacks **on the move**; holding Attack while standing still
+  only aims (attack starts on release); a chosen target is attacked until it dies or you move (auto attack off too);
+  tapping the ground does **not** walk (only while holding the minimap, or with a mouse); tap an enemy to attack it.
+- Every hero starts the match with 1 TP scroll.
 - Shop: tabs + grid + detail panel with BUY/SELL; taps only select (no accidental buys when scrolling);
   sell = full refund within 10 s, then half; dead heroes can shop; **no quick-buy**.
 - Match start: menu has no heroes; **draft inside the match** (1 ban per team, picks 1-2-2-1, then 30 s warm-up).

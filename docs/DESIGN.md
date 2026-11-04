@@ -321,7 +321,7 @@ Numbers are in `src/sim/constants.ts`, `data/units.ts` and `objectives.ts`.
 
 **Announcements:** short toasts for destroyed buildings, the boss, power-ups your team picks up, buybacks, the tower shield and revives.
 
-**Attack controls:** Attack is press-and-hold, and works together with the joystick (multi-touch). While held, your hero hits the best enemy in range (heroes first), and keeps walking where the joystick points when nothing is in range. Without the joystick, holding Attack walks to the nearest enemy. A quick tap still gets at least one hit in.
+**Attack controls:** Holding Attack while standing still only **aims** (an arrow at the best target; drag to pick another); nothing is attacked until you let go. On release (or a quick tap) the hero attacks that target and **keeps attacking only it** until it dies, disappears, or you move (also with auto attack off). Holding Attack **while steering** with the joystick (multi-touch) hits the best enemy in range on the move and keeps walking; a quick tap while steering still gets one hit in. Every hero starts the match with **1 teleport scroll**.
 
 **Sound:** on by default. The phone's silent switch mutes it, and so does the Sound setting.
 

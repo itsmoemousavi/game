@@ -74,8 +74,9 @@ export type Command =
   | { type: 'attack'; unitId: number; targetId: number }
   | { type: 'attackNearest'; unitId: number }
   /**
-   * Attack button held (mobile): while held, attack the best enemy in range; if nothing
-   * is in range keep following the joystick (or, with no joystick, chase the nearest enemy).
+   * Attack button held (mobile): while steering (joystick or a walk order), hit the best enemy
+   * in reach on the move. Holding it while standing still only aims (the client picks the target
+   * and sends 'attack' on release), so nothing is attacked before the player lets go.
    */
   | { type: 'attackHold'; unitId: number; held: boolean }
   /** Player setting: automatically attack enemies that come into range while idle. */
@@ -643,11 +644,6 @@ export class World {
         break;
       case 'attackHold':
         h.attackHeld = cmd.held;
-        if (cmd.held && h.order.type !== 'dir') {
-          // Not steering: lock onto the best target right away (classic tap-to-attack).
-          const t = this.pickAutoTarget(u);
-          if (t) h.order = { type: 'attack', targetId: t.id };
-        }
         break;
       case 'stop':
         h.order = { type: 'idle' };
@@ -874,7 +870,7 @@ export class World {
       skillPoints: 1,
       attackCount: 0,
       items: emptyInventory(),
-      tpCount: 0,
+      tpCount: 1, // everyone starts with one teleport scroll
       courier: null as unknown as CourierState,
       tpCooldown: 0,
       channel: null,
@@ -1147,7 +1143,7 @@ export class World {
     this.unstick(u);
     const o = h.order;
     // Holding Attack while steering: hit whatever is in range, otherwise keep walking.
-    if (h.attackHeld && (o.type === 'dir' || o.type === 'idle' || o.type === 'move')) {
+    if (h.attackHeld && (o.type === 'dir' || o.type === 'move')) {
       let t = this.unit(u.targetId);
       if (!this.canAttack(u, t) || !this.canSee(u.team, t) || !this.inReach(u, t)) {
         const reach = u.attackRange + u.radius + 1.5;
@@ -1166,15 +1162,6 @@ export class World {
       if (t && this.tryAttack(u, t)) {
         u.targetId = t.id;
         return;
-      }
-      if (o.type === 'idle') {
-        // Holding attack without steering: walk to the nearest enemy and hit it.
-        const chase = this.pickAutoTarget(u);
-        if (chase) {
-          u.targetId = chase.id;
-          if (!this.tryAttack(u, chase)) this.navigate(u, chase.x, chase.y, 0);
-          return;
-        }
       }
     }
     switch (o.type) {

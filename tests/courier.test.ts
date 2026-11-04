@@ -139,14 +139,14 @@ describe('courier', () => {
     b.hero!.gold = 500;
     const p = outInLane(w, b, 30);
     w.applyCommand({ type: 'buyTp', unitId: b.id });
-    expect(b.hero!.tpCount).toBe(0);
+    expect(b.hero!.tpCount).toBe(1); // the one every hero starts with
     expect(b.hero!.courier.bag[0]).toMatchObject({ id: 'tp', count: 1 });
     w.applyCommand({ type: 'courier', unitId: b.id });
     for (let i = 0; i < 30 * TICK_RATE && b.hero!.courier.bag[0]; i++) {
       place(b, p.x, p.y);
       w.step();
     }
-    expect(b.hero!.tpCount).toBe(1);
+    expect(b.hero!.tpCount).toBe(2);
   });
 
   it('turns back when its hero dies', () => {

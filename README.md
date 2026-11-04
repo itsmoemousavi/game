@@ -26,7 +26,7 @@ npx vite-node scripts/simulate.ts [seed] [minutes]   # headless all-bot match lo
 | | Phone (landscape) | Desktop |
 |---|---|---|
 | Move | Drag anywhere on the left half (virtual joystick) · tap an enemy to attack it · while holding the minimap, tap the map to walk there | Arrow keys, or right-click the ground |
-| Attack | **Hold Attack** (works together with the joystick: hits what's in range, otherwise you keep walking) · tap an enemy to attack it | Hold Space, or click an enemy |
+| Attack | **Tap Attack**: attack the best target nearby and keep hitting it until it dies or you walk away · **hold + drag** to aim at another target (the attack starts when you let go) · hold while steering with the joystick: hit what's in range on the move · tap an enemy to attack it | Space, or click an enemy |
 | Abilities | **Hold** Q/W/R: arrow appears · **drag** any direction to aim · release to cast · release on ✕ Cancel to abort | Q / W / R cast at the cursor |
 | Items | Tap an item to use it (poultices) · **totems** (Watcher / Seer): tap the slot, then tap the ground · 🛒 opens the shop (away from base, buys go on the courier) · **TP** slot: tap, then pick a friendly building (teleports are bought in the shop) | same (click) |
 | Deny | Tap one of your own creeps below half health (or your own tower below 10%) | Click it |

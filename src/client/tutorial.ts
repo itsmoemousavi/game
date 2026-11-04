@@ -61,7 +61,7 @@ export class Tutorial {
         done: (_w, _me, t) => t.spellHit,
       },
       {
-        text: 'Now hold the Attack button until the dummy falls. You can keep steering with the joystick while you hold it.',
+        text: 'Now tap the Attack button: your hero keeps hitting the dummy until it falls (walking away stops it). Hold Attack and drag to pick a different target; while steering with the joystick, holding Attack hits on the move.',
         marker: (w) => w.unit(this.dummyId) ?? null,
         done: (w) => !w.unit(this.dummyId)?.alive,
       },

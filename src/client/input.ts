@@ -172,11 +172,21 @@ export class Input {
   private attackUp(cancelled = false) {
     this.attackPointer = null;
     // Release with a target under the arrow: that's the next attack (it walks over if needed).
+    // Holding only aims; the attack starts on release. Standing still: the target under the arrow
+    // (a plain tap = the best target nearby) is attacked until it dies or you walk away.
+    // While steering, a tap still gets a swing on the move (see the timer below).
     const aim = this.aim?.slot === ATTACK_AIM ? this.aim : null;
-    if (aim) {
-      this.aim = null;
-      this.cancelZone.classList.remove('show');
-      if (!cancelled && !aim.cancel && aim.targetId !== undefined && this.attackDrag?.moved) this.queue.push({ type: 'attack', unitId: this.heroId(), targetId: aim.targetId });
+    const steering = Math.hypot(this.lastDir.dx, this.lastDir.dy) > 0.15;
+    this.aim = null;
+    this.cancelZone.classList.remove('show');
+    if (!cancelled && !aim?.cancel && !steering) {
+      let targetId = aim?.targetId;
+      if (targetId === undefined && !this.attackDrag?.moved) {
+        const w = this.world();
+        const me = w.unit(this.heroId());
+        targetId = me ? w.pickAutoTarget(me)?.id : undefined;
+      }
+      if (targetId !== undefined) this.queue.push({ type: 'attack', unitId: this.heroId(), targetId });
     }
     this.attackDrag = null;
     // A quick tap still gets at least one swing in.

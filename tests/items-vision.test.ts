@@ -109,15 +109,16 @@ describe('teleport', () => {
   it('buy as many as you like; channel 3s; lands next to the building; cooldown', () => {
     const { w, hero } = humans();
     const v = hero(0, 'vexa');
+    expect(v.hero!.tpCount).toBe(1); // every hero starts with one
     for (let i = 0; i < 4; i++) w.applyCommand({ type: 'buyTp', unitId: v.id });
-    expect(v.hero!.tpCount).toBe(4);
+    expect(v.hero!.tpCount).toBe(5);
     const t1 = w.structures.find((s) => s.team === 0 && s.structure!.tier === 'tower1' && s.structure!.lane === 'mid')!;
     w.applyCommand({ type: 'teleport', unitId: v.id, targetId: t1.id });
     run(w, TELEPORT.channel - 0.5);
     expect(Math.hypot(v.x - t1.x, v.y - t1.y)).toBeGreaterThan(50);
     run(w, 0.7);
     expect(Math.hypot(v.x - t1.x, v.y - t1.y)).toBeLessThan(10);
-    expect(v.hero!.tpCount).toBe(3);
+    expect(v.hero!.tpCount).toBe(4);
     expect(v.hero!.tpCooldown).toBeGreaterThan(50);
     w.applyCommand({ type: 'teleport', unitId: v.id, targetId: t1.id });
     expect(v.hero!.channel).toBeNull(); // on cooldown
@@ -136,11 +137,11 @@ describe('teleport', () => {
     run(w, 1);
     w.applyCommand({ type: 'moveDir', unitId: v.id, dx: 1, dy: 0 });
     expect(v.hero!.channel).toBeNull();
-    expect(v.hero!.tpCount).toBe(1);
+    expect(v.hero!.tpCount).toBe(2); // starting scroll + the one bought: none used up
     w.applyCommand({ type: 'teleport', unitId: v.id, targetId: mine.id });
     w.stun(v, 1);
     run(w, 3.5);
-    expect(v.hero!.tpCount).toBe(1);
+    expect(v.hero!.tpCount).toBe(2);
   });
 });
 
