@@ -9,6 +9,7 @@ The version you're playing is shown in **Settings → View** in the game.
 
 | Version | Milestone | Date |
 |---|---|---|
+| [0.11.x](#011x--new-map-art) | New map art and a living world | 2026-11-05 |
 | [0.10.x](#010x--ovra) | Ovra: new name, app icon, patch notes | 2026-11-04 |
 | [0.9.x](#09x--courier-and-polish) | Courier and polish | 2026-11-03 |
 | [0.8.x](#08x--new-map-look) | New map look: winding river, woods, painted ground | 2026-11-02 to 11-03 |
@@ -19,6 +20,20 @@ The version you're playing is shown in **Settings → View** in the game.
 | [0.3.x](#03x--hero-balance) | Hero balance | 2026-11-01 |
 | [0.2.x](#02x--six-heroes-and-smarter-bots) | Six heroes and smarter bots | 2026-11-01 |
 | [0.1.x](#01x--first-playable-prototype) | First playable prototype (2D) | 2026-11-01 |
+
+---
+
+## 0.11.x · New map art
+
+### 0.11.0
+*2026-11-05*
+- **New map art:** painted grass and earth, roads with worn edges, new trees and undergrowth, weathered river stones and real stone walls at the Warden's house and the fountain yards.
+- **The river flows:** the current follows the bends and foam laps at the shore.
+- **A living world:** wind moves the trees and grass, cloud shadows drift over the ground, and fireflies come out at night. None of it reacts to units, so it can't give away a hidden hero.
+- **Fog of war** has smooth edges, and rocks and plants now darken inside it.
+- **Watcher Totem** sees further: 19 m by day and 14 m at night (was 16 m and 12 m).
+- Graphics quality Low skips the wind, grass and ground detail to save battery.
+- Behind the scenes: hidden parts of the forest are no longer drawn, so the map draws about half as many triangles.
 
 ---
 

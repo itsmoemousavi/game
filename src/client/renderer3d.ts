@@ -1,13 +1,13 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { GLYPH_DURATION, GameMap, HEROES, House, TELEPORT, Team, Unit, World, courierFlying, isInvisible, isNight } from '../sim';
+import { GLYPH_DURATION, GameMap, HEROES, TELEPORT, Team, Unit, World, courierFlying, isInvisible, isNight } from '../sim';
 import type { Aim } from './input';
 import { Renderer, TEAM_COLORS } from './renderer';
 import { JOINTS, Joint, TEAM_HEX, model } from './three/models';
 import { Fx3D } from './three/fx';
 import { Anim, AnimCtx, Corpse, animateHero, buffFx, heroAttack, heroBlink, heroCast, heroCorpse, newAnim, pose, setGround } from './three/hero-anims';
 import { SpellFx } from './three/spell-fx';
+import { WorldArt } from './three/world-art';
 import { MonsterCorpse, animateMonster, monsterCorpse, monsterKind, wardenSlamFx } from './three/monster-anims';
 import type { GameEvent } from '../sim';
 
@@ -67,7 +67,7 @@ export class Renderer3D extends Renderer {
   private lastTreeShade = 0;
   private fxY = 0;
   private overlay: CanvasRenderingContext2D;
-  private trees: { meshes: THREE.InstancedMesh[]; entries: { mesh: number; k: number; cell: number; color: THREE.Color }[] } | null = null;
+  private art!: WorldArt;
   private objs = new Map<string, Obj>();
   /** Per-unit animation clocks (walk cycle, attack swing, cast). */
   private anims = new Map<number, Anim>();
@@ -155,6 +155,17 @@ export class Renderer3D extends Renderer {
         this.elev[vy * (n + 1) + vx] = cnt ? sum / cnt : 0;
       }
     }
+    // One smoothing pass: banks and plateau edges slope gently instead of stepping cell by cell.
+    {
+      const r = n + 1;
+      const src = this.elev.slice();
+      for (let vy = 1; vy < n; vy++) {
+        for (let vx = 1; vx < n; vx++) {
+          const i = vy * r + vx;
+          this.elev[i] = src[i] * 0.4 + (src[i - 1] + src[i + 1] + src[i - r] + src[i + r]) * 0.15;
+        }
+      }
+    }
     this.bridges = map.bridges.map((b) => ({ ...b, c: Math.cos(b.angle), s: Math.sin(b.angle) }));
     const geo = new THREE.PlaneGeometry(map.size, map.size, n, n);
     geo.rotateX(-Math.PI / 2);
@@ -190,15 +201,14 @@ export class Renderer3D extends Renderer {
     fx.renderOrder = 2;
     this.scene.add(fx);
 
-    this.buildTrees(map);
-    this.buildWater(map);
+    this.art = new WorldArt(this.scene, map, (x, y) => this.terrainAt(x, y), dpr, quality, this.fogTex, WATER_LEVEL);
+    this.art.detailGround(groundMat);
+    this.art.softFog(fog.material as THREE.MeshBasicMaterial, n);
     this.buildBridges(map);
-    this.buildCurbs(map);
-    this.buildRocks(map);
-    this.buildHouse(map.house);
+    this.art.buildWall(map.house);
     // Fountain yards: the same stone ring, only where it stands on open ground (forest closes the rest).
     for (const yard of map.fountainYards) {
-      this.buildHouse(yard, (x, y) => {
+      this.art.buildWall(yard, (x, y) => {
         const cx = Math.floor(x / map.cell);
         const cy = Math.floor(y / map.cell);
         return cx >= 0 && cy >= 0 && cx < map.grid && cy < map.grid && map.fountainWall[cy * map.grid + cx] === 1;
@@ -282,142 +292,6 @@ export class Renderer3D extends Renderer {
     return a * (1 - ty) + b * ty;
   }
 
-  /** The Warden's house: a ring of low stone wall blocks with a doorway, and two gate pillars. */
-  private buildHouse(h: House, keep?: (x: number, y: number) => boolean) {
-    const mid = (h.inner + h.outer) / 2;
-    const thick = h.outer - h.inner;
-    const doorAng = Math.atan2(h.door.y, h.door.x);
-    const gap = Math.asin(Math.min(1, (h.doorHalf + 0.3) / mid));
-    const span = Math.PI * 2 - gap * 2;
-    const count = Math.ceil((span * mid) / 2.4);
-    const step = span / count;
-    const height = 2.4;
-    const geo = new THREE.BoxGeometry(1, height, thick);
-    geo.translate(0, height / 2, 0);
-    const blocks = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ flatShading: true }), count + 2);
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const up = new THREE.Vector3(0, 1, 0);
-    const shades = [0x8a857a, 0x7c776d, 0x938d80, 0x726d64];
-    const hide = new THREE.Matrix4().makeScale(0, 0, 0);
-    const put = (k: number, a: number, r: number, len: number, hs: number, w = 1) => {
-      const x = h.x + Math.cos(a) * r;
-      const y = h.y + Math.sin(a) * r;
-      if (keep && !keep(x, y)) {
-        blocks.setMatrixAt(k, hide);
-        blocks.setColorAt(k, new THREE.Color(0));
-        return;
-      }
-      q.setFromAxisAngle(up, -a + Math.PI / 2);
-      m.compose(new THREE.Vector3(x, this.elevationAt(x, y) - 0.1, y), q, new THREE.Vector3(len, hs, w));
-      blocks.setMatrixAt(k, m);
-      blocks.setColorAt(k, new THREE.Color(shades[k % shades.length]));
-    };
-    for (let k = 0; k < count; k++) {
-      const a = doorAng + gap + step * (k + 0.5);
-      put(k, a, mid, step * mid + 0.15, 0.9 + ((k * 37) % 5) * 0.06);
-    }
-    // Gate pillars on both sides of the doorway.
-    put(count, doorAng + gap, mid, thick * 0.9, 1.45, 1.1);
-    put(count + 1, doorAng - gap, mid, thick * 0.9, 1.45, 1.1);
-    this.scene.add(blocks);
-  }
-
-  /**
-   * The forest: one 3D tree per tree in the map (pines, broad oaks and a few dead trees),
-   * drawn as instanced meshes (a handful of draw calls for thousands of trees).
-   */
-  private buildTrees(map: GameMap) {
-    const n = map.grid;
-    const kinds = ['pine', 'oak', 'dead'] as const;
-    const list = kinds.map((k) => map.trees.filter((t) => t.kind === k));
-    const merge = (parts: THREE.BufferGeometry[]) => {
-      const flat = parts.map((p) => (p.index ? p.toNonIndexed() : p));
-      for (const f of flat) for (const k of Object.keys(f.attributes)) if (k !== 'position' && k !== 'normal') f.deleteAttribute(k);
-      return mergeGeometries(flat)!;
-    };
-    // Pine: three stacked cones on a short trunk.
-    const pine = merge([0, 1, 2].map((i) => new THREE.ConeGeometry(1.7 - i * 0.42, 2.3 - i * 0.3, 7).translate(0, 2.2 + i * 1.25, 0)));
-    // Oak: a cluster of rounded clumps on a taller trunk.
-    const oak = merge([
-      new THREE.IcosahedronGeometry(1.5, 0).translate(0, 3.6, 0),
-      new THREE.IcosahedronGeometry(1.1, 0).translate(0.9, 3.1, 0.3),
-      new THREE.IcosahedronGeometry(1.0, 0).translate(-0.8, 3.2, -0.4),
-      new THREE.IcosahedronGeometry(0.9, 0).translate(0.1, 4.5, -0.2),
-    ]);
-    // Dead tree: bare branches.
-    const dead = merge([
-      new THREE.CylinderGeometry(0.05, 0.12, 1.6, 4).rotateZ(0.7).translate(0.55, 2.6, 0),
-      new THREE.CylinderGeometry(0.05, 0.1, 1.3, 4).rotateZ(-0.8).translate(-0.45, 2.9, 0.1),
-      new THREE.CylinderGeometry(0.04, 0.08, 1.1, 4).rotateX(0.7).translate(0, 3.3, 0.35),
-    ]);
-    const trunkGeo = new THREE.CylinderGeometry(0.14, 0.26, 2.6, 5).translate(0, 1.3, 0);
-    const crownMat = new THREE.MeshLambertMaterial({ flatShading: true });
-    const geos = [pine, oak, dead];
-    const palettes = [
-      [0x1f3d24, 0x264a2a, 0x1b3520, 0x2c5230],
-      [0x3b5226, 0x46602c, 0x354a22, 0x52662f],
-      [0x5a4a3a, 0x4f4234, 0x62513e, 0x564636],
-    ];
-    const trunks = new THREE.InstancedMesh(trunkGeo, new THREE.MeshLambertMaterial({ color: 0x3e2d1f }), map.trees.length);
-    const meshes: THREE.InstancedMesh[] = [];
-    const entries: { mesh: number; k: number; cell: number; color: THREE.Color }[] = [];
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const sc = new THREE.Vector3();
-    const p = new THREE.Vector3();
-    const up = new THREE.Vector3(0, 1, 0);
-    let ti = 0;
-    list.forEach((trees, kind) => {
-      const mesh = new THREE.InstancedMesh(geos[kind], kind === 2 ? new THREE.MeshLambertMaterial({ flatShading: true }) : crownMat, Math.max(1, trees.length));
-      mesh.count = trees.length;
-      meshes.push(mesh);
-      trees.forEach((t, k) => {
-        const h = Math.abs(Math.sin(t.x * 12.9898 + t.y * 78.233)) * 1000;
-        p.set(t.x, this.terrainAt(t.x, t.y) - 0.1, t.y);
-        q.setFromAxisAngle(up, h % 6.28);
-        const tall = 0.85 + ((h * 7) % 1) * 0.35;
-        sc.set(t.s, t.s * tall, t.s);
-        m.compose(p, q, sc);
-        mesh.setMatrixAt(k, m);
-        trunks.setMatrixAt(ti++, m);
-        const pal = palettes[kind];
-        const color = new THREE.Color(pal[Math.floor(h) % pal.length]);
-        mesh.setColorAt(k, color);
-        const cell = Math.floor(t.y / map.cell) * n + Math.floor(t.x / map.cell);
-        entries.push({ mesh: kind, k, cell, color });
-      });
-    });
-    this.scene.add(trunks, ...meshes);
-    this.trees = { meshes, entries };
-  }
-
-  /** Water surface along the river: a ribbon a little below the banks. */
-  private buildWater(map: GameMap) {
-    const rp = map.riverPath;
-    const half = map.riverWidth / 2 + 1.5;
-    const pos: number[] = [];
-    const idx: number[] = [];
-    rp.forEach((p, i) => {
-      const a = rp[Math.max(0, i - 1)];
-      const b = rp[Math.min(rp.length - 1, i + 1)];
-      const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-      const nx = -(b.y - a.y) / l;
-      const ny = (b.x - a.x) / l;
-      pos.push(p.x + nx * half, WATER_LEVEL, p.y + ny * half, p.x - nx * half, WATER_LEVEL, p.y - ny * half);
-      if (i) idx.push((i - 1) * 2, (i - 1) * 2 + 1, i * 2, (i - 1) * 2 + 1, i * 2 + 1, i * 2);
-    });
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    geo.setIndex(idx);
-    geo.computeVertexNormals();
-    // Drawn before the ground overlays and without writing depth, so the fog, aim arrows and
-    // spell markings painted on the river bed show on top of the water.
-    const water = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x1a3d48, roughness: 0.45, metalness: 0.05, transparent: true, opacity: 0.78, side: THREE.DoubleSide, depthWrite: false }));
-    water.renderOrder = -1;
-    this.scene.add(water);
-  }
-
   /** Stone-footed plank bridges where the roads cross the river. */
   private buildBridges(map: GameMap) {
     const wood = new THREE.MeshLambertMaterial({ color: 0x6b4f33, flatShading: true });
@@ -459,80 +333,6 @@ export class Renderer3D extends Renderer {
       g.rotation.y = -b.angle;
       this.scene.add(g);
     }
-  }
-
-  /** River curbs: a low wall of rough stones along the banks wherever you can't walk down. */
-  private buildCurbs(map: GameMap) {
-    const n = map.grid;
-    const cells: number[] = [];
-    map.cliff.forEach((c, i) => c && cells.push(i));
-    // The rim of each ward hill: a ring of rock (you can't climb up there).
-    map.hillTop.forEach((c, i) => {
-      if (!c) return;
-      const edge = [i - 1, i + 1, i - n, i + n].some((k) => !map.hillTop[k]);
-      if (edge) cells.push(i);
-    });
-    if (!cells.length) return;
-    const geo = new THREE.DodecahedronGeometry(1, 0);
-    const mesh = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ flatShading: true }), cells.length * 2);
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const e = new THREE.Euler();
-    let k = 0;
-    for (const i of cells) {
-      const cx = i % n;
-      const cy = (i - cx) / n;
-      for (let j = 0; j < 2; j++) {
-        const h = Math.abs(Math.sin(i * 12.9898 + j * 78.233) * 43758.5453) % 1;
-        const x = (cx + 0.3 + j * 0.4 + (h - 0.5) * 0.3) * map.cell;
-        const y = (cy + 0.3 + j * 0.4 + (((h * 7) % 1) - 0.5) * 0.3) * map.cell;
-        e.set(h * 3, h * 5, h * 2);
-        q.setFromEuler(e);
-        const sz = 0.75 + h * 0.4;
-        m.compose(new THREE.Vector3(x, this.terrainAt(x, y) - 0.25, y), q, new THREE.Vector3(sz * 1.2, sz * 0.9, sz * 1.2));
-        mesh.setMatrixAt(k, m);
-        mesh.setColorAt(k++, new THREE.Color().setHSL(0.08, 0.08, 0.13 + h * 0.08));
-      }
-    }
-    mesh.receiveShadow = true;
-    mesh.castShadow = true;
-    this.scene.add(mesh);
-  }
-
-  /** Boulders and stones in the woods and along the river banks. */
-  private buildRocks(map: GameMap) {
-    const n = map.grid;
-    const spots: { x: number; y: number; s: number }[] = [];
-    for (let i = 0; i < 900 && spots.length < 260; i++) {
-      const h = (k: number) => Math.abs(Math.sin(i * 91.7 + k * 47.3) * 43758.5453) % 1;
-      const x = 6 + h(1) * (map.size - 12);
-      const y = 6 + h(2) * (map.size - 12);
-      const cx = Math.floor(x / map.cell);
-      const cy = Math.floor(y / map.cell);
-      // Only in the woods: next to trees, never on roads or lanes.
-      if (map.walkable[cy * n + cx]) continue;
-      if (map.trees.length && !map.walkable[cy * n + cx] && h(3) < 0.4) spots.push({ x, y, s: 0.4 + h(4) * 0.9 });
-    }
-    // Banks: a line of stones along both sides of the river.
-    map.riverPath.forEach((p, i) => {
-      if (i % 3) return;
-      const a = map.riverPath[Math.max(0, i - 1)];
-      const b = map.riverPath[Math.min(map.riverPath.length - 1, i + 1)];
-      const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-      const side = i % 2 ? 1 : -1;
-      const off = map.riverWidth / 2 + 0.8;
-      spots.push({ x: p.x + (-(b.y - a.y) / l) * off * side, y: p.y + ((b.x - a.x) / l) * off * side, s: 0.5 + ((i * 0.37) % 1) * 0.7 });
-    });
-    const rocks = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(0.8, 0), new THREE.MeshLambertMaterial({ color: 0x6d6860, flatShading: true }), spots.length);
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    spots.forEach((r, k) => {
-      q.setFromEuler(new THREE.Euler(r.x % 1, r.y % 3, 0));
-      m.compose(new THREE.Vector3(r.x, this.terrainAt(r.x, r.y) + 0.1 * r.s, r.y), q, new THREE.Vector3(r.s * 1.3, r.s * 0.75, r.s));
-      rocks.setMatrixAt(k, m);
-    });
-    rocks.receiveShadow = true;
-    this.scene.add(rocks);
   }
 
   // ------------------------------------------------------------------ camera & input
@@ -626,8 +426,8 @@ export class Renderer3D extends Renderer {
     this.updateFog(w, viewTeam);
     const nightTarget = isNight(w.time) ? 1 : 0;
     this.night += (nightTarget - this.night) * 0.03;
-    this.sky.intensity = 1.5 - this.night * 0.75;
-    this.sun.intensity = 2.4 - this.night * 1.6;
+    this.sky.intensity = 1.5 - this.night * 0.5;
+    this.sun.intensity = 2.4 - this.night * 1.3;
     this.sun.color.setRGB(1, 0.95 - this.night * 0.2, 0.87 + this.night * 0.1);
 
     // 3. Units and buildings.
@@ -636,6 +436,7 @@ export class Renderer3D extends Renderer {
     this.sun.position.set(this.camX + 25, 60, this.camY + 18);
     this.sun.target.position.set(this.camX, 0, this.camY - 6);
     this.clock += this.dt;
+    this.art.update(this.dt, this.night);
     this.world = w;
     this.viewTeam = viewTeam;
     this.syncCtx();
@@ -663,33 +464,20 @@ export class Renderer3D extends Renderer {
       const row = (n - 1 - cy) * n; // texture rows run bottom-up
       for (let cx = 0; cx < n; cx++) {
         const o = (row + cx) * 4;
-        d[o] = 6;
-        d[o + 1] = 10;
-        d[o + 2] = 18;
+        // Very dark on purpose: this value is brightened on the way to the screen, and anything
+        // lighter than the painted ground turns fog into a pale haze.
+        d[o] = 1;
+        d[o + 1] = 2;
+        d[o + 2] = 4;
         d[o + 3] = g[cy * n + cx] ? 0 : a;
       }
     }
     this.fogTex.needsUpdate = true;
     // Trees outside vision get darker (a few times per second is enough).
     const now = performance.now();
-    if (this.trees && now - this.lastTreeShade > 250) {
+    if (now - this.lastTreeShade > 250) {
       this.lastTreeShade = now;
-      const { meshes, entries } = this.trees;
-      const tmp = new THREE.Color();
-      for (const e of entries) {
-        const cx = e.cell % n;
-        const cy = (e.cell / n) | 0;
-        // A tree is "seen" if any neighbouring cell is in vision.
-        let lit = false;
-        for (let dy = -1; dy <= 1 && !lit; dy++)
-          for (let dx = -1; dx <= 1 && !lit; dx++) {
-            const x = cx + dx;
-            const y = cy + dy;
-            if (x >= 0 && y >= 0 && x < n && y < n && g[y * n + x]) lit = true;
-          }
-        meshes[e.mesh].setColorAt(e.k, tmp.copy(e.color).multiplyScalar(lit ? 1 : 0.4));
-      }
-      for (const mesh of meshes) if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      this.art.shadeTrees(g, this.camX, this.camY);
     }
   }
 

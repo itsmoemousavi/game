@@ -29,6 +29,20 @@ function noise(x: number, y: number, k = 0): number {
 const fbm = (x: number, y: number, k = 0) => noise(x, y, k) * 0.55 + noise(x * 2.1, y * 2.1, k + 1) * 0.3 + noise(x * 4.3, y * 4.3, k + 2) * 0.15;
 const mix = (a: number[], b: number[], t: number) => a.map((v, i) => v + (b[i] - v) * t);
 
+/** A soft round blot of one colour, stamped many times (much quicker than a gradient per stamp). */
+function softStamp(r: number, g: number, b: number): HTMLCanvasElement {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const x = c.getContext('2d')!;
+  const grad = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, `rgba(${r},${g},${b},1)`);
+  grad.addColorStop(0.55, `rgba(${r},${g},${b},0.65)`);
+  grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+  x.fillStyle = grad;
+  x.fillRect(0, 0, 64, 64);
+  return c;
+}
+
 export function bakeMap(map: GameMap): HTMLCanvasElement {
   const px = PX_PER_UNIT_BAKED;
   const W = map.size * px;
@@ -49,17 +63,17 @@ export function bakeMap(map: GameMap): HTMLCanvasElement {
     field.width = field.height = R;
     const fg = field.getContext('2d')!;
     const img = fg.createImageData(R, R);
-    const grass = [50, 66, 36];
-    const lush = [40, 60, 30];
-    const moss = [34, 48, 30];
-    const dry = [78, 76, 46];
+    const grass = [44, 56, 32];
+    const lush = [36, 52, 30];
+    const moss = [30, 42, 28];
+    const dry = [60, 60, 38];
     for (let y = 0; y < R; y++) {
       for (let x = 0; x < R; x++) {
         const mx = x / 2;
         const my = y / 2;
-        let col = mix(grass, lush, fbm(mx / 18, my / 18));
-        col = mix(col, dry, Math.max(0, fbm(mx / 30, my / 30, 5) - 0.55) * 2.2);
-        col = mix(col, moss, Math.max(0, fbm(mx / 11, my / 11, 9) - 0.6) * 2);
+        let col = mix(grass, lush, fbm(mx / 9, my / 9));
+        col = mix(col, dry, Math.max(0, fbm(mx / 13, my / 13, 5) - 0.56) * 1.7);
+        col = mix(col, moss, Math.max(0, fbm(mx / 6, my / 6, 9) - 0.58) * 1.7);
         const grain = (hash(x, y, 3) - 0.5) * 10;
         const o = (y * R + x) * 4;
         img.data[o] = col[0] + grain;
@@ -73,14 +87,19 @@ export function bakeMap(map: GameMap): HTMLCanvasElement {
     g.drawImage(field, 0, 0, W, W);
   }
 
-  // 2. Forest floor: dark, needle-strewn ground under every tree.
-  for (const t of map.trees) {
-    const r = 2.6 * t.s * px;
-    const grad = g.createRadialGradient(t.x * px, t.y * px, 0, t.x * px, t.y * px, r);
-    grad.addColorStop(0, 'rgba(18,24,14,0.75)');
-    grad.addColorStop(1, 'rgba(18,24,14,0)');
-    g.fillStyle = grad;
-    g.fillRect(t.x * px - r, t.y * px - r, r * 2, r * 2);
+  // 2. Forest floor: dark, needle-strewn ground under every tree, and each tree's soft shadow
+  // falling away from the sun (drawn from one stamp: thousands of trees, must stay quick).
+  {
+    const stamp = softStamp(20, 26, 14);
+    for (const t of map.trees) {
+      const r = 3 * t.s * px;
+      g.globalAlpha = 0.72;
+      g.drawImage(stamp, t.x * px - r, t.y * px - r, r * 2, r * 2);
+      const sw = 3.4 * t.s * px;
+      g.globalAlpha = 0.5;
+      g.drawImage(stamp, (t.x - 2.2 * t.s) * px - sw, (t.y - 1.5 * t.s) * px - sw * 0.8, sw * 2, sw * 1.6);
+    }
+    g.globalAlpha = 1;
   }
 
   // 3. Trails through the woods and jungle paths: worn earth, no hard edges.
@@ -101,28 +120,48 @@ export function bakeMap(map: GameMap): HTMLCanvasElement {
       g.stroke();
     }
   };
-  strokeRoads('rgba(84,70,46,0.35)', 12);
-  strokeRoads('#6e5a3c', 8.5);
-  strokeRoads('rgba(126,104,70,0.55)', 5.5);
-  g.setLineDash([1.2 * px, 2.6 * px]);
-  for (const off of [-1.8, 1.8]) {
-    g.strokeStyle = 'rgba(60,48,32,0.35)';
-    g.lineWidth = 0.5 * px;
+  // A worn verge, then earth laid down in irregular patches so the edge isn't a clean line.
+  strokeRoads('rgba(58,50,34,0.4)', 11.5);
+  strokeRoads('rgb(70,58,40)', 7.5);
+  {
+    const dark = softStamp(58, 46, 32);
+    const pale = softStamp(104, 88, 62);
+    const grassy = softStamp(46, 56, 32);
+    let k = 0;
     for (const r of roads) {
-      g.beginPath();
-      for (let i = 0; i < r.length; i++) {
-        const a = r[Math.max(0, i - 1)];
-        const b = r[Math.min(r.length - 1, i + 1)];
+      for (let i = 0; i < r.length - 1; i++) {
+        const a = r[i];
+        const b = r[i + 1];
         const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-        const nx = (-(b.y - a.y) / l) * off;
-        const ny = ((b.x - a.x) / l) * off;
-        if (i) g.lineTo((r[i].x + nx) * px, (r[i].y + ny) * px);
-        else g.moveTo((r[i].x + nx) * px, (r[i].y + ny) * px);
+        const nx = -(b.y - a.y) / l;
+        const ny = (b.x - a.x) / l;
+        for (let d = 0; d < l; d += 0.8) {
+          k++;
+          const x = a.x + ((b.x - a.x) * d) / l;
+          const y = a.y + ((b.y - a.y) * d) / l;
+          // Earth spilling over the edge, on either side.
+          const side = hash(k, 1, 61) < 0.5 ? -1 : 1;
+          const off = (3.7 + hash(k, 2, 62) * 1.8) * side;
+          const rad = (0.9 + hash(k, 3, 63) * 1.9) * px;
+          g.globalAlpha = 0.55;
+          g.drawImage(hash(k, 9, 69) < 0.34 ? grassy : dark, (x + nx * off) * px - rad, (y + ny * off) * px - rad, rad * 2, rad * 2);
+          // Lighter, worn-down earth down the middle where everybody walks.
+          const mid = (hash(k, 4, 64) - 0.5) * 5;
+          const rm = (1 + hash(k, 5, 65) * 2) * px;
+          g.globalAlpha = 0.18;
+          g.drawImage(pale, (x + nx * mid) * px - rm, (y + ny * mid) * px - rm, rm * 2, rm * 2);
+          // A dark wheel-worn scuff now and then.
+          if (hash(k, 6, 66) < 0.16) {
+            const sc = (hash(k, 7, 67) < 0.5 ? -1.9 : 1.9) + (hash(k, 8, 68) - 0.5) * 0.7;
+            g.globalAlpha = 0.32;
+            const rs = 0.5 * px;
+            g.drawImage(dark, (x + nx * sc) * px - rs * 2.4, (y + ny * sc) * px - rs, rs * 4.8, rs * 2);
+          }
+        }
       }
-      g.stroke();
     }
+    g.globalAlpha = 1;
   }
-  g.setLineDash([]);
 
   // 5. River: muddy banks, then shallows, then deep water down the middle, with ripples.
   // Painted on its own layer, then wiped off the side lanes: the river ends at each side lane's
@@ -134,15 +173,15 @@ export function bakeMap(map: GameMap): HTMLCanvasElement {
   g = layer.getContext('2d')!;
   g.lineCap = 'round';
   g.lineJoin = 'round';
-  g.strokeStyle = '#4a3f2b';
+  g.strokeStyle = '#332c20';
   g.lineWidth = (rw + 4) * px;
   path(map.riverPath);
   g.stroke();
-  g.strokeStyle = '#2f5560';
+  g.strokeStyle = '#24323a';
   g.lineWidth = rw * px;
   path(map.riverPath);
   g.stroke();
-  g.strokeStyle = '#21414f';
+  g.strokeStyle = '#1a2a33';
   g.lineWidth = rw * 0.6 * px;
   path(map.riverPath);
   g.stroke();
@@ -184,8 +223,8 @@ export function bakeMap(map: GameMap): HTMLCanvasElement {
         const i = cy * n + cx;
         if (map.cliff[i]) {
           const v = hash(cx, cy, 41);
-          const l = 74 + v * 30;
-          g.fillStyle = `rgb(${l},${l - 4},${l - 10})`;
+          const l = 44 + v * 20;
+          g.fillStyle = `rgb(${l},${l - 3},${l - 9})`;
           g.beginPath();
           g.ellipse((cx + 0.5) * cs, (cy + 0.5) * cs, cs * 0.62, cs * 0.55, v * 3, 0, Math.PI * 2);
           g.fill();
@@ -200,14 +239,14 @@ export function bakeMap(map: GameMap): HTMLCanvasElement {
         const near = [i - 1, i + 1, i - n, i + n].some((k) => map.height[k] >= 1 && !map.cliff[k]);
         if (!near) continue;
         const grad = g.createRadialGradient((cx + 0.5) * cs, (cy + 0.5) * cs, 0, (cx + 0.5) * cs, (cy + 0.5) * cs, cs * 1.4);
-        grad.addColorStop(0, 'rgba(120,104,74,0.75)');
-        grad.addColorStop(1, 'rgba(120,104,74,0)');
+        grad.addColorStop(0, 'rgba(72,64,48,0.8)');
+        grad.addColorStop(1, 'rgba(72,64,48,0)');
         g.fillStyle = grad;
         g.fillRect((cx - 1) * cs, (cy - 1) * cs, cs * 3, cs * 3);
       }
     }
     // Lanes wade across: a gravel ford where each road meets the water.
-    g.strokeStyle = 'rgba(112,98,72,0.42)';
+    g.strokeStyle = 'rgba(70,62,46,0.4)';
     g.lineWidth = 8 * px;
     for (const r of roads) {
       path(r);
@@ -252,9 +291,9 @@ export function bakeMap(map: GameMap): HTMLCanvasElement {
     const cy = Math.floor(y / map.cell);
     return cx >= 0 && cy >= 0 && cx < n && cy < n && map.height[cy * n + cx] === 2 && map.walkable[cy * n + cx] === 1;
   };
-  g.fillStyle = 'rgba(52,48,40,0.9)';
+  g.fillStyle = 'rgba(30,28,24,0.95)';
   for (let cy = 0; cy < n; cy++) for (let cx = 0; cx < n; cx++) if (raised((cx + 0.5) * map.cell, (cy + 0.5) * map.cell)) g.fillRect(cx * cs, cy * cs, cs + 0.5, cs + 0.5);
-  const rowH = 1.7;
+  const rowH = 1.45;
   for (let row = 0; row * rowH < map.size; row++) {
     let x = -hash(row, 0, 31) * 2;
     const y = row * rowH;
@@ -262,16 +301,27 @@ export function bakeMap(map: GameMap): HTMLCanvasElement {
       const w = 1.3 + hash(row, k, 32) * 1.5;
       if (raised(x + w / 2, y + rowH / 2)) {
         const v = hash(row, k, 33);
-        const l = 92 + v * 26;
-        const warm = hash(row, k, 34) * 8;
+        // Worn in big patches: darker and greener where few people walk.
+        const wear = fbm(x / 14, y / 14, 35);
+        const l = 46 + v * 15 + wear * 24;
+        const warm = hash(row, k, 34) * 6;
         g.fillStyle = `rgb(${l + warm},${l - 2},${l - 12})`;
         g.beginPath();
         if (g.roundRect) g.roundRect((x + 0.09) * px, (y + 0.09) * px, (w - 0.18) * px, (rowH - 0.18) * px, 0.25 * px);
         else g.rect((x + 0.09) * px, (y + 0.09) * px, (w - 0.18) * px, (rowH - 0.18) * px);
         g.fill();
-        if (v > 0.8) {
-          g.fillStyle = 'rgba(70,84,48,0.35)'; // a little moss
-          g.fillRect(x * px, (y + rowH - 0.35) * px, w * 0.6 * px, 0.3 * px);
+        if (v > 0.62 || wear < 0.4) {
+          g.fillStyle = 'rgba(50,62,34,0.42)'; // moss creeping along the joints
+          g.fillRect(x * px, (y + rowH - 0.3) * px, w * (0.3 + v * 0.6) * px, 0.26 * px);
+        }
+        if (hash(row, k, 36) > 0.86) {
+          g.strokeStyle = 'rgba(14,12,10,0.5)'; // a crack
+          g.lineWidth = 0.06 * px;
+          g.beginPath();
+          g.moveTo((x + 0.2) * px, (y + 0.3) * px);
+          g.lineTo((x + w * 0.5) * px, (y + rowH * 0.56) * px);
+          g.lineTo((x + w - 0.2) * px, (y + rowH * 0.42) * px);
+          g.stroke();
         }
       }
       x += w;
@@ -306,7 +356,7 @@ export function bakeMap(map: GameMap): HTMLCanvasElement {
     const mid = (h.inner + h.outer) / 2;
     const doorAng = Math.atan2(h.door.y, h.door.x);
     const gap = Math.asin(Math.min(1, h.doorHalf / mid));
-    g.fillStyle = '#4a4740';
+    g.fillStyle = '#35332d';
     g.beginPath();
     g.arc(h.x * px, h.y * px, mid * px, 0, Math.PI * 2);
     g.fill();
@@ -344,7 +394,7 @@ export function bakeMap(map: GameMap): HTMLCanvasElement {
     if (!map.walkable[cy * n + cx] || Math.abs(x - y) < 28) continue; // not in the river
     const r = (0.15 + hash(i, 1, 23) * 0.35) * px;
     const l = 70 + hash(i, 2, 24) * 40;
-    g.fillStyle = `rgba(${l},${l - 2},${l - 8},0.7)`;
+    g.fillStyle = `rgba(${l * 0.72},${l * 0.7},${l * 0.64},0.6)`;
     g.beginPath();
     g.ellipse(x * px, y * px, r, r * 0.75, hash(i, 3, 25) * 3, 0, Math.PI * 2);
     g.fill();

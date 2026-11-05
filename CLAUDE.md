@@ -65,7 +65,7 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
   layer into a texture), `renderer3d.ts` (Three.js view, animations, overlay bars/text, picking),
   `three/hero-anims.ts` (hand-made hero animations: idle, walk,
   attacks, every spell, buffs, deaths), `three/spell-fx.ts` (projectile trails, area spells),
-  `three/fx.ts` (dust, sparks, slashes, roots, meteor, whirlpool, camera shake), `three/hero-models.ts` +
+  `three/fx.ts` (dust, sparks, slashes, roots, meteor, whirlpool, camera shake), `three/world-art.ts` (map look: ground detail, flowing river, swaying trees and grass, rocks, walls, fireflies; all decoration, never reacts to units), `three/hero-models.ts` +
   `three/models.ts` (low-poly placeholder models, baked into few meshes with animatable joints; still the fallback), `menu3d.ts` (start screen 3D hero + portraits), `hud.ts`, `input.ts`, `items-ui.ts`
   (shop), `audio.ts` (synthesized sounds), `tutorial.ts`.
 - `tests/` vitest. Positions in tests are on the 300 m map. Long full-match tests must `await` a
@@ -118,7 +118,7 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
 3. **Hero balance** on the 300 m map: all 46–54% (240 matches, 2026-11-03). Small tweaks after that (Orin nerf etc.)
    not re-checked. Red ~55% was mostly a biased test shuffle; tick order now alternates. Owner: don't chase it.
 4. 3D polish: real art/animations, spell effects in 3D. Courier art is a placeholder (ask owner).
-5. Living world: flowing water/foam, swaying trees, night fireflies (nothing ambient may reveal units in fog).
+5. Living world: shipped in 0.11.0. Phone frame rate and battery with the new art still need the owner's check.
 6. More heroes (2–3: summoner, shield support, mobile ranged carry).
 7. Later: multiplayer (first on owner's MacBook, local only), killable courier + bounty, Capacitor app builds, store release.
 
