@@ -50,7 +50,7 @@ const distToSeg = (px: number, py: number, ax: number, ay: number, bx: number, b
   const t = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * abx + (py - ay) * aby) / l2));
   return dist(px, py, ax + abx * t, ay + aby * t);
 };
-import { findPath } from './pathfinding';
+import { cellCenter, findPath, nearestWalkableCell } from './pathfinding';
 import { Rng } from './rng';
 import { BOT_THINK_INTERVAL, BotDifficulty, botThink, botWhileDead } from './ai/bots';
 import { applyAttackPassives, botLearn, castAbility, damageAfterPassives, passiveArmor, resolveCast } from './abilities';
@@ -125,6 +125,13 @@ export interface AbilityState {
 
 /** Sunder Pike: how long the lowered armor lasts. Storm Blade: lightning damage and how far it jumps. */
 const SUNDER_SECONDS = 4;
+/** Morra's wolves: how far they stray from her. Red Wolf: her reach while she's melee. */
+const SUMMON_LEASH = 22;
+const SUMMON_BUILDING_MULT = 0.5;
+const WOLF_FORM_RANGE = 1.6;
+/** Rhen's Bolt Storm: one bolt this often, at enemies within this range. */
+const BOLT_EVERY = 0.28;
+const BOLT_RADIUS = 11;
 const CHAIN_DAMAGE = 80;
 const CHAIN_RADIUS = 7;
 
@@ -147,12 +154,23 @@ export interface Buff {
   spellImmune?: boolean;
   /** Can't cast abilities (items still work). */
   silenced?: boolean;
+  /** Soaks up this much damage of any kind, then it's gone (Aegis). */
+  absorb?: number;
+  /** +% attack speed while it lasts. */
+  attackSpeedPct?: number;
+  /** Extra chance (%) of a critical hit, on top of items (Red Wolf). */
+  critChance?: number;
+  /** Extra attack damage while it lasts (Red Wolf). */
+  formDamage?: number;
+  /** Fires a bolt at a nearby enemy every BOLT_EVERY seconds (Bolt Storm). */
+  boltDamage?: number;
+  boltTimer?: number;
 }
 
 /** Lingering ground area that ticks damage / slow on enemies inside (Arrow Storm, burning ground). */
 export interface Zone {
   id: number;
-  kind: 'arrowStorm' | 'burn' | 'maelstrom';
+  kind: 'arrowStorm' | 'burn' | 'maelstrom' | 'sanctuary';
   team: Side;
   sourceId: number;
   x: number;
@@ -162,6 +180,8 @@ export interface Zone {
   duration: number;
   dps: number;
   slowPct: number;
+  /** Allied heroes inside take this % less damage (Sanctuary). */
+  reduction?: number;
 }
 
 /** Delayed one-shot area effect (Earthsplitter wind-up, Cataclysm meteor). */
@@ -183,7 +203,7 @@ export interface Blast {
 /** Non-homing projectile travelling in a straight line (Piercing Arrow). */
 export interface Skillshot {
   id: number;
-  kind: 'piercingArrow' | 'fireball' | 'tidalWave';
+  kind: 'piercingArrow' | 'fireball' | 'tidalWave' | 'rebuke';
   team: Side;
   sourceId: number;
   x: number;
@@ -211,6 +231,8 @@ export interface Dash {
   damage: number;
   stun: number;
   hit: number[];
+  /** Passes through everything without hitting (Gale Step). */
+  phase?: boolean;
 }
 
 export interface HeroState {
@@ -226,6 +248,8 @@ export interface HeroState {
   assists: number;
   lastHits: number;
   denies: number;
+  /** Morra is the Red Wolf right now. */
+  wolfForm?: boolean;
   /** All gold earned this match (for gold-per-minute). */
   goldEarned: number;
   /** Hero kills since this hero last died. */
@@ -311,6 +335,12 @@ export interface StructureState {
   rax?: 'melee' | 'ranged';
 }
 
+export interface SummonState {
+  kind: 'wolf';
+  ownerId: number;
+  expires: number;
+}
+
 export interface Unit {
   id: number;
   kind: UnitKind;
@@ -355,6 +385,8 @@ export interface Unit {
   dash: Dash | null;
   hero?: HeroState;
   creep?: CreepState;
+  /** A creature called by a hero (Morra's wolves). */
+  summon?: SummonState;
   structure?: StructureState;
   neutral?: NeutralState;
   ward?: WardState;
@@ -414,6 +446,10 @@ export type GameEvent =
   /** An item button was used (Arcane Boots, Frost Horn, Stoneskin Amulet). */
   | { type: 'itemActive'; unitId: number; kind: 'manaBurst' | 'frostNova' | 'stoneskin' | 'silence' | 'teamHeal' | 'vanish' | 'mire'; targetId?: number }
   | { type: 'chainLightning'; sourceId: number; targetIds: number[] }
+  | { type: 'shieldBreak'; unitId: number }
+  | { type: 'summon'; unitId: number; kind: 'wolf' }
+  | { type: 'wolfForm'; unitId: number; on: boolean }
+  | { type: 'feralBond'; unitId: number; ids: number[] }
   | { type: 'miss'; sourceId: number; targetId: number }
   /** Notable damage (spells, critical hits) for floating numbers. */
   | { type: 'damage'; sourceId: number; targetId: number; amount: number; kind: DamageKind; crit: boolean };
@@ -516,6 +552,8 @@ export class World {
     // Attacking or casting gives away your position for a moment, even from the fog.
     // Not from inside the Warden's house, though: its walls hide everything within.
     if (u.revealUntil > this.time && !isInvisible(u) && !inHouse(this.map, u.x, u.y)) return true;
+    // Hawk Mark: the marked enemy can't hide, not even by turning invisible.
+    if (u.team !== team && u.buffs.some((b) => b.key === 'hawkMark') && !inHouse(this.map, u.x, u.y)) return true;
     return this.vision.sees(team, u);
   }
 
@@ -912,7 +950,12 @@ export class World {
     u.hpRegen = def.hpRegen + 0.15 * lv + b.hpRegen;
     u.manaRegen = def.manaRegen + 0.1 * lv + b.manaRegen;
     u.armor = def.baseArmor + def.armorPerLevel * lv + b.armor;
-    u.damage = def.baseDamage + def.damagePerLevel * lv + b.damage;
+    // Red Wolf: Morra fights in melee with extra damage while it lasts.
+    const form = u.buffs.find((f) => f.key === 'redWolf');
+    h.wolfForm = !!form;
+    u.damage = def.baseDamage + def.damagePerLevel * lv + b.damage + (form?.formDamage ?? 0);
+    u.attackRange = form ? WOLF_FORM_RANGE : def.attackRange;
+    u.projectileSpeed = form ? 0 : def.projectileSpeed;
     u.attackInterval = Math.max(0.45, (def.attackInterval - def.attackIntervalPerLevel * lv) / (1 + b.attackSpeedPct / 100));
     u.moveSpeed = def.moveSpeed * (1 + b.moveSpeedPct / 100);
     if (fill) {
@@ -1041,6 +1084,7 @@ export class World {
         }
         this.updateHero(u);
       } else if (u.creep) this.updateCreep(u);
+      else if (u.summon) this.updateSummon(u);
       else if (u.neutral?.boss) this.updateWarden(u);
       else if (u.neutral) this.updateNeutral(u);
       else if (u.structure) this.updateStructure(u);
@@ -1070,6 +1114,11 @@ export class World {
       h.goldEarned += PASSIVE_GOLD_PER_SEC * DT;
     }
     for (const a of h.abilities) if (a.cooldown > 0) a.cooldown = Math.max(0, a.cooldown - DT);
+    // The Red Wolf ended (time ran out, or she died): back to human, and ranged again.
+    if (h.wolfForm && !u.buffs.some((f) => f.key === 'redWolf')) {
+      this.applyHeroStats(u);
+      this.events.push({ type: 'wolfForm', unitId: u.id, on: false });
+    }
     if (h.tpCooldown > 0) h.tpCooldown = Math.max(0, h.tpCooldown - DT);
     for (const it of h.items) if (it?.cooldown) it.cooldown = Math.max(0, it.cooldown - DT);
     if (h.autoLearn && h.skillPoints > 0) botLearn(this, u);
@@ -1250,6 +1299,47 @@ export class World {
     this.steerTo(u, wp.x, wp.y);
   }
 
+  /** Morra calls a creature: a body of its own, fighting and following on its own. */
+  spawnSummon(owner: Unit, s: SummonState, stats: CombatStats, angle: number): Unit {
+    const r = 2.5;
+    const want = { x: owner.x + Math.cos(angle) * r, y: owner.y + Math.sin(angle) * r };
+    const cell = nearestWalkableCell(this.nav, want.x, want.y);
+    const pos = cell >= 0 ? cellCenter(this.nav, cell) : { x: owner.x, y: owner.y };
+    const u = this.newUnit('creep', owner.team, pos, stats);
+    u.summon = s;
+    u.facing = owner.facing;
+    this.events.push({ type: 'summon', unitId: u.id, kind: s.kind });
+    return u;
+  }
+
+  /** Wolves hunt what their owner attacks, then whatever is close, and otherwise stay near the owner. */
+  private updateSummon(u: Unit) {
+    const s = u.summon!;
+    if (this.time >= s.expires) {
+      this.expire(u);
+      return;
+    }
+    const owner = this.unit(s.ownerId);
+    const home = owner?.alive ? owner : undefined;
+    let t = this.unit(u.targetId);
+    const order = home?.hero?.order;
+    const called = order?.type === 'attack' ? this.unit(order.targetId) : undefined;
+    if (called && this.canAttack(u, called) && called.team !== u.team && dist(u.x, u.y, called.x, called.y) < SUMMON_LEASH) t = called;
+    if (!this.canAttack(u, t) || !this.canSee(u.team, t) || dist(u.x, u.y, t.x, t.y) > u.acquireRange + 4) t = undefined;
+    if (home && dist(u.x, u.y, home.x, home.y) > SUMMON_LEASH && t !== called) t = undefined;
+    if (!t) {
+      t = this.enemiesNear(u, u.x, u.y, u.acquireRange, (e) => e.kind !== 'neutral' && e.kind !== 'ward' && this.canSee(u.team, e)).sort(
+        (a, b) => Number(!!b.hero) - Number(!!a.hero) || dist(u.x, u.y, a.x, a.y) - dist(u.x, u.y, b.x, b.y),
+      )[0];
+    }
+    u.targetId = t ? t.id : null;
+    if (t) {
+      if (!this.tryAttack(u, t)) this.steerTo(u, t.x, t.y);
+      return;
+    }
+    if (home && dist(u.x, u.y, home.x, home.y) > 4) this.steerTo(u, home.x, home.y);
+  }
+
   private updateStructure(u: Unit) {
     const s = u.structure!;
     if (u.attackInterval <= 0) return;
@@ -1397,6 +1487,19 @@ export class World {
       }
       if (b.manaPerSec) u.mana = Math.min(u.maxMana, u.mana + b.manaPerSec * DT);
       if (b.damagePerSec && b.sourceId !== undefined) this.dealDamage(b.sourceId, u, b.damagePerSec * DT, 'spell', { dot: true });
+      if (b.boltDamage) {
+        b.boltTimer = (b.boltTimer ?? 0) - DT;
+        if (b.boltTimer <= 0 && u.stunTimer <= 0) {
+          b.boltTimer = BOLT_EVERY;
+          const t = this.enemiesNear(u, u.x, u.y, BOLT_RADIUS, (e) => e.kind !== 'neutral' && e.kind !== 'ward' && e.kind !== 'structure' && this.canSee(u.team, e)).sort(
+            (p, q) => Number(!!q.hero) - Number(!!p.hero) || dist(u.x, u.y, p.x, p.y) - dist(u.x, u.y, q.x, q.y),
+          )[0];
+          if (t) {
+            this.projectiles.push({ id: this.nextId++, team: u.team, x: u.x, y: u.y, px: u.x, py: u.y, sourceId: u.id, targetId: t.id, speed: 34, damage: b.boltDamage, spell: { kind: 'fireball', aoe: 0 } });
+            this.events.push({ type: 'attack', sourceId: u.id, targetId: t.id });
+          }
+        }
+      }
       if (!u.alive) return;
     }
     u.buffs = u.buffs.filter((b) => b.t > 0);
@@ -1411,6 +1514,7 @@ export class World {
     const moved = Math.hypot(u.x - bx, u.y - by);
     d.remaining -= step;
     for (const e of this.units) {
+      if (d.phase) break;
       if (!e.alive || e.team === u.team || e.kind === 'structure' || d.hit.includes(e.id)) continue;
       if (dist(u.x, u.y, e.x, e.y) > u.radius + e.radius + 0.6) continue;
       d.hit.push(e.id);
@@ -1522,7 +1626,9 @@ export class World {
     u.path = null;
     if (u.attackTimer > 0) return true;
     // The team shield (glyph) also doubles tower attack speed while it lasts.
-    u.attackTimer = u.attackInterval * (u.structure && u.structure.glyph > 0 ? 0.5 : 1);
+    let hurry = 0;
+    for (const b of u.buffs) hurry += b.attackSpeedPct ?? 0;
+    u.attackTimer = (u.attackInterval / (1 + hurry / 100)) * (u.structure && u.structure.glyph > 0 ? 0.5 : 1);
     this.events.push({ type: 'attack', sourceId: u.id, targetId: t.id });
     this.breakInvisibility(u);
     this.reveal(u);
@@ -1570,8 +1676,12 @@ export class World {
     if (!target.alive) return;
     if (target.structure && (!target.structure.vulnerable || kind === 'spell' || target.structure.glyph > 0)) return;
     if (kind === 'spell' && this.isSpellImmune(target)) return;
-    const src = this.unit(sourceId);
-    if (kind === 'attack' && target.structure && src?.hero) raw *= 1 + src.hero.bonus.buildingDamagePct / 100;
+    const dealer = this.unit(sourceId);
+    // A creature's hits count as its owner's for gold, assists and the end-of-match numbers.
+    const src = dealer?.summon ? (this.unit(dealer.summon.ownerId) ?? dealer) : dealer;
+    if (kind === 'attack' && target.structure && src?.hero && !dealer?.summon) raw *= 1 + src.hero.bonus.buildingDamagePct / 100;
+    // Creatures are for fights, not sieges.
+    if (target.structure && dealer?.summon) raw *= SUMMON_BUILDING_MULT;
     // Nothing from outside the Warden's house hurts it (spells and arrows included).
     if (target.neutral?.boss && src && src !== target && !inHouse(this.map, src.x, src.y)) return;
     // Wards ignore spells and splash; every direct attack takes exactly half, so two hits kill one.
@@ -1582,6 +1692,25 @@ export class World {
     let amount = target.ward ? raw : kind === 'attack' ? raw * armorMultiplier(this.armorOf(target)) : raw;
     if (kind === 'spell' && src?.hero && !opts.reflect) amount *= 1 + src.hero.bonus.spellAmpPct / 100;
     if (!target.ward) amount = damageAfterPassives(this, target, amount, kind);
+    if (target.hero) {
+      // Sanctuary: the best dome you're standing in counts.
+      let cut = 0;
+      for (const z of this.zones) {
+        if (z.reduction && z.team === target.team && dist(z.x, z.y, target.x, target.y) <= z.radius + target.radius) cut = Math.max(cut, z.reduction);
+      }
+      amount *= 1 - cut / 100;
+      // Aegis soaks up what's left, before it reaches your health.
+      const shield = target.buffs.find((b) => b.absorb);
+      if (shield) {
+        const soaked = Math.min(shield.absorb!, amount);
+        shield.absorb! -= soaked;
+        amount -= soaked;
+        if (shield.absorb! <= 0) {
+          shield.t = 0;
+          this.events.push({ type: 'shieldBreak', unitId: target.id });
+        }
+      }
+    }
     // Backdoor protection: buildings shrug off damage when no enemy creeps are pushing them.
     if (target.structure?.backdoor && src?.team !== target.team) {
       amount *= BACKDOOR_DAMAGE_MULT;
@@ -1624,8 +1753,8 @@ export class World {
         }
       }
     }
-    if (target.hp <= 0) this.kill(target, src);
-    if (kind === 'attack' && !opts.cleave) this.attackItemEffects(src, target, amount);
+    if (target.hp <= 0) this.kill(target, dealer);
+    if (kind === 'attack' && !opts.cleave) this.attackItemEffects(dealer, target, amount);
   }
 
   /** What items do when an attack lands: thorns on the target, sundered armor and lightning from the attacker. */
@@ -1650,7 +1779,9 @@ export class World {
     }
   }
 
-  private kill(u: Unit, killer: Unit | undefined) {
+  private kill(u: Unit, by: Unit | undefined) {
+    // A creature's kill is its owner's kill.
+    const killer = by?.summon ? (this.unit(by.summon.ownerId) ?? by) : by;
     const charmAt = u.hero ? charmSlot(u) : -1;
     const charm = u.hero && (charmAt >= 0 || u.buffs.some((b) => b.key === 'charm'));
     u.hp = 0;
@@ -1744,6 +1875,11 @@ export class World {
         team: 2,
         droppedAt: this.time,
       });
+    } else if (u.summon) {
+      if (killerHero) {
+        this.giveGold(killerHero, u.bountyGold);
+        this.shareXp(u, u.bountyXp, killerHero.team);
+      }
     } else if (u.neutral) {
       if (killerHero) {
         killerHero.hero!.lastHits++;
@@ -1970,6 +2106,8 @@ export class World {
         // Allied heroes walk through each other: one standing by a wall could otherwise block a
         // teammate for good in a narrow spot.
         if (a.hero && b.hero && a.team === b.team) continue;
+        // Gale Step goes straight through whoever is in the way.
+        if (a.dash?.phase || b.dash?.phase) continue;
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const min = (a.radius + b.radius) * 0.9;

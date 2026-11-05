@@ -13,9 +13,9 @@ import type { Unit, World } from '../world';
  */
 
 /** How much of each enemy hero's damage comes from attacks (the rest is spells). */
-const PHYSICAL: Record<HeroId, number> = { vexa: 0.85, syl: 0.75, brakk: 0.55, grom: 0.45, kaela: 0.25, orin: 0.15 };
+const PHYSICAL: Record<HeroId, number> = { vexa: 0.85, syl: 0.75, brakk: 0.55, grom: 0.45, kaela: 0.25, orin: 0.15, morra: 0.6, seren: 0.45, rhen: 0.8 };
 /** Stuns / roots / slows each hero brings (spell-immunity is worth more against these). */
-const DISABLE: Record<HeroId, number> = { brakk: 1, grom: 1, kaela: 0.8, orin: 0.3, vexa: 0.4, syl: 0.1 };
+const DISABLE: Record<HeroId, number> = { brakk: 1, grom: 1, kaela: 0.8, orin: 0.3, vexa: 0.4, syl: 0.1, morra: 0.5, seren: 0.3, rhen: 0.1 };
 
 type Pick = ItemId | ((ctx: Ctx) => ItemId | null);
 
@@ -40,11 +40,14 @@ const PLANS: Record<HeroId, Pick[]> = {
   vexa: ['fleetBoots', 'twinBlades', defensiveIfNeeded, 'stormBlade', 'keenEdge', 'reaperEdge', 'crownOfAscension', 'lifedrinker', defensive],
   syl: ['fleetBoots', 'keenEdge', 'shadowStep', defensiveIfNeeded, 'reaperEdge', 'sunderPike', 'lifedrinker', 'crownOfAscension', defensive],
   orin: ['arcaneBoots', 'soulChalice', defensiveIfNeeded, 'hushBell', 'focusLens', 'arcaneAmplifier', 'crownOfAscension', 'archmageStaff', defensive],
+  morra: ['arcaneBoots', 'focusLens', banner, defensiveIfNeeded, 'mendersCenser', 'crownOfAscension', 'soulChalice', defensive],
+  seren: ['arcaneBoots', 'mendersCenser', banner, defensiveIfNeeded, 'focusLens', 'crownOfAscension', 'hushBell', defensive],
+  rhen: ['fleetBoots', 'twinBlades', defensiveIfNeeded, 'keenEdge', 'stormBlade', 'reaperEdge', 'crownOfAscension', defensive],
   kaela: ['arcaneBoots', banner, 'focusLens', defensiveIfNeeded, 'mireStaff', 'frostHorn', 'crownOfAscension', 'archmageStaff', defensive],
 };
 
 /** Plays the support role: buys the team's totems. */
-const SUPPORTS: HeroId[] = ['orin', 'kaela', 'grom', 'brakk', 'vexa', 'syl'];
+const SUPPORTS: HeroId[] = ['seren', 'orin', 'kaela', 'morra', 'grom', 'brakk', 'vexa', 'rhen', 'syl'];
 
 function context(w: World, me: Unit): Ctx {
   const enemies = w.heroes.filter((h) => h.team !== me.team);

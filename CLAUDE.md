@@ -73,7 +73,8 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
 
 ## Decisions the owner made (keep them)
 
-- 6 heroes (Brakk, Vexa, Orin, Syl, Grom, Kaela), 3 abilities each (R = ultimate). **No talents.**
+- 9 heroes (Brakk, Vexa, Orin, Syl, Grom, Kaela, Morra, Seren, Rhen), 3 abilities each (R = ultimate). **No talents.**
+- Owner's rules for the new heroes (2026-11-05): Aegis lasts 3 s. Morra's first spell calls 1 wolf at levels 1-2 and 2 from level 3 (never more). Her ultimate is a 14 s melee Red Wolf form, bigger than her wolves, with extra attack speed, damage, a little crit and move speed; no bear. Feral Bond boosts Morra only when she isn't the wolf.
 - Balance goal: no hero is a must-pick (every hero ≈45–55% win rate in random bot lineups);
   team play decides games. Last full check (200 m map): all 45–57%. Needs a re-check on the new map.
 - Map 1.5× bigger (300 m). Per lane: tier-1 near the river, tier-2, tier-3 at the gate with **two barracks**
@@ -119,7 +120,8 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
    adding an item early to a list swung Kaela and Syl by 15-20%. Red ~55% was mostly a biased test shuffle; tick order now alternates. Owner: don't chase it.
 4. 3D polish: real art/animations, spell effects in 3D. Courier art is a placeholder (ask owner).
 5. Living world: shipped in 0.11.0. Phone frame rate and battery with the new art still need the owner's check.
-6. More heroes: owner approved 3 (summoner, shield support, mobile ranged carry), each with a moving preview before it goes in.
+6. More heroes: Morra, Seren and Rhen shipped in 0.13.0. A 4th only if playing them shows a missing role (owner agreed to wait).
+   Balance after 0.13.0 is rough (about 70 matches per hero): Brakk 59%, Grom 58%, Rhen 40.5%, the rest 45-56%. Re-check with more matches.
 7. Later: multiplayer (first on owner's MacBook, local only), killable courier + bounty, Capacitor app builds, store release.
 
 ## Gotchas

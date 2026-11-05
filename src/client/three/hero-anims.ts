@@ -626,7 +626,197 @@ const kaela: Animator = (c, o, j, u, a, time) => {
   P.apply(j);
 };
 
-const ANIMATORS: Record<HeroId, Animator> = { brakk, vexa, orin, syl, grom, kaela };
+/**
+ * Morra: a watchful, loose-limbed walk with the staff swinging; flicks spirit wisps from the staff,
+ * plants it and throws both arms up to call her wolves, and howls for Feral Bond. As the Red Wolf
+ * she is animated like her wolves (see monster-anims.ts).
+ */
+const morra: Animator = (c, o, j, u, a, time) => {
+  const now = c.clock;
+  const { s, walk } = locomotion(c, u, a, 4.8, 0.85, (side) => footDust(c, u, side, 0x8a7558, 0.4));
+  const P = new Pose();
+  const ta = now - a.atkAt;
+  const tc = now - a.castAt;
+  P.add('torso', walk * 0.08 + Math.sin(time * 1.9 + u.id) * 0.03 * (1 - walk), s * 0.09 * walk);
+  P.add('head', Math.sin(time * 1.1 + u.id) * 0.04, Math.sin(time * 0.55 + u.id) * 0.3 * (1 - walk));
+  P.add('legL', s * 0.65 * walk);
+  P.add('legR', -s * 0.65 * walk);
+  P.add('armL', s * 0.5 * walk + Math.sin(time * 1.3 + u.id) * 0.04);
+  P.add('armR', -s * 0.18 * walk);
+  P.rigY = -Math.abs(s) * 0.06 * walk;
+  if (ta < 0.55) {
+    P.add('armR', track(ta, [[0, 0], [0.1, -1.3], [0.2, -0.3], [0.55, 0]]));
+    P.add('weapon', track(ta, [[0, 0], [0.1, -0.4], [0.2, 0.9], [0.55, 0]]));
+    P.add('torso', track(ta, [[0, 0], [0.1, -0.1], [0.2, 0.2], [0.55, 0]]), track(ta, [[0, 0], [0.1, 0.25], [0.2, -0.2], [0.55, 0]]));
+  }
+  if (tc < 1.05 && a.castSlot === 0) {
+    // Calling: staff high, the other arm flung up, chest open to the sky.
+    const up = track(tc, [[0, 0], [0.22, 1], [0.7, 1], [1.05, 0]]);
+    P.add('armR', -2.1 * up, 0, -0.15 * up);
+    P.add('armL', -2.6 * up, 0, -0.35 * up);
+    P.add('torso', -0.26 * up);
+    P.add('head', -0.45 * up);
+    P.add('weapon', 0.5 * up);
+    if (!a.castDone && tc > 0.22) {
+      a.castDone = true;
+      const tip = at(o, j.weapon, 0, 1.35, 0);
+      c.fx.flashAt(tip, 3, 0xffa64a, 0.4);
+      c.fx.burst(tip, 12, 0xffc247, 5, 0.3, 0.6, 2);
+    }
+  }
+  if (tc < 0.8 && a.castSlot === 1) {
+    // Feral Bond: a howl, head thrown back, arms low and wide.
+    const up = track(tc, [[0, 0], [0.15, 1], [0.55, 1], [0.8, 0]]);
+    P.add('head', -0.8 * up);
+    P.add('torso', -0.18 * up);
+    P.add('armL', 0.35 * up, 0, -0.6 * up);
+    P.add('armR', 0.2 * up, 0, 0.5 * up);
+  }
+  stunned(P, u, time);
+  P.apply(j);
+};
+
+/**
+ * Seren: an upright, measured walk behind her shield; a downward mace blow; lifts the mace to shield
+ * an ally, drives the shield forward to loose the lance, and raises the mace high for Sanctuary.
+ */
+const seren: Animator = (c, o, j, u, a, time) => {
+  const now = c.clock;
+  const { s, walk } = locomotion(c, u, a, 4.6, 0.8, (side) => {
+    footDust(c, u, side, 0x8a7558, 0.4);
+    if (u.id === c.meId) c.sound('step', u.x, u.y, 0.35);
+  });
+  const P = new Pose();
+  const ta = now - a.atkAt;
+  const tc = now - a.castAt;
+  P.add('torso', walk * 0.04 + Math.sin(time * 1.8 + u.id) * 0.018, s * 0.06 * walk);
+  P.add('head', 0, Math.sin(time * 0.5 + u.id) * 0.2 * (1 - walk));
+  P.add('legL', s * 0.6 * walk);
+  P.add('legR', -s * 0.6 * walk);
+  P.add('armL', s * 0.06 * walk);
+  P.add('armR', -s * 0.3 * walk);
+  P.rigY = -Math.abs(s) * 0.05 * walk;
+  if (ta < 0.55) {
+    P.add('armR', track(ta, [[0, 0], [0.12, -2.4], [0.24, -0.45], [0.55, 0]]));
+    P.add('weapon', track(ta, [[0, 0], [0.12, -0.5], [0.24, -0.8], [0.55, 0]]));
+    P.add('torso', track(ta, [[0, 0], [0.12, -0.12], [0.24, 0.26], [0.55, 0]]), track(ta, [[0, 0], [0.12, 0.3], [0.24, -0.25], [0.55, 0]]));
+    if (!a.impactDone && ta >= 0.22) {
+      a.impactDone = true;
+      const [x, y] = near(c, u, 1.7);
+      c.fx.sparks(x, y, 1.2, 6, 0xfff1c2, 3.5);
+      c.fx.flash(x, y, 1.2, 1.7, 0xffe9a8, 0.14);
+      if (u.id === c.meId) c.sound('ironClang', u.x, u.y, 0.4);
+    }
+  }
+  if (a.castSlot === 0 && tc < 0.7) {
+    const up = track(tc, [[0, 0], [0.16, 1], [0.45, 1], [0.7, 0]]);
+    P.add('armR', -2.3 * up, 0, 0.18 * up);
+    P.add('weapon', 0.4 * up);
+    P.add('torso', -0.08 * up);
+    P.add('head', -0.25 * up);
+    if (!a.castDone && tc > 0.16) {
+      a.castDone = true;
+      const tip = at(o, j.weapon, 0, 1.05, 0);
+      c.fx.flashAt(tip, 2.4, 0xfff1c2, 0.35);
+      c.fx.burst(tip, 10, 0xffe9a8, 4, 0.25, 0.5, 1);
+    }
+  }
+  if (a.castSlot === 1 && tc < 0.6) {
+    const up = track(tc, [[0, 0.3], [0.08, 1], [0.3, 1], [0.6, 0]]);
+    P.add('armL', -0.9 * up, 0, -0.1 * up);
+    P.add('torso', 0.18 * up, -0.3 * up);
+    P.add('armR', 0.25 * up);
+    if (!a.castDone) {
+      a.castDone = true;
+      const [x, y] = near(c, u, 1.2);
+      c.fx.flash(x, y, 1.6, 3.8, 0xfff1c2, 0.3);
+      c.fx.shockwave(x, y, 2.2, 0xffe9a8, 0.3, 0.7);
+    }
+  }
+  if (a.castSlot === 2 && tc < 1.05) {
+    const up = track(tc, [[0, 0], [0.22, 1], [0.75, 1], [1.05, 0]]);
+    P.add('armR', -2.8 * up);
+    P.add('armL', -0.6 * up);
+    P.add('weapon', 0.25 * up);
+    P.add('torso', -0.2 * up);
+    P.add('head', -0.45 * up);
+    if (!a.castDone && tc > 0.22) {
+      a.castDone = true;
+      const tip = at(o, j.weapon, 0, 1.05, 0);
+      c.fx.flashAt(tip, 4, 0xffe9a8, 0.5);
+      for (let i = 0; i < 10; i++) c.fx.particle(tip, 0xfff1c2, 0.3, 0.7, { vel: v3((Math.random() - 0.5) * 2, 9 + Math.random() * 7, (Math.random() - 0.5) * 2) });
+    }
+  }
+  stunned(P, u, time);
+  P.apply(j);
+};
+
+/**
+ * Rhen: a quick, light run with the coat tails flying and the crossbow at the hip; shoulders it
+ * to fire, jolts with each shot, dives into Gale Step, and in Bolt Storm keeps the bow up and firing.
+ */
+const rhen: Animator = (c, o, j, u, a, time) => {
+  const now = c.clock;
+  const { s, walk } = locomotion(c, u, a, 5.8, 1, (side) => {
+    footDust(c, u, side, 0x8a7558, 0.4);
+    if (u.id === c.meId) c.sound('step', u.x, u.y, 0.32);
+  });
+  const P = new Pose();
+  const ta = now - a.atkAt;
+  const tc = now - a.castAt;
+  const storm = u.buffs.some((b) => b.key === 'boltStorm');
+  const shooting = ta < 1.1 || storm || (a.castSlot === 1 && tc < 0.6);
+  a.aim += ((shooting ? 1 : 0) - a.aim) * Math.min(1, c.dt * (shooting ? 14 : 4));
+  const k = a.aim;
+  const free = 1 - k;
+  P.add('torso', walk * 0.15 * free + Math.sin(time * 2.1 + u.id) * 0.02 * (1 - walk), s * 0.1 * walk * free);
+  P.add('head', 0, Math.sin(time * 0.6 + u.id) * 0.22 * (1 - walk) * free);
+  P.add('legL', s * 0.8 * walk);
+  P.add('legR', -s * 0.8 * walk);
+  P.add('armL', s * 0.1 * walk * free);
+  P.add('armR', -s * 0.08 * walk * free);
+  P.rigY = -Math.abs(s) * 0.07 * walk;
+  // Shouldered: both arms up to the bow, head down on the sights.
+  P.add('armR', -0.8 * k, 0.2 * k, -0.15 * k);
+  P.add('armL', -0.5 * k, 0, 0.3 * k);
+  P.add('torso', -0.05 * k, 0.28 * k);
+  P.add('head', 0.08 * k, -0.28 * k);
+  if (ta < 0.3) {
+    // Recoil.
+    const kick = track(ta, [[0, 0.5], [0.05, 1], [0.3, 0]]);
+    P.add('armR', 0.28 * kick * k);
+    P.add('armL', 0.2 * kick * k);
+    P.add('torso', -0.09 * kick);
+    if (!a.impactDone) {
+      a.impactDone = true;
+      const tip = at(o, j.weapon, 0, 0.08, 0.72);
+      c.fx.flashAt(tip, 1.1, 0xe8efc0, 0.1);
+    }
+  }
+  if (u.dash) {
+    // Gale Step: a low dive with the coat flat behind.
+    P.add('torso', 0.7);
+    P.add('legL', -0.9);
+    P.add('legR', 0.8);
+    P.add('armL', 0.5);
+    P.add('armR', 0.6);
+    P.rigY -= 0.3;
+    if (now - a.trailAt > 0.03) {
+      a.trailAt = now;
+      c.fx.particle(v3(u.x, groundAt(c, u.x, u.y) + 1.2, u.y), 0xe8efc0, 1.3, 0.35, { grow: 1.1, opacity: 0.4 });
+    }
+  }
+  if (a.castSlot === 1 && tc < 0.4 && !a.castDone) {
+    a.castDone = true;
+    const tip = at(o, j.weapon, 0, 0.08, 0.72);
+    c.fx.flashAt(tip, 2, 0xff8a6a, 0.3);
+  }
+  stunned(P, u, time);
+  P.apply(j);
+  aimWeapon(o, j, k);
+};
+
+const ANIMATORS: Record<HeroId, Animator> = { brakk, vexa, orin, syl, grom, kaela, morra, seren, rhen };
 
 /** Animate one hero model for this frame. */
 export function animateHero(c: AnimCtx, o: THREE.Object3D, j: Joints, u: Unit, a: Anim, time: number) {
@@ -686,6 +876,15 @@ export function heroCast(c: AnimCtx, u: Unit, slot: number, a: Anim) {
     c.fx.flash(u.x, u.y, 1.4, 4, 0x6a4bd0, 0.3);
   } else if (id === 'grom' && slot === 2) {
     c.fx.shockwave(u.x, u.y, 4, 0x9dff5a, 0.4, 0.7);
+  } else if (id === 'morra' && slot === 1) {
+    c.fx.shockwave(u.x, u.y, 14, 0xffa64a, 0.55, 0.6);
+    c.fx.sparks(u.x, u.y, 1.6, 10, 0xffc247, 4);
+  } else if (id === 'rhen' && slot === 0) {
+    c.fx.dust(u.x, u.y, 8, 1.4, 0xb8b48c, 1, 0.7);
+    c.fx.shockwave(u.x, u.y, 3, 0xe8efc0, 0.3, 0.6);
+    a.trailAt = 0;
+  } else if (id === 'rhen' && slot === 2) {
+    c.fx.shockwave(u.x, u.y, 11, 0xe8efc0, 0.5, 0.45);
   }
 }
 
@@ -826,6 +1025,23 @@ export function heroCorpse(c: AnimCtx, k: Corpse): boolean {
       }
       sinkAt = 2.6;
       end = 3.4;
+      break;
+    case 'seren':
+      // Sinks to her knees with the mace falling away, then forward onto the shield.
+      P.add('legL', track(t, [[0, 0], [0.35, -1.05]]));
+      P.add('legR', track(t, [[0, 0], [0.35, -1.0]]));
+      P.add('torso', track(t, [[0, 0], [0.35, 0.4]]));
+      P.add('head', track(t, [[0, 0], [0.45, 0.5]]));
+      P.add('armR', track(t, [[0, 0], [0.4, 0.5]]), 0, 0.3);
+      P.add('weapon', track(t, [[0, 0], [0.45, 1.4]]));
+      P.rigY = track(t, [[0, 0], [0.35, -0.55]]);
+      k.o.rotation.x = track(t, [[0.5, 0], [0.95, 1.3]]);
+      if (!k.thud && t > 0.95) {
+        k.thud = true;
+        c.fx.dust(x, y, 6, 1.3, 0x8a7558, 1, 0.9);
+        c.fx.sparks(x, y, 1, 10, 0xffe9a8, 3);
+        c.sound('armorFall', x, y, 0.8);
+      }
       break;
     case 'orin':
     case 'kaela': {

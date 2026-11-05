@@ -191,6 +191,38 @@ const STATUS_ICONS: Record<StatusId, string> = {
   silenced: ICONS.hushBell,
   sunder: ICONS.sunderPike,
   ghostShroud: ICONS.ghostShroud,
+  aegis: svg(
+    '<path d="M12 3l7.5 2.5v5.7c0 4.8-3.2 8.2-7.5 9.8-4.3-1.6-7.5-5-7.5-9.8V5.5z" fill="#a8d8ee" fill-opacity=".85" stroke="#0c4a6e" stroke-width="1"/><path d="M12 6.5v11M7.8 11h8.4" stroke="#fef3c7" stroke-width="1.6" stroke-linecap="round"/>',
+    '#0c2233',
+  ),
+  sanctuary: svg(
+    '<path d="M3.5 18a8.5 8.5 0 0 1 17 0z" fill="#fde68a" fill-opacity=".55" stroke="#a16207" stroke-width="1.1"/><path d="M12 9.5v8M7 12l1.8 5.5M17 12l-1.8 5.5" stroke="#a16207" stroke-width=".8"/><path d="M3 18h18" stroke="#fef3c7" stroke-width="1.4"/>',
+    '#2a2206',
+  ),
+  sanctuaryAlly: svg(
+    '<path d="M3.5 18a8.5 8.5 0 0 1 17 0z" fill="#fde68a" fill-opacity=".85" stroke="#a16207" stroke-width="1.1"/><path d="M12 11v5.4M9.3 13.7h5.4" stroke="#713f12" stroke-width="1.6" stroke-linecap="round"/><path d="M3 18h18" stroke="#fef3c7" stroke-width="1.4"/>',
+    '#2a2206',
+  ),
+  galeStep: svg(
+    '<path d="M3 8.5h11c2.6 0 3.2-3.6.6-3.8-1.4-.1-2.3.9-2.1 2M3 12h15c2.8 0 3.3 3.8.6 4-1.5.1-2.4-1-2.2-2.2M3 15.5h7.5c1.9 0 2.3 2.7.4 2.9-1 .1-1.7-.6-1.5-1.5" fill="none" stroke="#d8e3a0" stroke-width="1.7" stroke-linecap="round"/>',
+    '#23280f',
+  ),
+  hawkMark: svg(
+    '<circle cx="12" cy="12" r="7.5" fill="none" stroke="#fb7185" stroke-width="1.5"/><circle cx="12" cy="12" r="3" fill="#ef4444" stroke="#450a0a" stroke-width=".8"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4" stroke="#fda4af" stroke-width="1.5" stroke-linecap="round"/>',
+    '#2b0a12',
+  ),
+  boltStorm: svg(
+    '<path d="M6 4l3.5 15.5M12.5 3l1 16.5M19.5 5l-3.5 14.5" stroke="#e7e5c8" stroke-width="1.3"/><path d="M8 18l2 3.2.2-3.8zM12.2 18.6l1.5 3 1-3.4zM14.8 18l1.2 3.4 1.5-3.2z" fill="#c9d2d8"/><path d="M3.5 7l2.6-3 1.3 3.6M10.5 6.5l1.8-3.5 2 3.4M16.7 7.5l2.9-3 1 3.7" fill="none" stroke="#9aa84e" stroke-width="1.2"/>',
+    '#23280f',
+  ),
+  redWolf: svg(
+    '<path d="M5.5 9L4 2.5l4.6 3.4c2.2-.8 4.6-.8 6.8 0L20 2.5 18.5 9c1 1.8 1 3.8.2 5.5L12 22l-6.7-7.5c-.8-1.7-.8-3.7.2-5.5z" fill="#a8321f" stroke="#2b0a06" stroke-width="1"/><path d="M12 13c-1.8 0-3 1.2-3 2.6L12 19.5l3-3.9c0-1.4-1.2-2.6-3-2.6z" fill="#5c1a10"/><path d="M10.7 14.4L12 16l1.3-1.6z" fill="#14110e"/><path d="M7.5 10.2l2.8 1.1M16.5 10.2l-2.8 1.1" stroke="#ffb14a" stroke-width="1.4" stroke-linecap="round"/>',
+    '#1f0805',
+  ),
+  feralBond: svg(
+    '<path d="M6.5 7.5c-1.7-1.6-2.2-3-2-5l3.8 2.5c2.3-.9 5.1-.9 7.4 0L19.5 2.5c.2 2-.3 3.4-2 5 1 1.6 1.4 3.6.8 5.5L12 21 5.7 13c-.6-1.9-.2-3.9.8-5.5z" fill="#c2763d" stroke="#3b1d0a" stroke-width="1"/><circle cx="9.3" cy="10.5" r="1" fill="#fde68a"/><circle cx="14.7" cy="10.5" r="1" fill="#fde68a"/>',
+    '#2b1508',
+  ),
   stun: svg(
     '<path d="M12 4l1.4 3 3.3.3-2.5 2.2.8 3.2L12 11l-3 1.7.8-3.2-2.5-2.2 3.3-.3z" fill="#fde047" stroke="#713f12" stroke-width="0.8"/><ellipse cx="12" cy="17" rx="7" ry="2.6" fill="none" stroke="#fde047" stroke-width="1.4" stroke-dasharray="2.5 1.5"/>',
     '#3f2a0a',
@@ -268,6 +300,21 @@ export const statusIcon = (id: StatusId) => STATUS_ICONS[id];
 
 /** Ability pictures (same hand-made style; buff abilities reuse their status icon). */
 const ABILITY_ICONS: Record<string, string> = {
+  callPack: svg(
+    '<path d="M3 15l2.6-2 1-3.2 1.7 1.6 3 .2 3.8 3.2-.7 4.2h-1.6l-.3-2.6-3.4-.3L8 20H6.4l.6-3.8L3 15z" fill="#a8a095" stroke="#1c1917" stroke-width=".8"/><path d="M12 9.5l2.2-1.6.9-2.9 1.5 1.5 2.7.2 3.1 2.8-.6 3.7h-1.5l-.2-2.2-3-.2-1.4 2.4h-1.4l.4-2.8-2.7-.7z" fill="#78716c" stroke="#1c1917" stroke-width=".8"/><circle cx="5.7" cy="13.2" r=".6" fill="#fde047"/>',
+    '#1f1a12',
+  ),
+  feralBond: STATUS_ICONS.feralBond,
+  redWolf: STATUS_ICONS.redWolf,
+  aegis: STATUS_ICONS.aegis,
+  rebuke: svg(
+    '<path d="M3 21L17.5 6.5" stroke="#ffd98a" stroke-width="3.6" stroke-linecap="round" stroke-opacity=".55"/><path d="M4 20L18 6" stroke="#fff7d6" stroke-width="1.6" stroke-linecap="round"/><path d="M21.5 2.5L17 13l-2.3-3.7L11 7z" fill="#fff1c2" stroke="#a16207" stroke-width=".9"/>',
+    '#2a2206',
+  ),
+  sanctuary: STATUS_ICONS.sanctuaryAlly,
+  galeStep: STATUS_ICONS.galeStep,
+  hawkMark: STATUS_ICONS.hawkMark,
+  boltStorm: STATUS_ICONS.boltStorm,
   // Brakk
   shieldCharge: svg(
     '<path d="M2 9h5M1 12h6M2 15h5" stroke="#cbd5e1" stroke-width="1.2" stroke-linecap="round"/><path d="M14 4l6 2.5v4.5c0 4.5-2.7 7.5-6 9-3.3-1.5-6-4.5-6-9V6.5z" fill="#94a3b8" stroke="#1e293b" stroke-width="1"/><path d="M14 7v11" stroke="#475569" stroke-width="1.2"/><circle cx="14" cy="11" r="1.6" fill="#fbbf24"/>',

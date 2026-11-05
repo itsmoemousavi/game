@@ -25,7 +25,7 @@
 
 - **3v3 matches** on three lanes, against bots that play as a team (they farm, push, defend and hunt the boss). Choose Easy, Normal or Hard bots.
 - **Draft inside the match:** each team bans one hero, then picks go 1-2-2-1, followed by a 30-second warm-up.
-- **Six heroes**, each with three abilities (R is the ultimate):
+- **Nine heroes**, each with three abilities (R is the ultimate):
 
   | Hero | Role | Abilities |
   |---|---|---|
@@ -35,6 +35,9 @@
   | **Syl** the Shadeblade | Melee Assassin | Shadow Lunge · Veil · Execution |
   | **Grom** the Ironroot | Bruiser / Controller | Root Snare · Bark Skin · Overgrowth |
   | **Kaela** the Tidecaller | Support / Controller | Tidal Wave · Brine Veil · Maelstrom |
+  | **Morra** the Beastcaller | Summoner | Call the Pack · Feral Bond · Red Wolf |
+  | **Seren** the Aegis | Support / Protector | Aegis · Rebuke · Sanctuary |
+  | **Rhen** the Galewalker | Mobile Ranged Carry | Gale Step · Hawk Mark · Bolt Storm |
 
 - **A real map:** towers, two barracks per lane, shrine towers, a winding river, woods that block sight, high ground, fog of war, day and night, runes, jungle camps, and the **Warden** boss in its walled house.
 - **Items and a shop** with combined items, wards, teleport scrolls, selling and dropping items, plus a **courier** that brings your items to you.

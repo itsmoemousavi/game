@@ -242,11 +242,11 @@ export class Renderer {
         this.drawNeutral(c, p);
         continue;
       }
-      ctx.fillStyle = c.creep!.super ? TEAM_DARK[c.team] : TEAM_COLORS[c.team];
+      ctx.fillStyle = c.creep?.super ? TEAM_DARK[c.team] : TEAM_COLORS[c.team];
       ctx.strokeStyle = 'rgba(0,0,0,0.6)';
       ctx.lineWidth = 0.12;
       ctx.beginPath();
-      if (c.creep!.type === 'ranged') {
+      if (c.creep?.type === 'ranged') {
         ctx.moveTo(p.x + Math.cos(c.facing) * c.radius * 1.3, p.y + Math.sin(c.facing) * c.radius * 1.3);
         ctx.lineTo(p.x + Math.cos(c.facing + 2.4) * c.radius, p.y + Math.sin(c.facing + 2.4) * c.radius);
         ctx.lineTo(p.x + Math.cos(c.facing - 2.4) * c.radius, p.y + Math.sin(c.facing - 2.4) * c.radius);

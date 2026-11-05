@@ -25,6 +25,8 @@ export class SpellFx {
     if (id === 'vexa') return crit ? 'shot:arrowCrit' : 'shot:arrow';
     if (id === 'orin') return 'shot:firebolt';
     if (id === 'kaela') return 'shot:waterbolt';
+    if (id === 'morra') return 'shot:spiritbolt';
+    if (id === 'rhen') return 'shot:crossbolt';
     return `shot:shot${team === 1 ? 1 : 0}`;
   }
 
@@ -103,6 +105,9 @@ export class SpellFx {
         if (Math.random() < 0.4) fx.particle(p3(x, y, 1.6), 0x3a3030, 1.0, 0.8, { grow: 1.4, opacity: 0.4, additive: false, vel: new THREE.Vector3(0, 1.5, 0) });
       } else if (s.kind === 'piercingArrow') {
         fx.particle(p3(x, y, 1.4), 0x9fffc8, 0.7, 0.3, { grow: -0.5 });
+      } else if (s.kind === 'rebuke') {
+        fx.particle(p3(x, y, 1.4), 0xfff1c2, 1.1, 0.32, { grow: -0.55 });
+        fx.particle(p3(x + (Math.random() - 0.5), y + (Math.random() - 0.5), 1.4), 0xffd98a, 0.3, 0.5, { vel: new THREE.Vector3(0, 1.4, 0) });
       } else if (s.kind === 'tidalWave') {
         const side = (Math.random() - 0.5) * 3;
         const px = x - s.dy * side;
@@ -118,6 +123,9 @@ export class SpellFx {
         fx.shockwave(s.x, s.y, 2.5, 0x5fe0f5, 0.4, 0.6);
       } else if (s.kind === 'piercingArrow') {
         fx.flashAt(p3(s.x, s.y, 1.4), 1.8, 0x9fffc8, 0.2);
+      } else if (s.kind === 'rebuke') {
+        fx.flashAt(p3(s.x, s.y, 1.4), 2.6, 0xfff1c2, 0.25);
+        fx.sparks(s.x, s.y, 1.2, 8, 0xffe9a8, 4);
       }
     }
 
@@ -134,7 +142,14 @@ export class SpellFx {
         const r = Math.sqrt(Math.random()) * z.radius;
         return [z.x + Math.cos(a) * r, z.y + Math.sin(a) * r];
       };
-      if (z.kind === 'arrowStorm') {
+      if (z.kind === 'sanctuary') {
+        fx.shield('sanctuary' + z.id, z.x, z.y, z.radius, z.radius * 0.72, Math.max(0, fade));
+        while (acc > 0.1) {
+          acc -= 0.1;
+          const [x, y] = rand();
+          fx.particle(p3(x, y, 0.3), 0xfff1c2, 0.3, 1.1, { vel: new THREE.Vector3(0, 1.8, 0), opacity: 0.8 });
+        }
+      } else if (z.kind === 'arrowStorm') {
         while (acc > 0.04) {
           acc -= 0.04;
           const [x, y] = rand();

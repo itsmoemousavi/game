@@ -3,10 +3,10 @@ import { HEROES, HERO_IDS, HeroId } from '../sim';
 import { JOINTS, model } from './three/models';
 
 /** Heroes whose big gear hides the face get their own portrait angle and a step back. */
-const TURN: Partial<Record<HeroId, number>> = { brakk: 0.12 };
-const BACK: Partial<Record<HeroId, number>> = { brakk: 3.5 };
+const TURN: Partial<Record<HeroId, number>> = { brakk: 0.12, seren: 0.1 };
+const BACK: Partial<Record<HeroId, number>> = { brakk: 3.5, seren: 3.35 };
 /** Heroes whose raised weapon would cover the face in the small round picture. */
-const NO_WEAPON_IN_PORTRAIT: HeroId[] = ['brakk'];
+const NO_WEAPON_IN_PORTRAIT: HeroId[] = ['brakk', 'seren'];
 
 /**
  * The hero on the start screen: the picked hero's 3D model on a lit pedestal, turning

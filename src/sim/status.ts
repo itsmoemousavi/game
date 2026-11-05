@@ -31,7 +31,15 @@ export type StatusId =
   | 'banner'
   | 'silenced'
   | 'sunder'
-  | 'ghostShroud';
+  | 'ghostShroud'
+  | 'aegis'
+  | 'sanctuary'
+  | 'sanctuaryAlly'
+  | 'galeStep'
+  | 'hawkMark'
+  | 'boltStorm'
+  | 'feralBond'
+  | 'redWolf';
 
 export interface Status {
   id: StatusId;
@@ -67,6 +75,14 @@ export const STATUS_INFO: Record<StatusId, { name: string; good: boolean }> = {
   silenced: { name: "Silenced: can't cast abilities", good: false },
   sunder: { name: 'Sundered: lower armor', good: false },
   ghostShroud: { name: 'Ghost Shroud: invisible and faster', good: true },
+  aegis: { name: 'Aegis: a shield soaks up damage', good: true },
+  sanctuary: { name: 'Sanctuary: slowed', good: false },
+  sanctuaryAlly: { name: 'Sanctuary: you take much less damage', good: true },
+  galeStep: { name: 'Gale Step: faster attacks', good: true },
+  hawkMark: { name: 'Hawk Mark: lower armor, you can be seen', good: false },
+  boltStorm: { name: 'Bolt Storm: firing at nearby enemies', good: true },
+  feralBond: { name: 'Feral Bond: faster', good: true },
+  redWolf: { name: 'Red Wolf: melee, faster and stronger', good: true },
 };
 
 const BUFF_STATUS: Record<string, StatusId> = {
@@ -83,6 +99,12 @@ const BUFF_STATUS: Record<string, StatusId> = {
   silenced: 'silenced',
   sunder: 'sunder',
   ghostShroud: 'ghostShroud',
+  aegis: 'aegis',
+  galeStep: 'galeStep',
+  hawkMark: 'hawkMark',
+  boltStorm: 'boltStorm',
+  feralBond: 'feralBond',
+  redWolf: 'redWolf',
 };
 
 export function statusEffects(w: World, u: Unit): Status[] {
@@ -93,6 +115,10 @@ export function statusEffects(w: World, u: Unit): Status[] {
   // Standing in an enemy area spell (one icon per kind; it replaces that area's slow icon).
   const inZone = new Set<string>();
   for (const z of w.zones) {
+    if (z.team === u.team && z.kind === 'sanctuary' && u.hero && !inZone.has('ally') && dist(z.x, z.y, u.x, u.y) <= z.radius + u.radius) {
+      inZone.add('ally');
+      add('sanctuaryAlly', Math.max(0, z.duration - z.t));
+    }
     if (z.team === u.team || inZone.has(z.kind) || dist(z.x, z.y, u.x, u.y) > z.radius + u.radius) continue;
     inZone.add(z.kind);
     add(z.kind, Math.max(0, z.duration - z.t));

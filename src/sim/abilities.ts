@@ -1,4 +1,5 @@
 import { AbilityDef, AbilityId, HEROES } from './data/heroes';
+import { SUMMONS } from './data/units';
 import { dist } from './math';
 import type { DamageKind, Order, Unit, World } from './world';
 
@@ -17,6 +18,8 @@ export interface CastRequest {
 }
 
 const CAST_POINT = 0.15;
+/** How hard the Red Wolf's critical hits land (unless a crit item is better). */
+const WOLF_CRIT_MULT = 1.5;
 
 export function abilityDef(u: Unit, slot: number): AbilityDef | undefined {
   return u.hero ? HEROES[u.hero.defId].abilities[slot] : undefined;
@@ -369,6 +372,100 @@ function execute(w: World, u: Unit, slot: number, def: AbilityDef, x: number, y:
         burn: { dps: val(def, 'burnDps', lvl) * m, duration: val(def, 'burnDuration', lvl) },
       });
       break;
+    case 'callPack': {
+      // A new call replaces the old pack.
+      for (const o of w.units) if (o.alive && o.summon?.kind === 'wolf' && o.summon.ownerId === u.id) w.expire(o);
+      const n = val(def, 'wolves', lvl);
+      const stats = { ...SUMMONS.wolf, hp: val(def, 'hp', lvl), damage: val(def, 'damage', lvl) };
+      for (let i = 0; i < n; i++) {
+        w.spawnSummon(u, { kind: 'wolf', ownerId: u.id, expires: w.time + val(def, 'duration', lvl) }, stats, u.facing + ((i - (n - 1) / 2) * Math.PI) / 2.2);
+      }
+      break;
+    }
+    case 'feralBond': {
+      const ids: number[] = [];
+      const t = val(def, 'duration', lvl);
+      for (const o of w.units) {
+        if (!o.alive || o.summon?.ownerId !== u.id || dist(u.x, u.y, o.x, o.y) > def.radius) continue;
+        w.heal(o, (o.maxHp * val(def, 'heal', lvl)) / 100);
+        w.addBuff(o, { key: 'feralBond', t, damageMult: val(def, 'damageMult', lvl), moveSpeedPct: val(def, 'speedPct', lvl) });
+        ids.push(o.id);
+      }
+      // In wolf form she has her own boost: this one is only for the human Morra.
+      if (!u.buffs.some((b) => b.key === 'redWolf')) w.addBuff(u, { key: 'feralBond', t, moveSpeedPct: val(def, 'speedPct', lvl) });
+      w.events.push({ type: 'feralBond', unitId: u.id, ids });
+      break;
+    }
+    case 'redWolf':
+      w.addBuff(u, {
+        key: 'redWolf',
+        t: val(def, 'duration', lvl),
+        attackSpeedPct: val(def, 'attackSpeed', lvl) * m,
+        moveSpeedPct: val(def, 'speedPct', lvl),
+        critChance: val(def, 'critChance', lvl),
+        formDamage: val(def, 'damage', lvl) * m,
+      });
+      w.applyHeroStats(u);
+      w.events.push({ type: 'wolfForm', unitId: u.id, on: true });
+      break;
+    case 'aegis':
+      w.addBuff(target!, { key: 'aegis', t: val(def, 'duration', lvl), absorb: val(def, 'shield', lvl), sourceId: u.id });
+      break;
+    case 'rebuke':
+      w.skillshots.push({
+        id: w.newId(),
+        kind: 'rebuke',
+        team: u.team,
+        sourceId: u.id,
+        x: u.x,
+        y: u.y,
+        px: u.x,
+        py: u.y,
+        dx: dx / len,
+        dy: dy / len,
+        speed: 30,
+        remaining: def.castRange,
+        width: def.radius * 2,
+        damage: val(def, 'damage', lvl),
+        hit: [],
+        slow: { pct: val(def, 'slowPct', lvl), t: 2 },
+      });
+      break;
+    case 'sanctuary':
+      w.zones.push({
+        id: w.newId(),
+        kind: 'sanctuary',
+        team: u.team,
+        sourceId: u.id,
+        x,
+        y,
+        radius: def.radius,
+        t: 0,
+        duration: val(def, 'duration', lvl) * m,
+        dps: 0,
+        slowPct: val(def, 'slowPct', lvl),
+        reduction: val(def, 'reduction', lvl),
+      });
+      break;
+    case 'galeStep': {
+      u.castLock = 0;
+      u.dash = { dx: dx / len, dy: dy / len, speed: 32, remaining: Math.min(def.castRange, len), damage: 0, stun: 0, hit: [], phase: true };
+      w.addBuff(u, { key: 'galeStep', t: val(def, 'duration', lvl), attackSpeedPct: val(def, 'attackSpeed', lvl) });
+      break;
+    }
+    case 'hawkMark': {
+      const t = target!;
+      if (w.isSpellImmune(t)) break;
+      const dur = val(def, 'duration', lvl);
+      w.addBuff(t, { key: 'hawkMark', t: dur, armor: -val(def, 'armor', lvl), sourceId: u.id });
+      w.breakInvisibility(t);
+      w.reveal(t, dur);
+      break;
+    }
+    case 'boltStorm':
+      u.castLock = 0;
+      w.addBuff(u, { key: 'boltStorm', t: val(def, 'duration', lvl), boltDamage: val(def, 'damage', lvl) * m, boltTimer: 0 });
+      break;
     case 'ironHide':
     case 'huntersRhythm':
       break;
@@ -391,9 +488,12 @@ export function applyAttackPassives(w: World, u: Unit, target?: Unit): number {
   }
   // Critical hit items (Keen Edge, Reaper's Edge); not on buildings.
   const b = u.hero.bonus;
-  if (b.critChance > 0 && target?.kind !== 'structure' && w.rng.next() * 100 < b.critChance) {
+  // Red Wolf adds a small chance of its own, on top of any crit item.
+  const formCrit = u.buffs.reduce((sum, x) => sum + (x.critChance ?? 0), 0);
+  const critChance = b.critChance + formCrit;
+  if (critChance > 0 && target?.kind !== 'structure' && w.rng.next() * 100 < critChance) {
     u.hero.lastCrit = true;
-    return u.damage * b.critMult;
+    return u.damage * Math.max(b.critMult, formCrit > 0 ? WOLF_CRIT_MULT : 1);
   }
   u.hero.lastCrit = false;
   return u.damage;

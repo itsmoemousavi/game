@@ -58,7 +58,7 @@ const fx = new Fx3D(scene, () => 0);
     if (scenario === 'cast' && slotArg === 2 && hero === 'orin' && i === 60 + 72) heroCast(ctx, u, -1, a);
     if (scenario === 'cast' && slotArg === 2 && hero === 'brakk' && i === 60 + 36) heroCast(ctx, u, -1, a);
     if (scenario === 'walk') { u.px = u.x - 0.15; }
-    if (scenario === 'buff') u.buffs = [{ key: { orin: 'mendingFlame', kaela: 'brineVeil', grom: 'barkSkin', vexa: 'huntersRhythm', syl: 'veil', brakk: 'x' }[hero] }];
+    if (scenario === 'buff') u.buffs = [{ key: { orin: 'mendingFlame', kaela: 'brineVeil', grom: 'barkSkin', vexa: 'huntersRhythm', syl: 'veil', brakk: 'x', morra: 'x', seren: 'aegis', rhen: 'galeStep' }[hero] }];
     if (corpse) { corpse.t += 1 / 60; heroCorpse(ctx, corpse); }
     else animateHero(ctx, o, jn, u, a, i / 60);
     buffFx(ctx, o, u, a);
@@ -125,7 +125,7 @@ const fx = new Fx3D(scene, () => 0);
   return meshes;
 };
 import { animateMonster, monsterCorpse, monsterKind } from '../client/three/monster-anims';
-/** Monsters: key = 'creep:melee:0' | 'creep:ranged:1' | 'imp' | 'brute' | 'warden'; scenario idle|walk|attack|slam|die. */
+/** Monsters: key = 'creep:melee:0' | 'creep:ranged:1' | 'imp' | 'brute' | 'warden' | 'wolf:0' | 'redwolf:0'; scenario idle|walk|attack|slam|die. */
 (window as any).runM = (key: string, scenario: string, t: number, view = 'front', scale = 1.6) => {
   for (const c of [...scene.children]) if (c.userData.hero) scene.remove(c);
   const o = model(key);

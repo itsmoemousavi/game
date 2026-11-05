@@ -9,6 +9,7 @@ The version you're playing is shown in **Settings → View** in the game.
 
 | Version | Milestone | Date |
 |---|---|---|
+| [0.13.x](#013x--three-new-heroes) | Three new heroes | 2026-11-05 |
 | [0.12.x](#012x--new-items) | 8 new items | 2026-11-05 |
 | [0.11.x](#011x--new-map-art) | New map art and a living world | 2026-11-05 |
 | [0.10.x](#010x--ovra) | Ovra: new name, app icon, patch notes | 2026-11-04 |
@@ -21,6 +22,32 @@ The version you're playing is shown in **Settings → View** in the game.
 | [0.3.x](#03x--hero-balance) | Hero balance | 2026-11-01 |
 | [0.2.x](#02x--six-heroes-and-smarter-bots) | Six heroes and smarter bots | 2026-11-01 |
 | [0.1.x](#01x--first-playable-prototype) | First playable prototype (2D) | 2026-11-01 |
+
+---
+
+## 0.13.x · Three new heroes
+
+### 0.13.0
+*2026-11-05*
+
+**Morra the Beastcaller**, a summoner:
+- **Call the Pack:** calls a wolf, or two from level 3, that fights for you for 22 seconds.
+- **Feral Bond:** your wolves heal, hit harder and run faster. Morra gets the speed too, unless she is the Red Wolf.
+- **Red Wolf (ultimate):** for 14 seconds Morra becomes a big red wolf and fights in melee, with more attack speed, damage and move speed and a small chance of critical hits.
+
+**Seren the Aegis**, a sturdy protector:
+- **Aegis:** a shield on an ally or herself soaks up damage for 3 seconds.
+- **Rebuke:** a lance of light damages and slows everything in its line.
+- **Sanctuary (ultimate):** a golden dome: allies inside take much less damage and enemies inside are slowed.
+
+**Rhen the Galewalker**, a fast ranged fighter:
+- **Gale Step:** dashes straight through enemies, then attacks faster for 3 seconds.
+- **Hawk Mark:** an enemy loses armor and can't hide, even by turning invisible.
+- **Bolt Storm (ultimate):** fires a stream of bolts at nearby enemies while Rhen keeps moving.
+
+Also:
+- The draft screen shows all 9 heroes in one row.
+- Grom hits a little harder (64 starting damage, was 60).
 
 ---
 

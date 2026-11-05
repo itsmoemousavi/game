@@ -744,7 +744,314 @@ function kaela() {
 }
 
 
-export const HERO_BUILDERS: Record<HeroId, () => THREE.Group> = { brakk, vexa, orin, syl, grom, kaela };
+/**
+ * Morra the Beastcaller: a wolf's pelt worn as a hood with the jaws over the brow, bone charms,
+ * braids, bare arms with bone bangles and a tall staff hung with skulls and feathers ('weapon').
+ */
+function morra() {
+  const b = humanoid({ skin: 0xa87a58, cloth: 0x4f3524, cloth2: 0x3a2a1e, boots: 0x2c2018, hip: 0.95, slim: 0.86, sculpt: true });
+  const pelt = [0x5d5245, 0x4c4238, 0x6c6052].map((c) => M(c, { roughness: 0.95 }));
+  const leather = M(0x452e1d);
+  const bone = M(0xb5a888);
+  const hair = M(0x2c1c14);
+  const red = M(0x7a2c1c);
+  // Hide tunic, a belt of bones, and a skirt of hide strips and fur.
+  add(b.torso, mesh(lathe([[0.2, 0.08], [0.2, 0.22], [0.26, 0.48], [0.28, 0.6], [0.2, 0.7], [0.12, 0.76]], 12), leather), 0, 0, 0).scale.set(1, 1, 0.78);
+  add(b.torso, mesh(lathe([[0.22, 0], [0.235, 0.03], [0.235, 0.08], [0.22, 0.11]], 12), M(0x2a1b11)), 0, 0, 0).scale.set(1, 1, 0.8);
+  for (let i = 0; i < 9; i++) {
+    const a = ((i - 4) * Math.PI) / 4.2;
+    add(b.torso, rot(mesh(cloth(0.13, 0.5, 1, 4, (x, y) => [0, (x - 0.5) * 0.02, (1 - y) * 0.06 + Math.sin(i + y * 5) * 0.012]), i % 2 ? leather : pelt[i % 3]), 0, a, 0), Math.sin(a) * 0.22, -0.24, Math.cos(a) * 0.18);
+  }
+  for (let i = 0; i < 5; i++) add(b.torso, mesh(taper([[-0.14 + i * 0.07, 0.02, 0.19], [-0.14 + i * 0.07, -0.08, 0.2]], 0.018, 0.005, 2, 4), bone), 0, 0, 0);
+  // Necklace of teeth and a red war-paint sash.
+  add(b.torso, mesh(new THREE.TorusGeometry(0.15, 0.009, 4, 16, Math.PI), M(0x2a1b11)), 0, 0.68, 0.11).rotation.set(Math.PI + 0.8, 0, 0);
+  for (let i = 0; i < 7; i++) {
+    const a = ((i - 3) / 3) * 1.25;
+    add(b.torso, mesh(taper([[Math.sin(a) * 0.15, 0.62 - Math.cos(a) * 0.05, 0.2], [Math.sin(a) * 0.15, 0.54 - Math.cos(a) * 0.05, 0.215]], 0.016, 0.003, 2, 4), bone), 0, 0, 0);
+  }
+  add(b.torso, rot(mesh(box(0.05, 0.6, 0.02), red), 0, 0, -0.65), 0, 0.33, 0.185);
+  // The pelt: a shaggy mantle over the shoulders, falling down the back as a cape.
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2;
+    const lump = lumpy(new THREE.IcosahedronGeometry(0.12 + (i % 3) * 0.015, 1), 0.2, i);
+    add(b.torso, mesh(lump, pelt[i % 3]), Math.cos(a) * 0.3, 0.76 + (i % 2) * 0.02, Math.sin(a) * 0.23).scale.set(1.15, 0.74, 1.05);
+  }
+  add(b.torso, mesh(cloth(0.58, 1.22, 8, 10, (x, y) => {
+    const fall = 1 - y;
+    return [(x - 0.5) * (-0.12 + fall * 0.22), fall > 0.88 ? Math.sin(x * 37) * 0.06 : 0, -fall * 0.1 + Math.sin(x * 24) * (0.01 + fall * 0.035)];
+  }), pelt[1]), 0, 0.14, -0.26);
+  // Wolf-head hood: skull cap, upper jaw over the brow with teeth, two ears; braids hang in front.
+  hood(b.head, 0.24, pelt[0], M(0x14100c), 0.72, 0.05);
+  // The wolf's muzzle juts out above her brow; its teeth hang over her eyes, never across them.
+  add(b.head, mesh(taper([[0, 0.25, 0.1], [0, 0.26, 0.27], [0, 0.22, 0.42]], 0.105, 0.05, 6, 7), pelt[0]), 0, 0, 0).scale.set(1.1, 0.85, 1);
+  add(b.head, mesh(sph(0.03, 0), M(0x14100c)), 0, 0.225, 0.445);
+  for (let i = 0; i < 5; i++) add(b.head, mesh(taper([[(i - 2) * 0.034, 0.19, 0.36 - Math.abs(i - 2) * 0.03], [(i - 2) * 0.034, 0.135, 0.36 - Math.abs(i - 2) * 0.03]], 0.012, 0.002, 2, 4), bone), 0, 0, 0);
+  for (const s of [-1, 1]) {
+    add(b.head, mesh(taper([[s * 0.12, 0.25, -0.03], [s * 0.15, 0.36, -0.03], [s * 0.16, 0.46, -0.05]], 0.06, 0.006, 3, 4), pelt[2]), 0, 0, 0);
+    add(b.head, mesh(sph(0.018, 0), glow(0xffb347, 2.2)), s * 0.08, 0.27, 0.27);
+    add(b.head, mesh(taper([[s * 0.17, -0.02, 0.09], [s * 0.2, -0.22, 0.1], [s * 0.17, -0.42, 0.09]], 0.04, 0.012, 5, 5), hair), 0, 0, 0);
+    add(b.head, mesh(new THREE.TorusGeometry(0.024, 0.008, 3, 8), bone), s * 0.195, -0.28, 0.1).rotation.x = Math.PI / 2;
+    add(b.head, mesh(box(0.1, 0.012, 0.012), red), s * 0.095, -0.03, 0.2);
+  }
+  // Bone bangles, fur on the upper arms, wrapped boots.
+  for (const arm of [b.armL, b.armR]) {
+    for (let i = 0; i < 3; i++) add(arm, mesh(new THREE.TorusGeometry(0.066, 0.011, 3, 9), bone), 0, -0.42 - i * 0.05, 0).rotation.x = Math.PI / 2;
+    add(arm, mesh(lumpy(new THREE.IcosahedronGeometry(0.135, 1), 0.2, 3), pelt[0]), 0, 0.03, 0).scale.set(1.1, 0.8, 1);
+  }
+  for (const leg of [b.legL, b.legR]) {
+    for (let i = 0; i < 5; i++) add(leg, mesh(new THREE.TorusGeometry(0.083 - i * 0.002, 0.012, 3, 9), M(0x2a1b11)), 0, -0.56 - i * 0.055, 0).rotation.x = Math.PI / 2 + 0.12;
+  }
+  // Staff: a gnarled branch forking at the top around a skull, with feathers and charms.
+  const w = add(b.armR, grp(), 0, -0.62, 0.02);
+  w.name = 'weapon';
+  const wood = M(0x3a281a);
+  add(w, mesh(taper([[0, -0.95, 0], [0.025, -0.3, 0.01], [-0.02, 0.45, -0.01], [0.015, 1.0, 0]], 0.028, 0.044, 12, 6), wood), 0, 0, 0);
+  add(w, mesh(taper([[0.015, 1.0, 0], [0.13, 1.25, 0.02], [0.1, 1.55, 0]], 0.04, 0.01, 6, 5), wood), 0, 0, 0);
+  add(w, mesh(taper([[0.015, 1.0, 0], [-0.12, 1.28, -0.02], [-0.07, 1.6, 0]], 0.04, 0.01, 6, 5), wood), 0, 0, 0);
+  add(w, mesh(sph(0.1, 1), bone), 0, 1.3, 0.01).scale.set(0.9, 1, 1.05);
+  add(w, mesh(box(0.1, 0.05, 0.1), bone), 0, 1.22, 0.05);
+  for (const s of [-1, 1]) add(w, mesh(sph(0.018, 0), glow(0xffb347, 2.4)), s * 0.034, 1.32, 0.095);
+  for (const [x, y, c] of [[0.14, 1.12, 0x7a2c1c], [-0.13, 1.1, 0x6c6052], [0.1, 0.96, 0x4c4238]] as const) {
+    add(w, mesh(cloth(0.05, 0.26, 1, 3, (_a, k) => [0, 0, (1 - k) * 0.05]), M(c)), x, y, 0);
+  }
+  rot(b.armR, -0.25, 0, 0.14);
+  rot(w, 0.25, 0, -0.1);
+  rot(b.armL, -0.2, 0, -0.14);
+  return b.root;
+}
+
+/**
+ * Seren the Aegis: a guardian in pale silver and white, a floating ring of light over a silver
+ * braid, winged pauldrons, a round shield with a glowing sun and a flanged mace ('weapon').
+ */
+function seren() {
+  const b = humanoid({ skin: 0xc9a58a, cloth: 0xb9bcc0, cloth2: 0x8c8f94, boots: 0x6f7277, hip: 0.97, slim: 0.84, sculpt: true });
+  const silver = M(0x9aa2aa, { metalness: 0.75, roughness: 0.35 });
+  const dark = M(0x5a6068, { metalness: 0.7 });
+  const brass = M(0x9c8247, { metalness: 0.7, roughness: 0.35 });
+  const white = M(0xc8c6bc);
+  const hair = M(0xa7abb0);
+  const light = glow(0xffe9a8, 2.4);
+  // Breastplate with a raised ridge, plate skirt over a white under-robe.
+  add(b.torso, mesh(lathe([[0.215, 0.24], [0.27, 0.46], [0.295, 0.6], [0.22, 0.7], [0.12, 0.76]], 14), silver), 0, 0, 0).scale.set(1, 1, 0.78);
+  add(b.torso, mesh(box(0.035, 0.46, 0.04), brass), 0, 0.48, 0.205);
+  add(b.torso, mesh(new THREE.OctahedronGeometry(0.055), light), 0, 0.56, 0.235);
+  add(b.torso, mesh(lathe([[0.2, 0.1], [0.225, 0.18], [0.215, 0.26]], 14), dark), 0, 0, 0).scale.set(1, 1, 0.8);
+  add(b.torso, mesh(lathe([[0.215, 0], [0.23, 0.03], [0.23, 0.09], [0.215, 0.12]], 14), brass), 0, 0, 0).scale.set(1, 1, 0.8);
+  add(b.torso, mesh(skirt(0.21, 0.36, 0.62, 8, 0.05, 16), white), 0, -0.6, 0).scale.set(1, 1, 0.84);
+  for (let i = 0; i < 6; i++) {
+    const a = ((i - 2.5) * Math.PI) / 3;
+    add(b.torso, rot(mesh(cloth(0.15, 0.34, 1, 2, (_x, y) => [0, 0, (1 - y) * 0.09]), silver), 0, a, 0), Math.sin(a) * 0.21, -0.16, Math.cos(a) * 0.175);
+  }
+  // White cape from the shoulders, long and clean, with a brass edge.
+  add(b.torso, mesh(cloth(0.6, 1.5, 8, 10, (x, y) => {
+    const fall = 1 - y;
+    return [(x - 0.5) * (-0.14 + fall * 0.24), 0, -fall * 0.09 + Math.sin(x * 22) * (0.008 + fall * 0.03)];
+  }), white), 0, 0.02, -0.25);
+  // Winged pauldrons, vambraces, greaves.
+  for (const [arm, s] of [[b.armL, -1], [b.armR, 1]] as const) {
+    add(arm, mesh(new THREE.SphereGeometry(0.155, 10, 5, 0, Math.PI * 2, 0, Math.PI * 0.55), silver), s * 0.01, 0.03, 0).scale.set(1.1, 0.75, 1.05);
+    add(arm, mesh(new THREE.TorusGeometry(0.15, 0.012, 4, 14), brass), s * 0.01, 0.03, 0).rotation.x = Math.PI / 2;
+    for (let i = 0; i < 3; i++) add(arm, mesh(taper([[s * 0.06, 0.1 - i * 0.03, -0.04], [s * 0.17, 0.2 - i * 0.04, -0.11], [s * (0.27 - i * 0.04), 0.26 - i * 0.07, -0.2]], 0.03, 0.006, 4, 4), i === 1 ? brass : silver), 0, 0, 0);
+    add(arm, mesh(lathe([[0.066, -0.34], [0.082, -0.38], [0.072, -0.5], [0.06, -0.59]], 8), silver), 0, 0, 0);
+    add(arm, mesh(sph(0.078, 1), dark), 0, -0.67, 0.01).scale.set(0.95, 0.8, 1.1);
+  }
+  for (const leg of [b.legL, b.legR]) {
+    add(leg, mesh(lathe([[0.105, -0.32], [0.112, -0.45], [0.1, -0.64], [0.085, -0.83]], 9), silver), 0, 0, 0.005);
+    add(leg, mesh(new THREE.SphereGeometry(0.095, 8, 5, 0, Math.PI * 2, 0, Math.PI * 0.6), brass), 0, -0.36, 0.05).rotation.x = 1.1;
+  }
+  // Silver hair in a long braid, a circlet and a ring of light floating above.
+  add(b.head, mesh(new THREE.SphereGeometry(0.222, 14, 8, Math.PI / 2 + 0.85, Math.PI * 2 - 1.7, 0, Math.PI * 0.72), hair), 0, 0.025, -0.01).scale.set(1.02, 1.05, 1.04);
+  add(b.head, mesh(new THREE.SphereGeometry(0.224, 12, 4, Math.PI / 2 - 0.9, 1.8, 0, 0.82), hair), 0, 0.025, -0.01).scale.set(1.02, 1.05, 1.04);
+  add(b.head, mesh(taper([[0, -0.02, -0.2], [0.02, -0.3, -0.24], [-0.01, -0.62, -0.26], [0.01, -0.86, -0.27]], 0.058, 0.014, 8, 6), hair), 0, 0, 0);
+  add(b.head, mesh(new THREE.TorusGeometry(0.208, 0.016, 4, 18), brass), 0, 0.09, 0).rotation.x = Math.PI / 2 - 0.2;
+  add(b.head, mesh(new THREE.OctahedronGeometry(0.03), light), 0, 0.13, 0.21);
+  add(b.head, mesh(new THREE.TorusGeometry(0.2, 0.014, 5, 24), light), 0, 0.42, -0.03).rotation.x = Math.PI / 2 - 0.2;
+  // Round shield on the left arm: a dished disc with a brass rim and a sun of light.
+  const sh = add(b.armL, grp(), 0.02, -0.46, 0.2);
+  rot(sh, 0.7, 0, 0);
+  add(sh, rot(mesh(lathe([[0.001, 0.07], [0.2, 0.05], [0.42, -0.012]], 16), silver), Math.PI / 2, 0, 0), 0, 0, 0);
+  add(sh, mesh(new THREE.TorusGeometry(0.42, 0.03, 5, 22), brass), 0, 0, -0.012);
+  add(sh, rot(mesh(cyl(0.42, 0.42, 0.015, 18), dark), Math.PI / 2, 0, 0), 0, 0, -0.018);
+  add(sh, mesh(box(0.05, 0.3, 0.03), M(0x3a2717)), 0, 0, -0.04);
+  add(sh, mesh(new THREE.TorusGeometry(0.12, 0.012, 4, 14), light), 0, 0, 0.06);
+  add(sh, mesh(sph(0.055, 1), light), 0, 0, 0.075);
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    add(sh, rot(mesh(box(0.024, i % 2 ? 0.13 : 0.2, 0.012), i % 2 ? brass : light), 0, 0, -a + Math.PI / 2), Math.cos(a) * (i % 2 ? 0.21 : 0.25), Math.sin(a) * (i % 2 ? 0.21 : 0.25), 0.04);
+  }
+  // Flanged mace.
+  const w = add(b.armR, grp(), 0, -0.62, 0.03);
+  w.name = 'weapon';
+  add(w, mesh(lathe([[0.03, -0.24], [0.034, 0], [0.03, 0.55], [0.036, 0.72]], 7), M(0x3a3024)), 0, 0, 0);
+  add(w, mesh(sph(0.052, 0), brass), 0, -0.27, 0);
+  for (let i = 0; i < 5; i++) add(w, mesh(cyl(0.037, 0.037, 0.018, 7), dark), 0, -0.1 + i * 0.05, 0);
+  add(w, mesh(lathe([[0.04, 0.7], [0.09, 0.82], [0.085, 0.96], [0.02, 1.08]], 8), silver), 0, 0, 0);
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    add(w, rot(mesh(box(0.14, 0.27, 0.025), i % 2 ? silver : dark), 0, -a, 0), Math.cos(a) * 0.1, 0.88, Math.sin(a) * 0.1);
+  }
+  add(w, mesh(new THREE.OctahedronGeometry(0.04), light), 0, 1.09, 0);
+  rot(b.armL, -0.75, 0, -0.16);
+  rot(b.armR, -0.15, 0, 0.14);
+  return b.root;
+}
+
+/**
+ * Rhen the Galewalker: a long weathered coat with tails, a broad hat with a feather, a scarf that
+ * trails in the wind, a bandolier of bolts and a heavy crossbow held in both hands ('weapon').
+ */
+function rhen() {
+  const b = humanoid({ skin: 0xb88a64, cloth: 0x4a4a32, cloth2: 0x33302a, boots: 0x2b2118, hip: 0.98, slim: 0.84, sculpt: true });
+  const coat = M(0x53502f);
+  const coatDark = M(0x3b3a26);
+  const leather = M(0x4b3220);
+  const dark = M(0x1f1913);
+  const scarf = M(0x8c4a2a);
+  const brass = M(0x8f7136, { metalness: 0.65, roughness: 0.35 });
+  const steel = M(0x868c92, { metalness: 0.75, roughness: 0.3 });
+  // Coat body with lapels, a belt, and long tails split at the back.
+  add(b.torso, mesh(lathe([[0.2, 0.04], [0.205, 0.22], [0.26, 0.46], [0.285, 0.6], [0.21, 0.7], [0.13, 0.76]], 12), coat), 0, 0, 0).scale.set(1, 1, 0.78);
+  add(b.torso, mesh(lathe([[0.215, 0.02], [0.23, 0.05], [0.23, 0.1], [0.215, 0.13]], 12), leather), 0, 0, 0).scale.set(1, 1, 0.8);
+  add(b.torso, mesh(box(0.08, 0.08, 0.04), brass), 0, 0.075, 0.185);
+  for (const s of [-1, 1]) {
+    add(b.torso, rot(mesh(box(0.09, 0.34, 0.03), coatDark), -0.08, 0, s * -0.3), s * 0.1, 0.52, 0.2);
+    add(b.torso, mesh(cloth(0.26, 1.06, 3, 9, (x, y) => {
+      const fall = 1 - y;
+      return [s * fall * 0.1, 0, -fall * 0.22 + Math.sin(x * 9 + y * 2) * 0.016];
+    }), s < 0 ? coat : coatDark), s * 0.13, -0.44, -0.16);
+    add(b.torso, mesh(cloth(0.2, 0.68, 2, 5, (_x, y) => [s * (1 - y) * 0.08, 0, (1 - y) * 0.04]), coat), s * 0.14, -0.3, 0.14);
+    add(b.torso, mesh(sph(0.035, 0), brass), s * 0.06, 0.4 - (s + 1) * 0.0, 0.215);
+  }
+  // Bandolier of bolts across the chest.
+  add(b.torso, rot(mesh(box(0.06, 0.8, 0.03), leather), 0, 0, -0.68), 0, 0.42, 0.195);
+  for (let i = 0; i < 6; i++) {
+    const k = (i - 2.5) * 0.095;
+    add(b.torso, rot(mesh(cyl(0.012, 0.012, 0.13, 4), steel), 0, 0, -0.68), k * 0.63 * 1.25, 0.42 - k * 0.77 * 1.25, 0.215);
+  }
+  // Scarf at the neck, one long tail streaming behind.
+  add(b.torso, mesh(lathe([[0.14, 0.66], [0.2, 0.72], [0.19, 0.8], [0.12, 0.84]], 12), scarf), 0, 0, 0).scale.set(1, 1, 0.9);
+  add(b.torso, mesh(cloth(0.15, 1.1, 2, 9, (x, y) => {
+    const fall = 1 - y;
+    return [Math.sin(fall * 5 + x) * 0.05, fall * 0.28, -fall * 0.86 + Math.sin(fall * 8) * 0.05];
+  }), scarf), 0.1, 0.25, -0.15);
+  // Broad-brimmed hat, a feather, a short beard; the eyes sit in the brim's shadow.
+  add(b.head, mesh(lathe([[0.12, 0.09], [0.205, 0.1], [0.335, 0.05], [0.42, 0.03]], 16), M(0x2f2c1c)), 0, 0.04, 0).scale.set(1, 1, 0.96);
+  add(b.head, mesh(lathe([[0.42, 0.015], [0.335, 0.03], [0.2, 0.08]], 16), M(0x201d13)), 0, 0.04, 0).scale.set(1, 1, 0.96);
+  add(b.head, mesh(lathe([[0.2, 0.09], [0.19, 0.18], [0.16, 0.27], [0.1, 0.32], [0.001, 0.335]], 12), M(0x38351f)), 0, 0.04, -0.005);
+  add(b.head, mesh(new THREE.TorusGeometry(0.195, 0.018, 4, 16), scarf), 0, 0.15, -0.005).rotation.x = Math.PI / 2;
+  add(b.head, mesh(cloth(0.05, 0.48, 1, 5, (_x, y) => [0, 0, -y * 0.2]), M(0x9aa84e)), 0.19, 0.31, -0.03).rotation.z = -0.32;
+  add(b.head, mesh(new THREE.SphereGeometry(0.2, 12, 5, 0, Math.PI * 2, Math.PI * 0.68, Math.PI * 0.3), M(0x3d2a1b)), 0, 0.005, 0.02).scale.set(0.98, 1.14, 1.06);
+  // Gloves, bracers, tall boots with brass buckles.
+  for (const arm of [b.armL, b.armR]) {
+    add(arm, mesh(lathe([[0.1, 0.03], [0.1, -0.1], [0.085, -0.3], [0.08, -0.42], [0.09, -0.46]], 8), coat), 0, 0, 0);
+    add(arm, mesh(sph(0.078, 1), dark), 0, -0.67, 0.01).scale.set(0.95, 0.85, 1.1);
+    add(arm, mesh(lathe([[0.062, -0.46], [0.074, -0.5], [0.065, -0.59]], 8), leather), 0, 0, 0);
+  }
+  for (const leg of [b.legL, b.legR]) {
+    add(leg, mesh(lathe([[0.11, -0.46], [0.105, -0.5], [0.092, -0.7], [0.082, -0.92]], 8), leather), 0, 0, 0);
+    add(leg, mesh(new THREE.TorusGeometry(0.1, 0.012, 4, 10), brass), 0, -0.62, 0).rotation.x = Math.PI / 2;
+  }
+  // Heavy crossbow: stock, steel prod with a string, stirrup and a loaded bolt. Faces +z.
+  const w = add(b.armR, grp(), 0, -0.62, 0.02);
+  w.name = 'weapon';
+  add(w, mesh(box(0.07, 0.09, 0.92), M(0x3a2717)), 0, 0.02, 0.2);
+  add(w, mesh(box(0.08, 0.15, 0.3), M(0x2b1c11)), 0, -0.03, -0.22);
+  add(w, mesh(box(0.05, 0.012, 0.7), M(0x57402a)), 0, 0.072, 0.3);
+  for (const s of [-1, 1]) {
+    add(w, mesh(taper([[0, 0.05, 0.62], [s * 0.27, 0.05, 0.54], [s * 0.46, 0.05, 0.34]], 0.032, 0.012, 7, 5), steel), 0, 0, 0);
+    add(w, mesh(tube([[s * 0.46, 0.05, 0.34], [s * 0.2, 0.075, 0.12], [0, 0.075, 0.03]], 0.005, 3, 3), M(0xb2ae9a)), 0, 0, 0);
+  }
+  add(w, mesh(new THREE.TorusGeometry(0.08, 0.012, 4, 10), steel), 0, 0.05, 0.71).rotation.x = Math.PI / 2;
+  add(w, rot(mesh(cyl(0.011, 0.011, 0.62, 4), M(0xa89f82)), Math.PI / 2, 0, 0), 0, 0.085, 0.34);
+  add(w, rot(mesh(cone(0.03, 0.09, 4), steel), Math.PI / 2, 0, 0), 0, 0.085, 0.69);
+  for (const y of [0.11, 0.06]) add(w, mesh(box(0.012, 0.05, 0.1), M(0x9aa84e)), 0, y, 0.06);
+  rot(b.armR, -0.75, 0, 0.1);
+  rot(w, 0.78, 0, -0.05);
+  rot(b.armL, -1.0, 0, 0.22);
+  return b.root;
+}
+
+/**
+ * Four-legged creatures on the same joints as everything else: the front legs are the arms, the
+ * back legs the legs. Body along +z.
+ */
+function beast(o: { len: number; high: number; girth: number; fur: number[]; team: number; rune: number; alpha?: boolean }): THREE.Group {
+  const f = o.fur.map((c) => M(c, { roughness: 0.95 }));
+  const root = grp();
+  const torso = add(root, grp(), 0, o.high, 0);
+  const g = o.girth;
+  const L = o.len;
+  // Body: broad at the chest, tucked at the hips.
+  const body = lumpy(lathe([[0.001, -L * 0.52], [g * 0.7, -L * 0.42], [g * 0.82, -L * 0.1], [g, L * 0.22], [g * 0.92, L * 0.42], [0.001, L * 0.56]], 10), 0.05, o.len);
+  add(torso, rot(mesh(body, f[0]), Math.PI / 2, 0, 0), 0, 0, 0).scale.set(1, 1, 1.02);
+  // Shaggy ridge down the spine.
+  for (let i = 0; i < 7; i++) {
+    const z = (i / 6 - 0.5) * L * 0.9;
+    const up = g * (0.82 + (z / L + 0.5) * 0.2);
+    const tuft = o.alpha ? 1.2 : 1.06;
+    add(torso, mesh(taper([[0, up * 0.72, z + 0.03], [0, up * (tuft - 0.1), z - 0.05], [(i % 2) * 0.02, up * tuft, z - 0.16]], g * 0.26, 0.012, 3, 5), f[i % f.length]), 0, 0, 0);
+  }
+  if (o.alpha) {
+    // A heavy mane over the shoulders and scars of ember down the flanks.
+    add(torso, mesh(lumpy(new THREE.IcosahedronGeometry(g * 0.92, 1), 0.14, 5), f[1]), 0, g * 0.3, L * 0.26).scale.set(1.05, 0.95, 1.1);
+    for (const s of [-1, 1]) {
+      add(torso, rot(mesh(box(0.02, 0.24, 0.07), glow(0xff8a4a, 2)), 0.35, 0, s * 0.42), s * g * 0.9, 0.03, L * 0.02);
+      add(torso, rot(mesh(box(0.02, 0.18, 0.06), glow(0xff8a4a, 2)), -0.45, 0, s * 0.42), s * g * 0.86, -0.02, -L * 0.12);
+    }
+  }
+  // Team-coloured collar.
+  add(torso, mesh(new THREE.TorusGeometry(g * 0.56, g * 0.1, 5, 14), glow(o.rune, 1.2)), 0, g * 0.14, L * 0.42);
+  // Head: skull, muzzle, jaw, ears, teeth and glowing eyes.
+  const head = add(torso, grp(), 0, g * 0.38, L * 0.55);
+  const hs = 1;
+  add(head, mesh(lumpy(new THREE.IcosahedronGeometry(g * 0.56, 1), 0.06, 2), f[0]), 0, 0, 0).scale.set(1, 0.92, 1.08);
+  add(head, rot(mesh(lathe([[0.001, 0.56 * g * hs], [g * 0.2, g * 0.46 * hs], [g * 0.3, g * 0.12]], 8), f[2]), Math.PI / 2, 0, 0), 0, -g * 0.08, g * 0.34);
+  add(head, mesh(sph(g * 0.09, 0), M(0x14110e)), 0, -g * 0.03, g * (0.92 + (hs - 1) * 0.5));
+  add(head, rot(mesh(lathe([[0.001, 0.44 * g * hs], [g * 0.17, g * 0.3 * hs], [g * 0.2, 0]], 7), M(0x241b14)), Math.PI / 2 + 0.2, 0, 0), 0, -g * 0.27, g * 0.3);
+  for (const s of [-1, 1]) {
+    add(head, mesh(taper([[s * g * 0.3, g * 0.38, -g * 0.08], [s * g * 0.36, g * 0.62, -g * 0.1], [s * g * 0.4, g * 0.92, -g * 0.14]], g * 0.17, 0.012, 3, 4), f[1]), 0, 0, 0);
+    add(head, mesh(sph(g * 0.055, 0), glow(0xffc247, 2.4)), s * g * 0.24, g * 0.14, g * 0.46);
+    add(head, mesh(taper([[s * g * 0.12, -g * 0.24, g * 0.66], [s * g * 0.12, -g * 0.37, g * 0.66]], g * 0.05, 0.003, 2, 4), M(0xbdb092)), 0, 0, 0);
+  }
+  // Legs: the two front ones hang off the torso, as arms.
+  const leg = (name: string, x: number, z: number, big: number) => {
+    const j = add(z > 0 ? torso : root, grp(), x, z > 0 ? -g * 0.2 : o.high - g * 0.25, z);
+    j.name = name;
+    const H = o.high - (z > 0 ? g * 0.2 : g * 0.25);
+    add(j, mesh(lumpy(new THREE.IcosahedronGeometry(g * 0.42 * big, 1), 0.06, x), f[0]), 0, -H * 0.05, 0).scale.set(0.85, 1.25, 1.05);
+    add(j, mesh(lathe([[g * 0.3 * big, 0], [g * 0.32 * big, -H * 0.3], [g * 0.2 * big, -H * 0.6], [g * 0.17 * big, -H * 0.9], [g * 0.24 * big, -H]], 7), f[1]), 0, 0, 0);
+    add(j, mesh(sph(g * 0.25 * big, 0), f[2]), 0, -H + g * 0.1, g * 0.07).scale.set(1, 0.65, 1.3);
+    for (const s of [-1, 0, 1]) add(j, mesh(taper([[s * g * 0.13, -H + g * 0.06, g * 0.22], [s * g * 0.14, -H + g * 0.01, g * 0.36]], g * 0.05, 0.003, 2, 4), M(0x28221c)), 0, 0, 0);
+    return j;
+  };
+  const side = g * 0.7;
+  leg('armL', -side, L * 0.32, 1.05);
+  leg('armR', side, L * 0.32, 1.05);
+  leg('legL', -side * 0.85, -L * 0.34, 1);
+  leg('legR', side * 0.85, -L * 0.34, 1);
+  // The bake step looks for hand joints on anything with a body; these hold nothing.
+  const hl = add(root, grp());
+  hl.name = 'handL';
+  const hr = add(root, grp());
+  hr.name = 'handR';
+  // Tail.
+  add(torso, mesh(taper([[0, g * 0.3, -L * 0.48], [0, g * 0.5, -L * 0.72], [0, g * 0.15, -L * 0.98]], g * 0.26, 0.015, 5, 5), f[1]), 0, 0, 0);
+  root.name = 'rig';
+  torso.name = 'torso';
+  head.name = 'head';
+  return root;
+}
+
+function wolf(team: 0 | 1) {
+  return beast({ len: 1.5, high: 0.86, girth: 0.3, fur: [0x5f5a52, 0x47433d, 0x77716a], team, rune: team === 0 ? 0x62aef0 : 0xf07a5a });
+}
+/** Morra as the Red Wolf: blood-red, bigger than her wolves, with a mane and ember scars. */
+function redWolf(team: 0 | 1) {
+  return beast({ len: 1.75, high: 1.02, girth: 0.37, fur: [0x7a2418, 0x571a12, 0x98321f], team, rune: team === 0 ? 0x62aef0 : 0xf07a5a, alpha: true });
+}
+export const HERO_BUILDERS: Record<HeroId, () => THREE.Group> = { brakk, vexa, orin, syl, grom, kaela, morra, seren, rhen };
+export { wolf, redWolf };
 
 /** Everything else: creeps, jungle monsters, buildings, wards, power-ups. */
 export { humanoid, M, glow, add, mesh, box, cyl, sph, cone, grp, rot, lathe, taper, plate, cloth, skirt, lumpy, hood };

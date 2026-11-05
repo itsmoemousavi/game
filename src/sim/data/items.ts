@@ -516,7 +516,10 @@ export const SHOP_RADIUS = 22;
 export const SALVE = { heal: 350, duration: 8 };
 
 /** Default build orders (also the "recommended" list in the shop). */
-export const BUILDS: Record<'brakk' | 'vexa' | 'orin' | 'syl' | 'grom' | 'kaela', ItemId[]> = {
+export const BUILDS: Record<'brakk' | 'vexa' | 'orin' | 'syl' | 'grom' | 'kaela' | 'morra' | 'seren' | 'rhen', ItemId[]> = {
+  morra: ['healingSalve', 'swiftBoots', 'manaCrystal', 'arcaneBoots', 'vitalStone', 'mendersCenser', 'focusLens', 'bannerOfValor', 'crownOfAscension', 'soulChalice'],
+  seren: ['healingSalve', 'swiftBoots', 'vitalStone', 'manaCrystal', 'arcaneBoots', 'mendersCenser', 'guardPlate', 'bannerOfValor', 'hushBell', 'crownOfAscension'],
+  rhen: ['healingSalve', 'swiftBoots', 'ironBlade', 'quickGloves', 'fleetBoots', 'twinBlades', 'keenEdge', 'stormBlade', 'reaperEdge', 'crownOfAscension'],
   brakk: ['healingSalve', 'swiftBoots', 'vitalStone', 'guardPlate', 'platedBoots', 'ironBlade', 'quickGloves', 'cleavingAxe', 'shadowStep', 'brambleMail', 'crownOfAscension', 'stoneskinAmulet'],
   vexa: ['healingSalve', 'swiftBoots', 'ironBlade', 'keenEdge', 'fleetBoots', 'quickGloves', 'twinBlades', 'stormBlade', 'ironBlade', 'reaperEdge', 'crownOfAscension', 'lifedrinker'],
   orin: ['healingSalve', 'swiftBoots', 'manaCrystal', 'arcaneBoots', 'vitalStone', 'manaCrystal', 'soulChalice', 'hushBell', 'arcaneAmplifier', 'crownOfAscension', 'focusLens'],

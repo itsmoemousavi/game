@@ -7,13 +7,15 @@ import { Anim, AnimCtx, Joints, Pose, at, footDust, locomotion, near, shake, stu
  * goblins and brutes, and the Warden. Same approach as the heroes: small joint rotations from a
  * few keyframes, on top of the model's rest stance, with dust, sparks and shockwaves from Fx3D.
  */
-export type MonsterKind = 'creepMelee' | 'creepRanged' | 'imp' | 'brute' | 'warden';
+export type MonsterKind = 'creepMelee' | 'creepRanged' | 'imp' | 'brute' | 'warden' | 'wolf' | 'redWolf';
 
 /** Which animation a model key uses (null for things that don't move). */
 export function monsterKind(key: string): MonsterKind | null {
   if (key.startsWith('creep:melee')) return 'creepMelee';
   if (key.startsWith('creep:ranged')) return 'creepRanged';
   if (key === 'imp' || key === 'brute' || key === 'warden') return key;
+  if (key.startsWith('redwolf')) return 'redWolf';
+  if (key.startsWith('wolf')) return 'wolf';
   return null;
 }
 
@@ -25,6 +27,39 @@ export function animateMonster(c: AnimCtx, kind: MonsterKind, o: THREE.Object3D,
   const ta = now - a.atkAt;
   const P = new Pose();
   switch (kind) {
+    case 'wolf':
+    case 'redWolf': {
+      // A loping trot, head low; a lunge with a snap of the jaws. Morra's wolf form runs heavier.
+      const big = kind === 'redWolf';
+      const { s, walk } = locomotion(c, u, a, big ? 7 : 8.5, 0.95, big ? (side) => footDust(c, u, side, 0x8a7558, 0.5) : undefined);
+      P.add('armL', s * 0.8 * walk);
+      P.add('armR', -s * 0.8 * walk);
+      P.add('legL', -s * 0.8 * walk);
+      P.add('legR', s * 0.8 * walk);
+      P.add('torso', Math.sin(a.phase * 2) * 0.045 * walk + Math.sin(time * 2.4 + u.id) * 0.012 * (1 - walk));
+      P.add('head', 0.06 * walk + Math.sin(time * 1.4 + u.id) * 0.03 * (1 - walk), Math.sin(time * 0.7 + u.id) * 0.2 * (1 - walk));
+      P.rigY = Math.abs(s) * 0.09 * walk;
+      if (ta < 0.42) {
+        P.add('torso', track(ta, [[0, 0], [0.08, -0.25], [0.18, 0.28], [0.42, 0]]));
+        P.add('head', track(ta, [[0, 0], [0.08, -0.45], [0.18, 0.3], [0.42, 0]]));
+        P.add('armL', track(ta, [[0, 0], [0.08, -0.9], [0.18, -1.2], [0.42, 0]]));
+        P.add('armR', track(ta, [[0, 0], [0.08, -0.9], [0.18, -1.2], [0.42, 0]]));
+        P.add('legL', track(ta, [[0, 0], [0.18, 0.6], [0.42, 0]]));
+        P.add('legR', track(ta, [[0, 0], [0.18, 0.6], [0.42, 0]]));
+        P.rigY += track(ta, [[0, 0], [0.12, 0.26], [0.26, 0]]);
+        if (!a.impactDone && ta >= 0.18) {
+          a.impactDone = true;
+          if (closeToCamera(c, u)) {
+            const [x, y] = near(c, u, big ? 2.2 : 1.6);
+            if (big && u.hero?.lastCrit) {
+              c.fx.flash(x, y, 1.2, 2.4, 0xff6a3a, 0.2);
+              c.fx.sparks(x, y, 1.2, 10, 0xffa070, 5);
+            } else c.fx.sparks(x, y, 1, big ? 5 : 3, 0xffe2a0, big ? 3 : 2);
+          }
+        }
+      }
+      break;
+    }
     case 'creepMelee': {
       // A soldier's march; a quick overhead sword cut (hit at 0.14 s).
       const { s, walk } = locomotion(c, u, a, 5.5, 0.9);
@@ -203,6 +238,25 @@ export function monsterCorpse(c: AnimCtx, k: MonsterCorpse): boolean {
   k.o.rotation.order = 'YXZ';
   let end = 2;
   switch (k.mkind) {
+    case 'wolf':
+    case 'redWolf': {
+      // Stumbles, then rolls over onto its side, legs folding.
+      const big = k.mkind === 'redWolf';
+      P.add('armL', track(t, [[0, 0], [0.4, 0.8]]));
+      P.add('armR', track(t, [[0, 0], [0.4, -0.5]]));
+      P.add('legL', track(t, [[0, 0], [0.4, -0.7]]));
+      P.add('legR', track(t, [[0, 0], [0.4, 0.6]]));
+      P.add('head', track(t, [[0, 0], [0.5, 0.4]]));
+      k.o.rotation.z = track(t, [[0.1, 0], [big ? 0.75 : 0.5, 1.45]]);
+      if (!k.thud && t > (big ? 0.75 : 0.5)) {
+        k.thud = true;
+        c.fx.dust(x, y, big ? 8 : 4, big ? 1.8 : 1, 0x7a6448, big ? 1.5 : 0.8, 0.9);
+        c.sound('bodyFall', x, y, big ? 1 : 0.5);
+      }
+      if (t > (big ? 1.8 : 1.2)) k.o.position.y -= c.dt * 1.4;
+      end = big ? 2.6 : 1.9;
+      break;
+    }
     case 'creepMelee':
     case 'creepRanged':
     case 'imp':

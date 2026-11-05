@@ -2,8 +2,8 @@
  * Hero definitions. Everything about a hero is data so we can rebalance or swap heroes
  * without touching game logic. Ability behaviour lives in ../abilities.ts.
  */
-export type HeroId = 'brakk' | 'vexa' | 'orin' | 'syl' | 'grom' | 'kaela';
-export type HeroRole = 'Tank / Initiator' | 'Ranged Carry' | 'Mage / Support' | 'Melee Assassin' | 'Bruiser / Controller' | 'Support / Controller';
+export type HeroId = 'brakk' | 'vexa' | 'orin' | 'syl' | 'grom' | 'kaela' | 'morra' | 'seren' | 'rhen';
+export type HeroRole = 'Tank / Initiator' | 'Ranged Carry' | 'Mage / Support' | 'Melee Assassin' | 'Bruiser / Controller' | 'Support / Controller' | 'Summoner' | 'Support / Protector' | 'Mobile Ranged Carry';
 
 export type AbilityId =
   | 'shieldCharge'
@@ -23,7 +23,16 @@ export type AbilityId =
   | 'overgrowth'
   | 'tidalWave'
   | 'brineVeil'
-  | 'maelstrom';
+  | 'maelstrom'
+  | 'callPack'
+  | 'feralBond'
+  | 'redWolf'
+  | 'aegis'
+  | 'rebuke'
+  | 'sanctuary'
+  | 'galeStep'
+  | 'hawkMark'
+  | 'boltStorm';
 
 /**
  * How an ability is aimed.
@@ -346,7 +355,7 @@ export const HEROES: Record<HeroId, HeroDef> = {
     manaRegen: 1,
     baseArmor: 4,
     armorPerLevel: 0.45,
-    baseDamage: 60,
+    baseDamage: 64,
     damagePerLevel: 4.4,
     attackInterval: 1.6,
     attackIntervalPerLevel: 0.02,
@@ -413,7 +422,7 @@ export const HEROES: Record<HeroId, HeroDef> = {
     damagePerLevel: 3,
     attackInterval: 1.6,
     attackIntervalPerLevel: 0.02,
-    attackRange: 8.5,
+    attackRange: 9,
     projectileSpeed: 18,
     moveSpeed: 6.9,
     abilities: [
@@ -459,9 +468,198 @@ export const HEROES: Record<HeroId, HeroDef> = {
     ],
   },
 
+  morra: {
+    id: 'morra',
+    name: 'Morra',
+    title: 'the Beastcaller',
+    role: 'Summoner',
+    color: '#b5653a',
+    baseHp: 630,
+    hpPerLevel: 74,
+    hpRegen: 2,
+    baseMana: 340,
+    manaPerLevel: 34,
+    manaRegen: 1.6,
+    baseArmor: 3,
+    armorPerLevel: 0.38,
+    baseDamage: 48,
+    damagePerLevel: 3.4,
+    attackInterval: 1.6,
+    attackIntervalPerLevel: 0.015,
+    attackRange: 7,
+    projectileSpeed: 17,
+    moveSpeed: 6.7,
+    abilities: [
+      {
+        id: 'callPack',
+        slot: 'Q',
+        name: 'Call the Pack',
+        ultimate: false,
+        targeting: 'none',
+        castRange: 0,
+        radius: 0,
+        manaCost: [90, 100, 110, 120],
+        cooldown: [20, 18, 16, 14],
+        values: { wolves: [1, 1, 2, 2], hp: [360, 450, 480, 580], damage: [28, 36, 38, 48], duration: [22, 22, 22, 22] },
+        summary: 'Calls a wolf (two from level 3) that fights for you for 22 s and hunts whatever you attack. Calling again replaces the old pack. Enemies earn a little gold for killing them. Wolves deal half damage to buildings.',
+      },
+      {
+        id: 'feralBond',
+        slot: 'W',
+        name: 'Feral Bond',
+        ultimate: false,
+        targeting: 'none',
+        castRange: 0,
+        radius: 14,
+        manaCost: [60, 70, 80, 90],
+        cooldown: [16, 15, 14, 13],
+        values: { heal: [20, 28, 36, 44], damageMult: [1.2, 1.3, 1.4, 1.5], speedPct: [25, 25, 30, 30], duration: [5, 5, 6, 6] },
+        summary: 'Your wolves within 14 m heal part of their health and hit harder and run faster for a few seconds. Morra also gets the speed, unless she is the Red Wolf.',
+      },
+      {
+        id: 'redWolf',
+        slot: 'R',
+        name: 'Red Wolf',
+        ultimate: true,
+        targeting: 'none',
+        castRange: 0,
+        radius: 0,
+        manaCost: [100, 120, 140],
+        cooldown: [75, 65, 55],
+        values: { duration: [14, 14, 14], attackSpeed: [45, 65, 85], damage: [35, 60, 85], critChance: [10, 15, 20], speedPct: [20, 25, 30] },
+        summary: 'Morra becomes a big red wolf for 14 s: she fights in melee, with more attack speed, damage and move speed and a small chance of critical hits. Feral Bond no longer speeds her up while she is the wolf.',
+      },
+    ],
+  },
+  seren: {
+    id: 'seren',
+    name: 'Seren',
+    title: 'the Aegis',
+    role: 'Support / Protector',
+    color: '#cfe4ee',
+    baseHp: 700,
+    hpPerLevel: 82,
+    hpRegen: 3,
+    baseMana: 300,
+    manaPerLevel: 30,
+    manaRegen: 1.4,
+    baseArmor: 5,
+    armorPerLevel: 0.5,
+    baseDamage: 54,
+    damagePerLevel: 3.4,
+    attackInterval: 1.55,
+    attackIntervalPerLevel: 0.018,
+    attackRange: 1.7,
+    projectileSpeed: 0,
+    moveSpeed: 6.8,
+    abilities: [
+      {
+        id: 'aegis',
+        slot: 'Q',
+        name: 'Aegis',
+        ultimate: false,
+        targeting: 'ally',
+        castRange: 11,
+        radius: 0,
+        manaCost: [70, 80, 90, 100],
+        cooldown: [12, 11, 10, 9],
+        values: { shield: [150, 235, 320, 400], duration: [3, 3, 3, 3] },
+        summary: 'Shields an allied hero or yourself: the shield soaks up damage for 3 s or until it breaks.',
+      },
+      {
+        id: 'rebuke',
+        slot: 'W',
+        name: 'Rebuke',
+        ultimate: false,
+        targeting: 'direction',
+        castRange: 11,
+        radius: 1.3,
+        manaCost: [80, 90, 100, 110],
+        cooldown: [11, 10, 9, 8],
+        values: { damage: [95, 150, 205, 260], slowPct: [30, 35, 40, 45] },
+        summary: 'A lance of light flies forward through enemies, damaging and slowing all it hits.',
+      },
+      {
+        id: 'sanctuary',
+        slot: 'R',
+        name: 'Sanctuary',
+        ultimate: true,
+        targeting: 'point',
+        castRange: 10,
+        radius: 6,
+        manaCost: [150, 180, 210],
+        cooldown: [85, 75, 65],
+        values: { reduction: [45, 55, 65], duration: [4, 5, 6], slowPct: [30, 30, 30] },
+        summary: 'Raises a golden dome: allied heroes inside take much less damage and enemies inside are slowed.',
+      },
+    ],
+  },
+  rhen: {
+    id: 'rhen',
+    name: 'Rhen',
+    title: 'the Galewalker',
+    role: 'Mobile Ranged Carry',
+    color: '#9aa84e',
+    baseHp: 610,
+    hpPerLevel: 70,
+    hpRegen: 1.8,
+    baseMana: 240,
+    manaPerLevel: 24,
+    manaRegen: 1,
+    baseArmor: 3.2,
+    armorPerLevel: 0.38,
+    baseDamage: 47,
+    damagePerLevel: 4,
+    attackInterval: 1.45,
+    attackIntervalPerLevel: 0.024,
+    attackRange: 8.5,
+    projectileSpeed: 26,
+    moveSpeed: 7.1,
+    abilities: [
+      {
+        id: 'galeStep',
+        slot: 'Q',
+        name: 'Gale Step',
+        ultimate: false,
+        targeting: 'direction',
+        castRange: 7,
+        radius: 0.8,
+        manaCost: [60, 65, 70, 75],
+        cooldown: [14, 12, 10, 8],
+        values: { attackSpeed: [25, 35, 45, 55], duration: [3, 3, 3, 3] },
+        summary: 'Dashes on the wind, then shoots faster for 3 s.',
+      },
+      {
+        id: 'hawkMark',
+        slot: 'W',
+        name: 'Hawk Mark',
+        ultimate: false,
+        targeting: 'enemy',
+        castRange: 11,
+        radius: 0,
+        manaCost: [55, 65, 75, 85],
+        cooldown: [14, 13, 12, 11],
+        values: { armor: [3, 5, 7, 9], duration: [5, 5, 6, 6] },
+        summary: 'Marks an enemy: it loses armor and everyone on your team can see it, even if it turns invisible.',
+      },
+      {
+        id: 'boltStorm',
+        slot: 'R',
+        name: 'Bolt Storm',
+        ultimate: true,
+        targeting: 'none',
+        castRange: 0,
+        radius: 11,
+        manaCost: [140, 170, 200],
+        cooldown: [75, 65, 55],
+        values: { damage: [58, 80, 102], duration: [3, 3.5, 4] },
+        summary: 'For a few seconds, fires a stream of bolts at nearby enemies while you keep moving and attacking. Heroes are shot first.',
+      },
+    ],
+  },
 };
 
-export const HERO_IDS: HeroId[] = ['brakk', 'vexa', 'orin', 'syl', 'grom', 'kaela'];
+export const HERO_IDS: HeroId[] = ['brakk', 'vexa', 'orin', 'syl', 'grom', 'kaela', 'morra', 'seren', 'rhen'];
 
 /** Highest level an ability may have at a given hero level (Dota-style). */
 export function maxAbilityLevel(def: AbilityDef, heroLevel: number): number {

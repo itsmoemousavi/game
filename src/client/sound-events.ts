@@ -31,6 +31,9 @@ const ATTACK_SOUNDS: Record<string, SoundName> = {
   syl: 'daggerSlash',
   grom: 'woodPunch',
   kaela: 'waterBolt',
+  morra: 'fireBolt',
+  seren: 'hammerAttack',
+  rhen: 'bowShot',
 };
 
 /** A hero's delayed blast landing (Earthsplitter, Cataclysm, Root Snare / Overgrowth). */
@@ -61,7 +64,7 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
         const involvesMe = s.id === meId || t?.id === meId;
         if (s.kind === 'structure') sfx.play('tower', near(s) * (involvesMe ? 1 : 0.5));
         else if (s.hero) {
-          sfx.play(ATTACK_SOUNDS[s.hero.defId] ?? 'swing', near(s));
+          sfx.play(s.hero.wolfForm ? 'impStab' : (ATTACK_SOUNDS[s.hero.defId] ?? 'swing'), near(s));
           if (s.hero.defId === 'vexa' && s.hero.lastCrit) sfx.play('critPing', near(s));
         }
         else if (s.kind === 'neutral' && s.neutral?.boss) sfx.play('wardenPunch', near(s));
@@ -156,6 +159,15 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
                   : 'ironClang',
           near(w.unit(e.unitId)),
         );
+        break;
+      case 'summon':
+        sfx.play('rootsErupt', near(w.unit(e.unitId)) * 0.6);
+        break;
+      case 'wolfForm':
+        sfx.play(e.on ? 'earthsplitter' : 'cast', near(w.unit(e.unitId)) * (e.on ? 0.8 : 0.5));
+        break;
+      case 'shieldBreak':
+        sfx.play('ironClang', near(w.unit(e.unitId)) * 0.7);
         break;
       case 'chainLightning':
         sfx.play('zap', near(w.unit(e.sourceId)));

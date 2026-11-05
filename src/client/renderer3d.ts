@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { GLYPH_DURATION, GameMap, HEROES, TELEPORT, Team, Unit, World, courierFlying, isInvisible, isNight } from '../sim';
+import { GLYPH_DURATION, GameMap, HEROES, HERO_IDS, TELEPORT, Team, Unit, World, courierFlying, isInvisible, isNight } from '../sim';
 import type { Aim } from './input';
 import { Renderer, TEAM_COLORS } from './renderer';
 import { JOINTS, Joint, TEAM_HEX, model } from './three/models';
@@ -228,7 +228,8 @@ export class Renderer3D extends Renderer {
    */
   private prewarm() {
     const keys = [
-      ...['brakk', 'vexa', 'orin', 'syl', 'grom', 'kaela'].map((h) => `hero:${h}`),
+      ...HERO_IDS.map((h) => `hero:${h}`),
+      'wolf:0', 'wolf:1', 'redwolf:0', 'redwolf:1', 'shot:rebuke', 'shot:spiritbolt', 'shot:crossbolt',
       ...[0, 1].flatMap((t) => [`creep:melee:${t}`, `creep:ranged:${t}`]),
       'brute', 'imp', 'warden', 'ward:observer', 'ward:sentry', 'courier:walk:0', 'courier:walk:1', 'courier:fly:0', 'courier:fly:1',
       ...['haste', 'doubleDamage', 'regen', 'invisibility', 'bounty'].map((r) => `rune:${r}`),
@@ -504,8 +505,10 @@ export class Renderer3D extends Renderer {
 
   /** Model key for a unit (same model is used for its death animation). */
   private keyOf(u: Unit): { key: string; scale: number } | null {
+    if (u.hero?.wolfForm) return { key: `redwolf:${u.team === 1 ? 1 : 0}`, scale: HERO_SCALE };
     if (u.kind === 'hero') return { key: `hero:${u.hero!.defId}`, scale: HERO_SCALE };
     if (u.creep) return { key: `creep:${u.creep.type}:${u.team === 1 ? 1 : 0}`, scale: u.creep.super ? CREEP_SCALE * 1.2 : CREEP_SCALE };
+    if (u.summon) return { key: `${u.summon.kind}:${u.team === 1 ? 1 : 0}`, scale: 1.7 };
     if (u.neutral) return { key: u.neutral.boss ? 'warden' : u.radius > 0.9 ? 'brute' : 'imp', scale: u.neutral.boss ? 1.8 : 1.6 };
     return null;
   }
@@ -636,6 +639,38 @@ export class Renderer3D extends Renderer {
           this.fx3.flash(u.x, u.y, 2, 5, 0xd6d3d1, 0.4);
           this.fx3.shockwave(u.x, u.y, 2.6, 0xa8a29e, 0.35);
         }
+      } else if (e.type === 'summon') {
+        // A wolf arrives: a puff of dust and a flash.
+        const u = w.unit(e.unitId);
+        if (u && w.canSee(this.viewTeam, u)) {
+          this.fx3.dust(u.x, u.y, 6, 1.3, 0x8a7558, 0.9, 0.9);
+          this.fx3.shockwave(u.x, u.y, 2.4, 0xffa64a, 0.45, 0.7);
+          this.fx3.flash(u.x, u.y, 1, 2.6, 0xffc247, 0.3);
+        }
+      } else if (e.type === 'wolfForm') {
+        // Morra changes shape: a burst of red and a ring of dust. The model swaps at the same moment.
+        const u = w.unit(e.unitId);
+        if (u && u.alive && w.canSee(this.viewTeam, u)) {
+          this.fx3.flash(u.x, u.y, 1.4, e.on ? 6 : 4, 0xff5a2a, 0.35);
+          this.fx3.shockwave(u.x, u.y, e.on ? 5 : 3, 0xc9401f, 0.45, 0.8);
+          this.fx3.dust(u.x, u.y, e.on ? 12 : 7, 1.8, 0x5a2a1c, 1.5, 0.9);
+          this.fx3.sparks(u.x, u.y, 1.2, e.on ? 18 : 9, 0xff8a4a, 6);
+        }
+      } else if (e.type === 'feralBond') {
+        for (const id of e.ids) {
+          const o = w.unit(id);
+          if (o && w.canSee(this.viewTeam, o)) {
+            this.fx3.flash(o.x, o.y, 1, 3.2, 0xffa64a, 0.35);
+            this.fx3.sparks(o.x, o.y, 1, 8, 0xffc247, 3.5);
+          }
+        }
+      } else if (e.type === 'shieldBreak') {
+        // Aegis used up: the shield shatters.
+        const u = w.unit(e.unitId);
+        if (u && w.canSee(this.viewTeam, u)) {
+          this.fx3.flash(u.x, u.y, 1.6, 4, 0xcfe4ee, 0.25);
+          this.fx3.sparks(u.x, u.y, 1.5, 14, 0xe6f4fa, 5);
+        }
       } else if (e.type === 'chainLightning') {
         // Storm Blade: the lightning jumps attacker → target → the enemies near it.
         let from = w.unit(e.sourceId);
@@ -681,8 +716,10 @@ export class Renderer3D extends Renderer {
         // Reuse the live model as the corpse.
         this.objs.delete('u' + e.unitId);
         this.anims.delete(e.unitId);
-        const mk = live.joints.rig && !u.hero ? monsterKind(live.key) : null;
-        this.corpses.push({ o: live.o, t: 0, joints: live.joints, kind: live.joints.rig && u.hero ? u.hero.defId : undefined, mkind: mk ?? undefined, x: u.x, y: u.y });
+        // Morra dying as the Red Wolf falls like a wolf.
+        const asWolf = live.key.startsWith('redwolf');
+        const mk = live.joints.rig && (!u.hero || asWolf) ? monsterKind(live.key) : null;
+        this.corpses.push({ o: live.o, t: 0, joints: live.joints, kind: live.joints.rig && u.hero && !asWolf ? u.hero.defId : undefined, mkind: mk ?? undefined, x: u.x, y: u.y });
       }
     }
   }
@@ -704,6 +741,12 @@ export class Renderer3D extends Renderer {
       else if (b.key === 'stoneskin') this.fx3.heroAura(id, x, y, 'shell', 0x8b7d6b, fade(b.t));
       else if (b.key === 'slow:frostHorn') this.fx3.heroAura(id, x, y, 'glow', 0x93c5fd, fade(b.t) * 0.7, 0.8);
       else if (b.key === 'slow:mireStaff') this.fx3.heroAura(id, x, y, 'glow', 0x65a30d, fade(b.t) * 0.7, 0.8);
+      else if (b.key === 'aegis') this.fx3.heroAura(id, x, y, 'bubble', 0xa8d8ee, fade(b.t));
+      else if (b.key === 'galeStep') this.fx3.heroAura(id, x, y, 'glow', 0xd8e3a0, fade(b.t) * 0.7, 0.85);
+      else if (b.key === 'boltStorm') this.fx3.heroAura(id, x, y, 'glow', 0xe8efc0, fade(b.t), 1);
+      else if (b.key === 'redWolf') this.fx3.heroAura(id, x, y, 'glow', 0xff5a2a, fade(b.t) * 0.55, 1);
+      else if (b.key === 'feralBond') this.fx3.heroAura(id, x, y, 'glow', 0xffa64a, fade(b.t) * 0.7, 0.85);
+      else if (b.key === 'hawkMark') this.fx3.heroAura(id, x, y, 'glow', 0xff5a3a, fade(b.t), 0.95);
       else if (b.key === 'silenced') this.fx3.heroAura(id, x, y, 'glow', 0xa78bfa, fade(b.t) * 0.8, 0.85);
       else if (b.key === 'sunder') this.fx3.heroAura(id, x, y, 'glow', 0xf87171, fade(b.t) * 0.4, 0.7);
       else if (b.key === 'rune') {
@@ -744,7 +787,7 @@ export class Renderer3D extends Renderer {
 
   /** Walk cycle, attack swing and casting pose, layered on the model's rest pose. */
   private animate(e: Obj, u: Unit, time: number) {
-    if (u.hero && e.joints.rig) return animateHero(this.actx, e.o, e.joints, u, this.anim(u.id), time);
+    if (u.hero && e.joints.rig && !e.key.startsWith('redwolf')) return animateHero(this.actx, e.o, e.joints, u, this.anim(u.id), time);
     const mk = e.joints.rig ? monsterKind(e.key) : null;
     if (mk) return animateMonster(this.actx, mk, e.o, e.joints, u, this.anim(u.id), time);
     const a = this.anim(u.id);

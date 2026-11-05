@@ -49,6 +49,11 @@ export const CREEPS: Record<'melee' | 'ranged', CombatStats> = {
   },
 };
 
+/** Morra's wolves (health and damage come from the ability's level). */
+export const SUMMONS: Record<'wolf', CombatStats> = {
+  wolf: { hp: 240, armor: 1, damage: 18, attackInterval: 1, attackRange: 1.2, projectileSpeed: 0, moveSpeed: 8, radius: 0.7, acquireRange: 10, bountyGold: 20, bountyXp: 25, vision: [10, 8] },
+};
+
 /** Multiplier applied to creeps of a lane whose enemy barracks has fallen. */
 export const SUPER_CREEP_MULT = { hp: 1.6, damage: 1.6, gold: 0.6 };
 

@@ -88,6 +88,9 @@ If 3D performance in a Capacitor WebView ever becomes a blocker, the simulation 
 | **Syl, the Shadeblade** | Melee assassin | *Shadow Lunge*: leap next to an enemy and strike (80–200) | *Veil*: invisible + 15–30% speed for 3–4.5 s (attacking/casting reveals) | *Execution*: 150–350 + 30–50% of the target's missing health |
 | **Grom, the Ironroot** | Melee bruiser | *Root Snare*: after 0.4 s, roots (1.2–2.1 s) and damages (60–180) in a 3 m area | *Bark Skin*: +6–12 armor and 8–20 health regen for 6 s | *Overgrowth*: roots everyone within 9 m (2–3 s), then 40–80 damage per second for 3 s |
 | **Kaela, the Tidecaller** | Ranged support | *Tidal Wave*: line wave, 70–190 damage + 30% slow to everyone hit | *Brine Veil*: heal an ally 60–150, +4–10 armor and +15% speed for 5 s | *Maelstrom*: 6 m area for 4 s, 50–110 damage per second, 50% slow |
+| **Morra, the Beastcaller** | Summoner | *Call the Pack*: 1 wolf at levels 1 and 2, 2 wolves from level 3, for 22 s. They chase what she attacks, stay within 22 m of her and deal half damage to buildings. A new call replaces the old pack. Their kills count as hers | *Feral Bond*: wolves within 14 m heal 20–44% and hit 20–50% harder and run faster. Morra gets the speed too, but not as the Red Wolf | *Red Wolf*: 14 s as a big red wolf, melee, +45–85% attack speed, +35–85 damage, 10–20% critical chance, +20–30% move speed. Cooldown 75/65/55 s |
+| **Seren, the Aegis** | Melee support | *Aegis*: a shield on an ally or herself soaks up 150–400 damage of any kind for 3 s | *Rebuke*: a lance of light through a line, 95–260 damage and a 30–45% slow | *Sanctuary*: a dome with a 6 m radius for 4–6 s; allied heroes inside take 45–65% less damage, enemies inside are 30% slower |
+| **Rhen, the Galewalker** | Mobile ranged carry | *Gale Step*: dash up to 7 m straight through enemies, then +25–55% attack speed for 3 s | *Hawk Mark*: an enemy loses 3–9 armor for 5–6 s and can't hide, even by turning invisible | *Bolt Storm*: for 3–4 s, a bolt every 0.28 s at enemies within 11 m (heroes first), 58–102 damage each, while he keeps moving and attacking |
 
 Bots pick random heroes (no duplicates within a team), and every hero has a recommended item build (shown in the shop). Bots themselves plan their items from their role and the enemy lineup (`src/sim/ai/bot-items.ts`): armor (Stoneskin Amulet) against attack-heavy teams, the Warded Cloak against spell- and stun-heavy ones, only one Banner of Valor per team, sentry totems against Syl, and the defensive pick sooner when a hero keeps dying.
 
@@ -117,7 +120,7 @@ Ability levels: basic abilities max level 4 (and at most ⌈hero level / 2⌉), 
 The start menu no longer shows heroes: you choose lane and bot difficulty, then **Play** opens the draft.
 - **Bans:** your team bans one hero (20 s; no ban if time runs out), then the enemy bans one. Banned heroes can't be played by anyone this match.
 - **Picks** alternate 1-2-2-1 (Azure, Crimson, Crimson, Azure, Azure, Crimson). Which of your team's three picks is yours is random each match; bots pick the other seats. 30 s per pick (a random hero if time runs out).
-- With 6 heroes, the same hero can be on both teams, but only once per team.
+- With 9 heroes, the same hero can be on both teams, but only once per team.
 - Tapping a hero shows its abilities; the big button bans or locks it in (no accidental picks).
 - After the draft: a **30 s warm-up**. The clock counts up from -0:30; no creeps and no passive gold before 0:00 (shop and walk to lane).
 - Practice and the tutorial only ask you to pick your hero (no bans, no warm-up).

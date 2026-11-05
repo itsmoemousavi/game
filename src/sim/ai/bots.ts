@@ -316,13 +316,20 @@ const ready = (me: Unit, slot: number) => castBlocker(me, slot) === null;
 
 /** Healer bots top up hurt allies first. */
 function supportAllies(w: World, me: Unit): boolean {
-  const def = abilityDef(me, 1);
-  if (!def || def.targeting !== 'ally' || !ready(me, 1)) return false;
+  // The ally spell is on W for most healers, on Q for Seren.
+  const slot = [1, 0].find((s) => abilityDef(me, s)?.targeting === 'ally');
+  if (slot === undefined || !ready(me, slot)) return false;
+  const def = abilityDef(me, slot)!;
   const hurt = w.units
-    .filter((a) => a.hero && a.alive && a.team === me.team && a.hp / a.maxHp < 0.55 && dist(a.x, a.y, me.x, me.y) <= def.castRange + 4)
+    .filter((a) => {
+      if (!a.hero || !a.alive || a.team !== me.team || dist(a.x, a.y, me.x, me.y) > def.castRange + 4) return false;
+      // Aegis goes up early, on anyone being hit; healing waits until it's really needed.
+      const recentlyHit = def.id === 'aegis' && [...a.hero.damagedBy.values()].some((at) => w.time - at < 1.5);
+      return a.hp / a.maxHp < 0.55 || (recentlyHit && !a.buffs.some((b) => b.absorb));
+    })
     .sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
   if (!hurt) return false;
-  w.applyCommand({ type: 'cast', unitId: me.id, slot: 1, targetId: hurt.id });
+  w.applyCommand({ type: 'cast', unitId: me.id, slot, targetId: hurt.id });
   return true;
 }
 
@@ -398,6 +405,26 @@ function useAbilities(w: World, me: Unit, target: Unit): boolean {
       if (!ready(me, slot)) continue;
       const def = abilityDef(me, slot)!;
       if (def.targeting === 'passive' || def.targeting === 'ally') continue;
+      // Feral Bond only with creatures nearby; Call the Pack only when there's no pack.
+      const mine = w.units.filter((o) => o.alive && o.summon?.ownerId === me.id);
+      if (def.id === 'feralBond' && !mine.some((o) => dist(o.x, o.y, me.x, me.y) < def.radius && dist(o.x, o.y, target.x, target.y) < 8)) continue;
+      if (def.id === 'callPack' && mine.some((o) => o.summon!.kind === 'wolf')) continue;
+      // Sanctuary goes over your own side of the fight, when it's going badly.
+      if (def.id === 'sanctuary') {
+        const hurt = w.heroes.filter((a) => a.alive && a.team === me.team && a.hp < a.maxHp * 0.6 && dist(a.x, a.y, me.x, me.y) < def.castRange + 3);
+        if (!hurt.length) continue;
+        w.applyCommand({ type: 'cast', unitId: me.id, slot, x: hurt[0].x, y: hurt[0].y });
+        return true;
+      }
+      // Gale Step keeps a shooter alive: away from danger when hurt, in only to finish someone running.
+      if (def.id === 'galeStep') {
+        if (me.hp < me.maxHp * 0.55 && d < me.attackRange) {
+          const away = Math.atan2(me.y - target.y, me.x - target.x);
+          w.applyCommand({ type: 'cast', unitId: me.id, slot, x: me.x + Math.cos(away) * def.castRange, y: me.y + Math.sin(away) * def.castRange });
+          return true;
+        }
+        if (d < me.attackRange + 2 || target.hp > target.maxHp * 0.35 || me.hp < me.maxHp * 0.6) continue;
+      }
       // Self-buffs (no radius): use them when a fight is on.
       if (def.targeting === 'none' && def.radius === 0) {
         if (d < 9) {
@@ -417,6 +444,11 @@ function useAbilities(w: World, me: Unit, target: Unit): boolean {
       return true;
     }
     return false;
+  }
+  // Morra calls her pack to push and farm too, not only for hero fights.
+  if (me.hero!.defId === 'morra' && ready(me, 0) && me.mana > me.maxMana * 0.85 && !w.units.some((o) => o.alive && o.summon?.ownerId === me.id && o.summon.kind === 'wolf')) {
+    w.applyCommand({ type: 'cast', unitId: me.id, slot: 0 });
+    return true;
   }
   // Farming: blast creep waves with the basic nuke when mana is plentiful.
   if (target.creep && me.mana > me.maxMana * 0.7 && ready(me, 0)) {

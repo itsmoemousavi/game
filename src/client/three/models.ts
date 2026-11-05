@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { HeroId, RuneKind, StructureTier } from '../../sim';
-import { HERO_BUILDERS, M, add, box, cloth, cone, cyl, glow, grp, hood, humanoid, lathe, lumpy, mesh, resetFx, rot, skirt, sph, taper } from './hero-models';
+import { HERO_BUILDERS, M, add, redWolf, wolf, box, cloth, cone, cyl, glow, grp, hood, humanoid, lathe, lumpy, mesh, resetFx, rot, skirt, sph, taper } from './hero-models';
 
 export const TEAM_HEX = [0x3d8bfd, 0xe5484d] as const;
 
@@ -244,7 +244,7 @@ function finishOf(key: string): Finish {
   if (kind === 'hero') return FINISH.hero;
   if (kind === 'structure' || kind === 'rubble') return FINISH.building;
   if (kind === 'warden') return FINISH.stone;
-  if (kind === 'brute' || kind === 'imp') return FINISH.monster;
+  if (kind === 'brute' || kind === 'imp' || kind === 'wolf' || kind === 'redwolf') return FINISH.monster;
   return FINISH.unit;
 }
 
@@ -262,6 +262,10 @@ function build(key: string): THREE.Object3D {
       return imp();
     case 'warden':
       return warden();
+    case 'wolf':
+      return wolf(Number(a) as 0 | 1);
+    case 'redwolf':
+      return redWolf(Number(a) as 0 | 1);
     case 'structure':
       return structure(a as StructureTier, Number(b) as 0 | 1, c as 'melee' | 'ranged' | undefined);
     case 'rubble':
@@ -739,6 +743,22 @@ function shot(kind: string): THREE.Object3D {
     add(g, mesh(sph(0.24, 1), glow(0x9ff0ff, 2)), 0, 0, 0);
     add(g, mesh(sph(0.38, 1), glow(0x1fa3c4, 1.3, 0.45)), 0, 0, -0.08);
     add(g, mesh(new THREE.TorusGeometry(0.34, 0.03, 4, 16), glow(0xe8fdff, 1.5, 0.7)), 0, 0, 0);
+  } else if (kind === 'rebuke') {
+    // Seren's lance of light.
+    add(g, rot(mesh(cone(0.34, 1.9, 6), glow(0xfff1c2, 2.6)), Math.PI / 2, 0, 0), 0, 0, 0.3);
+    add(g, rot(mesh(cone(0.6, 2.6, 8), glow(0xffd98a, 1.3, 0.35)), Math.PI / 2, 0, 0), 0, 0, 0.1);
+    add(g, mesh(new THREE.TorusGeometry(0.45, 0.04, 4, 16), glow(0xfff1c2, 1.8, 0.8)), 0, 0, -0.5);
+  } else if (kind === 'spiritbolt') {
+    // Morra's attack: a little spirit wisp with a tail.
+    add(g, mesh(sph(0.18, 1), glow(0xffc247, 2.6)), 0, 0, 0);
+    add(g, mesh(sph(0.32, 1), glow(0xd2691e, 1.3, 0.4)), 0, 0, -0.06);
+    add(g, rot(mesh(cone(0.2, 0.7, 5), glow(0xffa64a, 1.4, 0.5)), -Math.PI / 2, 0, 0), 0, 0, -0.42);
+  } else if (kind === 'crossbolt') {
+    // Rhen's short heavy bolt.
+    add(g, rot(mesh(cyl(0.035, 0.035, 0.9, 4), M(0xb8aa86)), Math.PI / 2, 0, 0), 0, 0, 0);
+    add(g, rot(mesh(cone(0.075, 0.24, 4), M(0xc9d2d8, { metalness: 0.7 })), Math.PI / 2, 0, 0), 0, 0, 0.55);
+    for (const s of [-1, 1]) add(g, mesh(box(0.02, 0.13, 0.17), M(0x9aa84e)), s * 0.03, 0, -0.38);
+    add(g, rot(mesh(cone(0.09, 0.5, 5), glow(0xe8efc0, 1, 0.3)), -Math.PI / 2, 0, 0), 0, 0, -0.5);
   } else if (kind === 'spell') {
     add(g, mesh(sph(0.4, 1), glow(0xffb347, 3)), 0, 0, 0);
   } else {
