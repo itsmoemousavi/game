@@ -255,9 +255,7 @@ export class Renderer {
     this.drawGroundItems(w, viewTeam, focus);
     this.drawWardenSlam(w, sees);
     for (const u of w.units) if (u.ward && u.alive && sees(u)) this.drawWard(u, viewTeam);
-    for (const u of w.units) {
-      if (trueSightRadius(u) > 0 && sees(u)) drawTrueSightEye(this.ctx, u.x, u.y - u.radius - 1.6, 2.6);
-    }
+    this.drawEyes(w, sees);
     if (this.wardMode !== null && focus?.alive) {
       const p = lerp(focus);
       ctx.strokeStyle = 'rgba(250,204,21,0.8)';
@@ -679,6 +677,13 @@ export class Renderer {
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 0.1;
       ctx.stroke();
+    }
+  }
+
+  /** The 2D view's green eyes. (The 3D view floats its own over the models instead.) */
+  protected drawEyes(w: World, sees: (u: Unit) => boolean) {
+    for (const u of w.units) {
+      if (trueSightRadius(u) > 0 && sees(u)) drawTrueSightEye(this.ctx, u.x, u.y - u.radius - 1.6, 2.6);
     }
   }
 

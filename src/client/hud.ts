@@ -24,9 +24,9 @@ import {
 import { abilityIcon, itemIcon, statusIcon } from './icons';
 
 const fmtTime = (t: number) => {
-  // Warm-up counts up from -0:30.
+  // The 30 s warm-up counts down to 0:00, then the match clock counts up from there.
   const a = t < 0 ? Math.ceil(-t) : Math.floor(t);
-  return `${t < 0 ? '-' : ''}${Math.floor(a / 60)}:${String(a % 60).padStart(2, '0')}`;
+  return `${Math.floor(a / 60)}:${String(a % 60).padStart(2, '0')}`;
 };
 
 /** Hero headshots (image URLs), filled in by main.ts once the 3D portraits are rendered. */
@@ -68,7 +68,6 @@ export class Hud {
       'status-row',
       'toasts',
       'killfeed',
-      'killed-by',
     ]) {
       this.el[id] = root.querySelector(`#${id}`)!;
     }
@@ -247,7 +246,6 @@ export class Hud {
     this.el.killfeed.appendChild(d);
     while (this.el.killfeed.children.length > 5) this.el.killfeed.firstElementChild!.remove();
     setTimeout(() => d.remove(), 9200);
-    if (victim.id === meId) this.el['killed-by'].textContent = `Killed by ${label(killer)} ·`;
     void w;
   }
 
@@ -414,12 +412,6 @@ export class Hud {
   onGameOver: (w: World) => void = () => {};
 
   /** End-of-match table: everyone's numbers, with the MVP highlighted. */
-  /** Show how much gold this death cost, in the respawn banner. */
-  goldLost(amount: number) {
-    const el = this.el['killed-by'];
-    el.textContent = `${el.textContent?.replace(/ ·$/, '') ?? ''} · −${amount} gold ·`;
-  }
-
   /** Short announcement under the top bar. */
   toast(text: string, color = '#fff') {
     const d = document.createElement('div');
@@ -490,7 +482,6 @@ export class Hud {
     this.el.respawn.style.display = !me.alive && w.winner === null ? 'block' : 'none';
     const night = isNight(w.time);
     this.el.daynight.textContent = night ? '☾' : '☀';
-    if (me.alive) this.el['killed-by'].textContent = '';
     this.el.daynight.classList.toggle('night', night);
     this.el.daynight.title = night ? 'Night: everyone sees less' : 'Day';
     this.el['respawn-time'].textContent = String(Math.max(0, Math.ceil(h.respawnTimer)));

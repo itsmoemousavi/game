@@ -86,7 +86,9 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
 - Spells vs obstacles (owner, 2026-11-05): trees, walls, buildings and mountains block only walking, never spells. Charges/dashes go through and may end anywhere: on a mountain, off one, in or out of a pocket, into the Warden's house. Ending inside something moves you to the nearest open spot.
 - Mountains (owner, 2026-11-05): six, in the woods between forests, never on a lane or trail (`tests/map.test.ts` checks it), open ground all around so anyone can walk to the foot and plant a ward on top. Not walkable at all: up or down only by blink, teleport or charge. Melee can only hit someone up there from up there.
 - Forest: no crowded spots; pockets with no walking way out are on purpose (escape with blink, charge, or a TP brought by courier). Bots are lifted out of pockets and off mountains until they can use them.
-- True sight (owner, 2026-11-05): towers (attack range), Shrine and fountain always have it; sentry totems too. It needs vision: a sentry gives vision only for its first 5 s, then only unmasks where the team already sees. Vision is the observer totem's job. Everything with true sight wears a green outlined eye.
+- Tower sight (owner, 2026-11-05): towers give the team NO vision; the ground around them stays fog, and lanes are lit only by heroes, creeps and wards. Sight = attack range: any enemy hero or creep in a tower's attack zone is seen by that tower's whole team and shot, even in fog and even invisible, until they leave the zone. It doesn't reveal wards. Barracks, Shrine and fountain keep normal team vision.
+- True sight: towers, fountain and sentry totems have it and wear a green outlined eye floating on top (never on the ground); the Shrine and barracks do not. A sentry gives vision only for its first 5 s, then only unmasks where the team already sees. Vision is the observer totem's job (24/18 m, 34/26 m on a mountain).
+- Morra's wolves need no control: attack what she attacks (any mode, jungle too), turn on whoever hits her, stay within 14 m, don't dive towers or hit buildings by themselves. Non-human units walk around anything blocking them unless there's truly no way (`goingAround` in world.ts).
 - Match ending: everything freezes (heroes do not walk), the camera glides to the fallen Shrine, it explodes, result banner, then end screen.
 - Menu: Play with Bots, Practice, Play with Friend (locked until multiplayer). Courier art approved: pack mule, winged after 6:00.
 - Teleport: hero is frozen while channelling, only the X on the TP slot (or a stun) stops it, no walking cancels it; the destination is fixed when it starts, so a tower falling mid-channel doesn't matter. Channel bar over the health bar shows anything charging. Wayfarer Boots: always 1 TP, never used up, 30 s cooldown, allied heroes and creeps as targets too, can't buy scrolls; drop them and you keep 1.
@@ -127,7 +129,7 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
 4. 3D polish: real art/animations, spell effects in 3D.
 5. Living world: shipped in 0.11.0. Phone frame rate and battery with the new art still need the owner's check.
 6. More heroes: Morra, Seren and Rhen shipped in 0.13.0. A 4th only if playing them shows a missing role (owner agreed to wait).
-   Balance after 0.15.0 is rough (about 45 matches per hero, so ±7-15%): Brakk 65%, Vexa 62%, Grom 58%, Syl 54%, Kaela 50%, Seren 47%, Rhen 42%, Morra 37%, Orin 30%. Re-check with more matches before tuning.
+   Balance after 0.15.1 is rough (about 45 matches per hero, so ±7-15%; the last two runs differ a lot): Kaela 66%, Seren 55%, Vexa 55%, Syl 54%, Grom 51%, Orin 49%, Brakk 46%, Rhen 36%, Morra 33%. Owner: balance LATER. Re-check with more matches before tuning.
 7. Later: multiplayer (first on owner's MacBook, local only), killable courier + bounty, Capacitor app builds, store release.
 
 ## Gotchas

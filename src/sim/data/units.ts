@@ -159,7 +159,7 @@ export const WARDS: Record<'observer' | 'sentry', CombatStats> = {
     acquireRange: 0,
     bountyGold: 50,
     bountyXp: 50,
-    vision: [19, 14],
+    vision: [24, 18],
   },
   sentry: {
     hp: 200,

@@ -558,6 +558,10 @@ export class Renderer3D extends Renderer {
     this.sound?.('meteorImpact', x, y, 1);
   }
 
+  protected drawEyes() {
+    // This layer is painted on the ground; here the eyes float over the models (see the overlay).
+  }
+
   private updateFog(w: World, team: Team) {
     // Vision only changes a few times a second: rebuild the fog texture only then.
     const key = `${w.vision.version}|${team}|${isNight(w.time)}|${!!this.ending}`;
@@ -1053,7 +1057,7 @@ export class Renderer3D extends Renderer {
       // True sight: a green eye floating over everything that has it.
       if (trueSightRadius(u) > 0 && w.canSee(team, u)) {
         const tier = u.structure?.tier;
-        const e = this.toScreen(u.x, u.y, u.ward ? 2.5 : tier === 'shrine' ? 12 : tier === 'fountain' ? 8 : 11.5);
+        const e = this.toScreen(u.x, u.y, u.ward ? 2.5 : tier === 'fountain' ? 8 : 11.5);
         drawTrueSightEye(ctx, e.x, e.y, u.ward ? 15 : 18);
       }
       if (u.kind === 'structure') {

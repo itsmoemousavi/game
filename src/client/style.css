@@ -108,9 +108,9 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #pstats b { color: #ffd23f; font-size: 13px; font-weight: 900; }
 #kda { display: flex; flex-direction: column; font-size: 11px; font-weight: 700; line-height: 1.25; opacity: 0.85; white-space: nowrap; margin-top: 4px; font-variant-numeric: tabular-nums; }
 
-#actions { position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); width: 210px; height: 190px; }
+#actions { position: absolute; right: max(32px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); width: 226px; height: 200px; }
 #actions button { position: absolute; border-radius: 50%; border: 2px solid rgba(255,255,255,0.35); background: rgba(20,30,24,0.75); display: grid; place-items: center; touch-action: none; }
-#btn-attack { right: 0; bottom: 0; width: 88px; height: 88px; background: rgba(170,50,50,0.8) !important; font-weight: 800; font-size: 14px; }
+#btn-attack { right: 0; bottom: 0; width: 104px; height: 104px; background: rgba(170,50,50,0.8) !important; font-weight: 800; font-size: 14px; }
 .ability { width: 58px; height: 58px; align-content: center; gap: 1px; overflow: hidden; }
 .ability { padding: 0; }
 .ability .pic { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; }
@@ -126,13 +126,13 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 .ability.nomana { background: rgba(30,50,120,0.8) !important; }
 .ability.unlearned { opacity: 0.35; }
 .ability.passive { border-style: dashed !important; }
-#btn-q { right: 100px; bottom: 2px; } #btn-w { right: 88px; bottom: 72px; } #btn-r { right: 20px; bottom: 104px; border-color: #ffd23f !important; }
+#btn-q { right: 116px; bottom: 2px; } #btn-w { right: 104px; bottom: 72px; } #btn-r { right: 28px; bottom: 118px; border-color: #ffd23f !important; }
 #actions .learn { display: none; width: 26px; height: 26px; padding: 0; border-radius: 50%; background: #ffd23f !important; color: transparent; font-size: 0; border: 2px solid #fff; z-index: 2; }
 /* The plus is two bars drawn exactly in the middle (a text "+" sits off-centre in most fonts). */
 #actions .learn::before, #actions .learn::after { content: ''; position: absolute; left: 50%; top: 50%; width: 12px; height: 3px; margin: -1.5px 0 0 -6px; border-radius: 1px; background: #111; }
 #actions .learn::after { transform: rotate(90deg); }
 #actions .learn.show { display: grid; animation: pulse 1s infinite alternate; }
-#learn-q { right: 140px; bottom: 44px; } #learn-w { right: 128px; bottom: 116px; } #learn-r { right: 60px; bottom: 148px; }
+#learn-q { right: 156px; bottom: 44px; } #learn-w { right: 144px; bottom: 116px; } #learn-r { right: 68px; bottom: 162px; }
 @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.15); } }
 #cancel-zone { display: none; position: absolute; right: max(12px, env(safe-area-inset-right)); top: 64px; padding: 14px 18px; border-radius: 12px; background: rgba(160,30,30,0.75); border: 2px solid rgba(255,255,255,0.5); font-weight: 700; pointer-events: none; }
 #cancel-zone.show { display: block; }
@@ -178,10 +178,10 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #itembar .tp.channel::after { content: '✕'; position: absolute; inset: 0; z-index: 3; display: grid; place-items: center; background: rgba(20,8,8,0.62); color: #ff9a9a; font-size: 20px; font-weight: 900; border-radius: 5px; }
 /* The bar over the health bar while something charges up. */
 .bars { position: relative; }
-#channel-bar { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); height: 16px; border-radius: 8px; overflow: hidden; background: rgba(10,12,16,0.85); border: 1px solid rgba(214,177,99,0.7); box-shadow: 0 2px 8px rgba(0,0,0,0.5); z-index: 4; }
+#channel-bar { position: absolute; left: 0; right: 0; bottom: calc(100% + 11px); height: 22px; border-radius: 8px; overflow: hidden; background: rgba(10,12,16,0.85); border: 1px solid rgba(214,177,99,0.7); box-shadow: 0 2px 8px rgba(0,0,0,0.5); z-index: 4; }
 #channel-bar.hidden { display: none; }
 #channel-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(180deg, #9fd0ff, #3f8ae0); }
-#channel-text { position: absolute; inset: 0; display: grid; place-items: center; font-size: 10.5px; font-weight: 800; letter-spacing: 0.03em; color: #fff; text-shadow: 0 1px 2px #000; font-variant-numeric: tabular-nums; }
+#channel-text { position: absolute; inset: 0; padding: 2px 10px; box-sizing: border-box; display: grid; place-items: center; font-size: 10.5px; font-weight: 800; letter-spacing: 0.03em; color: #fff; text-shadow: 0 1px 2px #000; font-variant-numeric: tabular-nums; }
 #itembar .tp .cd { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,0.6); border-radius: 5px; font-size: 13px; font-weight: 800; }
 #itembar .tp .cd:empty { display: none; }
 /* Shop: a round button sitting on the panel's bottom-right corner. */
@@ -276,8 +276,6 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #killfeed .vs { opacity: 0.8; font-size: 11px; }
 #killfeed .me { outline: 1px solid #ffe066; }
 @keyframes feed { 0% { opacity: 0; transform: translateX(10px); } 4% { opacity: 1; transform: none; } 85% { opacity: 1; } 100% { opacity: 0; } }
-#killed-by:empty { display: none; }
-#killed-by { margin-right: 6px; color: #ffd0d0; }
 
 /* ---------- settings / stats ---------- */
 #btn-settings { position: absolute; right: max(10px, env(safe-area-inset-right)); top: max(6px, env(safe-area-inset-top)); width: 34px; height: 34px; border-radius: 50%; border: 0; background: rgba(0,0,0,0.5); font-size: 18px; color: #e8eee9; }
@@ -322,7 +320,7 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 
 
 /* ---------- ability info ---------- */
-#ability-tip { position: absolute; right: calc(max(12px, env(safe-area-inset-right)) + 220px); bottom: 20px; width: min(320px, 46%); background: rgba(10,16,12,0.95); border: 2px solid #8cc4ff; border-radius: 10px; padding: 8px 10px; font-size: 12px; z-index: 6; pointer-events: none; }
+#ability-tip { position: absolute; right: calc(max(32px, env(safe-area-inset-right)) + 236px); bottom: 20px; width: min(320px, 46%); background: rgba(10,16,12,0.95); border: 2px solid #8cc4ff; border-radius: 10px; padding: 8px 10px; font-size: 12px; z-index: 6; pointer-events: none; }
 #ability-tip h3 { margin: 0; font-size: 14px; }
 #ability-tip .tag { font-size: 10px; opacity: 0.7; margin-bottom: 4px; }
 #ability-tip p { margin: 4px 0 6px; opacity: 0.9; }
@@ -337,11 +335,11 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #set-zoom { width: 140px; accent-color: #3d8bfd; }
 
 /* ---------- left-handed layout ---------- */
-#app.lefty #actions { right: auto; left: max(12px, env(safe-area-inset-left)); transform: scaleX(-1); }
+#app.lefty #actions { right: auto; left: max(32px, env(safe-area-inset-left)); transform: scaleX(-1); }
 #app.lefty #actions > * { transform: scaleX(-1); }
 #app.lefty #actions .learn.show { animation: none; }
 #app.lefty #cancel-zone { right: auto; left: max(12px, env(safe-area-inset-left)); top: auto; bottom: 230px; }
-#app.lefty #ability-tip { right: auto; left: calc(max(12px, env(safe-area-inset-left)) + 220px); }
+#app.lefty #ability-tip { right: auto; left: calc(max(32px, env(safe-area-inset-left)) + 236px); }
 #app.lefty #hint { display: none; }
 
 /* The ability area is a layout box only: let taps through to whatever is under its empty parts. */

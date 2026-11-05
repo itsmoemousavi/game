@@ -487,10 +487,7 @@ function announce(w: World, events: GameEvent[]) {
   };
   for (const e of events) {
     if (e.type === 'megaCreeps') announceMega(e.team);
-    if (e.type === 'goldLost' && e.unitId === myHeroId) {
-      hud.goldLost(e.amount);
-      continue;
-    }
+    if (e.type === 'goldLost') continue;
     if (e.type === 'ping') {
       if (e.ping.team !== myTeam) continue;
       const st = PING_STYLE[e.ping.kind];

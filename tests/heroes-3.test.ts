@@ -51,7 +51,7 @@ describe('Morra', () => {
     place(hero(1, 'brakk'), 20, 20);
     learn(m, 0);
     w.applyCommand({ type: 'cast', unitId: m.id, slot: 0 });
-    run(w, 23);
+    run(w, 36);
     expect(summons(w, m).length).toBe(0);
   });
 

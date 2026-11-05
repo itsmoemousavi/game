@@ -29,6 +29,31 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.15.x · A real start and finish
 
+### 0.15.1
+*2026-11-05*
+
+**Towers see differently:**
+- Towers no longer light up the map. The ground around them stays in fog, so only heroes, creeps and totems give vision on the lanes. Barracks, the Shrine and the fountain still give vision.
+- Anyone who steps into a tower's attack zone is seen by that tower's whole team and gets shot, even in fog and even invisible. Leave the zone and you are hidden again.
+
+**Morra's wolves are easier to use:**
+- They attack whatever Morra attacks, with auto attack too, including jungle camps.
+- They turn on whoever hits her.
+- They stay closer to her, and don't dive under towers or attack buildings on their own.
+- They last 35 s instead of 22 s and are slightly weaker to make up for it.
+- Red Wolf form is faster: 30/35/40% move speed instead of 20/25/30%.
+
+**Watcher totems see farther:** 24 m by day and 18 m at night, and 34 m and 26 m from on top of a mountain.
+
+**Screen:**
+- The match starts with a 30 second countdown, then the clock counts up from 0:00, with no minus sign.
+- The Attack button is bigger, and Attack and the spells sit a little further left.
+- When you die you only see the respawn countdown and the buyback button.
+- The channel bar has more room around it and around its text.
+- The Shrine no longer has true sight or a green eye, and the extra eye painted on the ground is gone.
+
+**Going around things:** bots, creeps and wolves now notice when they aren't getting anywhere and walk around whatever is blocking them. They only stand still if there is truly no way through.
+
 ### 0.15.0
 *2026-11-05*
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { HEROES, HeroId, ITEMS, fits, isWalkable, trueSightRadius, LANE_IDS, PlayerSlot, TICK_RATE, TELEPORT, Team, Unit, World, teleportTargets, tpBuyBlocker } from '../src/sim';
+import { CREEPS, HEROES, HeroId, ITEMS, fits, isWalkable, trueSightRadius, LANE_IDS, PlayerSlot, TICK_RATE, TELEPORT, Team, Unit, World, teleportTargets, tpBuyBlocker } from '../src/sim';
 import { onHillTop } from '../src/sim/objectives';
+import { SUMMONS, WARDS } from '../src/sim/data/units';
 import { spawnDummy } from '../src/client/tutorial';
 
 function arena(a: HeroId[], b: HeroId[]) {
@@ -458,49 +459,67 @@ describe('spells go through trees, walls and buildings', () => {
 describe('true sight', () => {
   const veil = (u: Unit) => u.buffs.push({ key: 'veil', t: 60, invisible: true } as Unit['buffs'][number]);
 
-  it('towers show invisible enemies inside their attack range, not outside', () => {
+  const zoneSpot = (w: World, tower: Unit, r: number, u: Unit) => {
+    for (let a = 0; a < 6.3; a += 0.1) {
+      const x = tower.x + Math.cos(a) * r;
+      const y = tower.y + Math.sin(a) * r;
+      if (fits(w.nav, x, y, u.radius)) return { x, y };
+    }
+    throw new Error('no spot');
+  };
+
+  it('anyone in a tower attack zone is seen by its team and shot, invisible or not; outside it they are not', () => {
     const { w, hero } = arena(['brakk'], ['syl']);
     const tower = w.structures.find((s) => s.team === 0 && s.structure!.tier === 'tower1')!;
     const syl = hero(1, 'syl');
     place(hero(0, 'brakk'), 20, 250);
     veil(syl);
     const r = trueSightRadius(tower);
-    expect(r).toBeGreaterThan(5);
-    let inside: { x: number; y: number } | null = null;
-    for (let a = 0; a < 6.3 && !inside; a += 0.1) {
-      const x = tower.x + Math.cos(a) * (r - 2);
-      const y = tower.y + Math.sin(a) * (r - 2);
-      if (fits(w.nav, x, y, syl.radius)) {
-        place(syl, x, y);
-        w.vision.update(w);
-        if (w.vision.seesPoint(0, x, y)) inside = { x, y };
-      }
-    }
-    expect(inside).not.toBeNull();
+    let p = zoneSpot(w, tower, r - 2.5, syl);
+    place(syl, p.x, p.y);
+    w.vision.update(w);
+    expect(w.vision.seesPoint(0, p.x, p.y)).toBe(false); // the ground is still in fog
     expect(w.canSee(0, syl)).toBe(true);
+    const hp = syl.hp;
+    run(w, 2);
+    expect(syl.hp).toBeLessThan(hp);
+    p = zoneSpot(w, tower, r + 3, syl);
+    place(syl, p.x, p.y);
+    w.vision.update(w);
+    expect(w.canSee(0, syl)).toBe(false);
     syl.buffs.length = 0;
-    expect(w.canSee(0, syl)).toBe(true);
-    veil(syl);
-    let outside = false;
-    for (let a = 0; a < 6.3 && !outside; a += 0.1) {
-      const x = tower.x + Math.cos(a) * (r + 3);
-      const y = tower.y + Math.sin(a) * (r + 3);
-      if (fits(w.nav, x, y, syl.radius)) {
-        place(syl, x, y);
-        w.vision.update(w);
-        outside = w.vision.seesPoint(0, x, y);
-      }
-    }
-    expect(outside).toBe(true);
+    w.vision.update(w);
     expect(w.canSee(0, syl)).toBe(false);
   });
 
-  it('the Shrine and fountain have it, barracks and observers do not', () => {
+  it('towers give no vision; barracks, Shrine and fountain do. Only towers, fountain and sentries wear the eye', () => {
     const { w } = arena(['brakk'], ['syl']);
-    const tier = (t: string) => w.structures.find((s) => s.structure!.tier === t)!;
-    expect(trueSightRadius(tier('shrine'))).toBeGreaterThan(0);
-    expect(trueSightRadius(tier('fountain'))).toBeGreaterThan(0);
+    w.vision.update(w);
+    const tier = (t: string) => w.structures.find((s) => s.team === 0 && s.structure!.tier === t)!;
+    for (const t of ['tower1', 'tower2', 'tower3', 'shrineTower']) expect(trueSightRadius(tier(t))).toBeGreaterThan(5);
+    expect(trueSightRadius(tier('shrine'))).toBe(0);
     expect(trueSightRadius(tier('barracks'))).toBe(0);
+    expect(trueSightRadius(tier('fountain'))).toBeGreaterThan(0);
+    const t1 = tier('tower1');
+    expect(w.vision.seesPoint(0, t1.x + 3, t1.y + 3)).toBe(false);
+    for (const t of ['barracks', 'shrine', 'fountain']) expect(w.vision.seesPoint(0, tier(t).x, tier(t).y)).toBe(true);
+  });
+
+  it('a Watcher totem sees much farther from a mountain', () => {
+    const { w, hero } = arena(['brakk'], ['orin']);
+    const hill = w.map.hills[0];
+    const count = () => {
+      w.vision.update(w);
+      return w.vision.grids[0].reduce((n, c) => n + c, 0);
+    };
+    place(hero(0, 'brakk'), 20, 250);
+    const base = count();
+    const ward = w.spawnUnit('ward', 0, { x: hill.x + 7, y: hill.y }, WARDS.observer);
+    ward.ward = { kind: 'observer', expires: 1e9, placedAt: 0 };
+    const ground = count() - base;
+    ward.x = hill.x;
+    const top = count() - base;
+    expect(top).toBeGreaterThan(ground * 1.5);
   });
 
   it('a sentry on a mountain shows the enemy observer for 5 seconds, then you need vision of your own', () => {
@@ -532,5 +551,94 @@ describe('true sight', () => {
     place(mine, hill.x, hill.y);
     w.vision.update(w);
     expect(w.canSee(0, observer)).toBe(true);
+  });
+});
+
+describe("Morra's wolves", () => {
+  const pack = (w: World, m: Unit, x: number, y: number) => {
+    const wolf = w.spawnSummon(m, { kind: 'wolf', ownerId: m.id, expires: w.time + 60 }, SUMMONS.wolf, 0);
+    wolf.x = wolf.px = x;
+    wolf.y = wolf.py = y;
+    return wolf;
+  };
+
+  it('attack what she attacks with auto attack, and turn on whoever hits her', () => {
+    const { w, hero } = arena(['morra'], ['orin', 'syl']);
+    const m = hero(0, 'morra');
+    const a = hero(1, 'orin');
+    const b = hero(1, 'syl');
+    place(m, 150, 150);
+    place(a, 155, 150);
+    place(b, 145, 150);
+    const wolf = pack(w, m, 150, 152);
+    w.vision.update(w);
+    m.targetId = a.id;
+    w.step();
+    expect(wolf.targetId).toBe(a.id);
+    place(a, 190, 150);
+    m.targetId = null;
+    w.vision.update(w);
+    w.step();
+    w.dealDamage(b.id, m, 1, 'attack');
+    w.step();
+    expect(wolf.targetId).toBe(b.id);
+  });
+
+  it('do not dive an enemy tower by themselves', () => {
+    const { w, hero } = arena(['morra'], ['orin']);
+    const m = hero(0, 'morra');
+    const o = hero(1, 'orin');
+    const tower = w.structures.find((s) => s.team === 1 && s.structure!.tier === 'tower1')!;
+    place(o, tower.x + 5, tower.y + 5);
+    place(m, tower.x + 16, tower.y + 16);
+    const wolf = pack(w, m, tower.x + 15, tower.y + 15);
+    w.vision.update(w);
+    w.step();
+    expect(wolf.targetId).not.toBe(o.id);
+    expect(wolf.targetId).not.toBe(tower.id);
+  });
+});
+
+describe('going around things', () => {
+  it('creeps walk around every building to reach the far side', async () => {
+    const { w } = arena(['brakk'], ['orin']);
+    const walkers: { c: Unit; x: number; y: number }[] = [];
+    for (const s of w.structures) {
+      for (let a = 0; a < 6.28; a += 1.57) {
+        const r = s.radius + 3;
+        const x0 = s.x + Math.cos(a) * r;
+        const y0 = s.y + Math.sin(a) * r;
+        const x1 = s.x - Math.cos(a) * r;
+        const y1 = s.y - Math.sin(a) * r;
+        if (!fits(w.nav, x0, y0, 0.7) || !fits(w.nav, x1, y1, 0.7)) continue;
+        const c = w.spawnUnit('creep', s.team as Team, { x: x0, y: y0 }, { ...CREEPS.melee, acquireRange: 0, attackRange: 0 });
+        c.creep = { type: 'melee', lane: 'mid', path: [{ x: x1, y: y1 }], wp: 0, super: false, mega: false };
+        walkers.push({ c, x: x1, y: y1 });
+      }
+    }
+    expect(walkers.length).toBeGreaterThan(30);
+    for (let i = 0; i < 25 * TICK_RATE; i++) {
+      w.step();
+      if (i % 200 === 0) await new Promise((r) => setTimeout(r, 0));
+    }
+    const lost = walkers.filter((k) => k.c.alive && k.c.creep!.wp < 1);
+    expect(lost.map((k) => [Math.round(k.c.x), Math.round(k.c.y), Math.round(k.x), Math.round(k.y), k.c.creep!.wp, k.c.targetId])).toEqual([]);
+  }, 60000);
+
+  it('a unit with truly nowhere to go just stands there', () => {
+    const { w, hero } = arena(['brakk'], ['orin']);
+    const b = hero(0, 'brakk');
+    const n = w.map.grid;
+    const c = w.map.cell;
+    const x = 150;
+    const y = 150;
+    place(b, x, y);
+    for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) if (Math.hypot(dx, dy) > 1.5) w.nav.walkable[(Math.floor(y / c) + dy) * n + Math.floor(x / c) + dx] = 0;
+    b.hero!.controller = 'bot';
+    for (let i = 0; i < 90; i++) {
+      w.time += 1 / 30;
+      w.navigate(b, x + 30, y, 0.3);
+    }
+    expect(Math.hypot(b.x - x, b.y - y)).toBeLessThan(5);
   });
 });

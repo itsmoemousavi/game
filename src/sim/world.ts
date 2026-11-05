@@ -132,7 +132,7 @@ const SUNDER_SECONDS = 4;
 /** A single attack tap this close to the swing being ready still counts (fingers aren't perfect). */
 const ONCE_GRACE = 0.1;
 /** Morra's wolves: how far they stray from her. Red Wolf: her reach while she's melee. */
-const SUMMON_LEASH = 22;
+const SUMMON_LEASH = 14;
 const SUMMON_BUILDING_MULT = 0.5;
 const WOLF_FORM_RANGE = 1.6;
 /** Rhen's Bolt Storm: one bolt this often, at enemies within this range. */
@@ -253,6 +253,9 @@ export interface HeroState {
   deaths: number;
   assists: number;
   lastHits: number;
+  /** Who last hurt this hero, and when (their wolves turn on that unit). */
+  lastHurtBy: number | null;
+  lastHurtAt: number;
   denies: number;
   hadTeleportBoots?: boolean;
   /** Morra is the Red Wolf right now. */
@@ -399,6 +402,8 @@ export interface Unit {
   creep?: CreepState;
   /** A creature called by a hero (Morra's wolves). */
   summon?: SummonState;
+  /** Watches for getting nowhere; see goingAround. */
+  stuckWatch?: { t: number; last: number; x: number; y: number; until: number; side: number };
   structure?: StructureState;
   neutral?: NeutralState;
   ward?: WardState;
@@ -948,6 +953,8 @@ export class World {
       deaths: 0,
       assists: 0,
       lastHits: 0,
+      lastHurtBy: null,
+      lastHurtAt: -999,
       denies: 0,
       goldEarned: 0,
       streak: 0,
@@ -1431,13 +1438,23 @@ export class World {
     const owner = this.unit(s.ownerId);
     const home = owner?.alive ? owner : undefined;
     let t = this.unit(u.targetId);
-    const order = home?.hero?.order;
-    const called = order?.type === 'attack' ? this.unit(order.targetId) : undefined;
-    if (called && this.canAttack(u, called) && called.team !== u.team && dist(u.x, u.y, called.x, called.y) < SUMMON_LEASH) t = called;
-    if (!this.canAttack(u, t) || !this.canSee(u.team, t) || dist(u.x, u.y, t.x, t.y) > u.acquireRange + 4) t = undefined;
-    if (home && dist(u.x, u.y, home.x, home.y) > SUMMON_LEASH && t !== called) t = undefined;
+    // Whatever Morra is hitting, however she came to hit it (tap, arrow or auto attack).
+    const near = (e: Unit | undefined) => !!e && e.team !== u.team && this.canAttack(u, e) && !!home && dist(home.x, home.y, e.x, e.y) < SUMMON_LEASH;
+    const hers = home ? this.unit(home.targetId) : undefined;
+    const called = near(hers) ? hers : undefined;
+    // Whoever is hurting her.
+    const hurt = home?.hero && this.time - home.hero.lastHurtAt < 3 ? this.unit(home.hero.lastHurtBy) : undefined;
+    const attacker = near(hurt) && this.canSee(u.team, hurt!) ? hurt : undefined;
+    if (called) t = called;
+    else if (attacker) t = attacker;
+    if (!this.canAttack(u, t) || !this.canSee(u.team, t) || (t !== called && dist(u.x, u.y, t.x, t.y) > u.acquireRange + 4)) t = undefined;
+    if (home && t && t !== called && dist(u.x, u.y, home.x, home.y) > SUMMON_LEASH) t = undefined;
+    // By themselves they stay out of buildings and enemy tower zones.
+    const enemy = (u.team === 0 ? 1 : 0) as Team;
+    const dive = (e: Unit) => e !== called && e !== attacker && (e.kind === 'structure' || this.vision.inTowerZone(enemy, e.x, e.y));
+    if (t && dive(t)) t = undefined;
     if (!t) {
-      t = this.enemiesNear(u, u.x, u.y, u.acquireRange, (e) => e.kind !== 'neutral' && e.kind !== 'ward' && this.canSee(u.team, e)).sort(
+      t = this.enemiesNear(u, u.x, u.y, u.acquireRange, (e) => e.kind !== 'neutral' && e.kind !== 'ward' && !dive(e) && this.canSee(u.team, e)).sort(
         (a, b) => Number(!!b.hero) - Number(!!a.hero) || dist(u.x, u.y, a.x, a.y) - dist(u.x, u.y, b.x, b.y),
       )[0];
     }
@@ -1793,6 +1810,10 @@ export class World {
     if (target.structure && (!target.structure.vulnerable || kind === 'spell' || target.structure.glyph > 0)) return;
     if (kind === 'spell' && this.isSpellImmune(target)) return;
     const dealer = this.unit(sourceId);
+    if (target.hero && dealer && !dealer.structure && dealer.team !== target.team) {
+      target.hero.lastHurtBy = dealer.id;
+      target.hero.lastHurtAt = this.time;
+    }
     // A creature's hits count as its owner's for gold, assists and the end-of-match numbers.
     const src = dealer?.summon ? (this.unit(dealer.summon.ownerId) ?? dealer) : dealer;
     if (kind === 'attack' && target.structure && src?.hero && !dealer?.summon) raw *= 1 + src.hero.bonus.buildingDamagePct / 100;
@@ -2168,6 +2189,7 @@ export class World {
   private steerTo(u: Unit, x: number, y: number) {
     const d = dist(u.x, u.y, x, y);
     if (d < 0.05) return;
+    if (this.goingAround(u, x, y)) return;
     const look = Math.min(d, 10);
     const ahead = { x: u.x + ((x - u.x) / d) * look, y: u.y + ((y - u.y) / d) * look };
     if (!u.path && lineClear(this.nav, u, ahead, u.radius * 0.8)) {
@@ -2177,6 +2199,45 @@ export class World {
     if (this.navigate(u, x, y, 0) || (u.path && lineClear(this.nav, u, { x, y }, u.radius * 0.8))) u.path = null;
   }
 
+  /**
+   * Everything that isn't a human's hero notices when it has stopped getting anywhere (a building,
+   * a corner, a crowd) and walks around: a fresh path, or a side-step if that doesn't help. It only
+   * stands still if there is truly nowhere to go. Returns true while it is doing that.
+   */
+  private goingAround(u: Unit, x: number, y: number): boolean {
+    if (u.hero?.controller === 'human') return false;
+    const now = this.time;
+    const w = u.stuckWatch;
+    if (!w || now - w.last > 0.6) {
+      u.stuckWatch = { t: now, last: now, x: u.x, y: u.y, until: w?.until ?? 0, side: w?.side ?? 1 };
+    } else {
+      w.last = now;
+      if (now - w.t >= 0.5) {
+        if (now >= w.until && dist(u.x, u.y, w.x, w.y) < this.speedOf(u) * 0.5 * 0.2) {
+          w.until = now + 1.5;
+          w.side = -w.side;
+          u.path = findPath(this.nav, u, { x, y }, u.radius);
+          u.pathGoal = { x, y };
+          u.repathAt = now + 1.5;
+        }
+        w.t = now;
+        w.x = u.x;
+        w.y = u.y;
+      }
+    }
+    const s = u.stuckWatch!;
+    if (now >= s.until) return false;
+    const step = this.speedOf(u) * DT;
+    while (u.path && u.path.length > 1 && dist(u.x, u.y, u.path[0].x, u.path[0].y) < 0.6) u.path.shift();
+    if (u.path?.length && dist(u.x, u.y, u.path[0].x, u.path[0].y) >= 0.6) {
+      this.stepMove(u, u.path[0].x - u.x, u.path[0].y - u.y, step);
+    } else {
+      const d = dist(u.x, u.y, x, y) || 1;
+      this.stepMove(u, (-(y - u.y) / d) * s.side, ((x - u.x) / d) * s.side, step);
+    }
+    return true;
+  }
+
   /** Path-following movement (heroes). Returns true on arrival. */
   navigate(u: Unit, x: number, y: number, arriveDist: number): boolean {
     const d = dist(u.x, u.y, x, y);
@@ -2184,6 +2245,7 @@ export class World {
       u.path = null;
       return true;
     }
+    if (this.goingAround(u, x, y)) return false;
     const step = this.speedOf(u) * DT;
     if (lineClear(this.nav, u, { x, y }, u.radius * 0.7)) {
       u.path = null;

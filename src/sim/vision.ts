@@ -1,11 +1,12 @@
-import { DAY_SECONDS, NIGHT_SECONDS, SENTRY_VISION_SECONDS, SHRINE_TRUE_SIGHT, TRUE_SIGHT_RADIUS, Team } from './constants';
+import { DAY_SECONDS, NIGHT_SECONDS, OBSERVER_MOUNTAIN_VISION, SENTRY_VISION_SECONDS, TRUE_SIGHT_RADIUS, Team } from './constants';
 import type { House } from './map';
 import type { Unit, World } from './world';
 
 /**
  * Fog of war. Each team has a coarse grid (same cells as the walk grid) of what it
- * can currently see. Vision comes from the team's living heroes, creeps and buildings
- * and shrinks at night. Enemy units outside it are hidden from players and bots.
+ * can currently see. Vision comes from the team's living heroes, creeps, wards, barracks, Shrine
+ * and fountain, and shrinks at night. Towers light up nothing: the ground around them stays in
+ * fog, but any enemy who steps into a tower's attack zone is seen by that tower's whole team. Enemy units outside it are hidden from players and bots.
  *
  * Trees (wall cells) block line of sight: a cell is visible only if the straight line
  * from the viewer to it crosses no tree. The first trees along a line are lit, so you
@@ -24,23 +25,28 @@ import type { Unit, World } from './world';
 /** Wards are always invisible; heroes are while an invisibility buff is active. */
 export const isInvisible = (u: Unit) => !!u.ward || u.buffs.some((b) => b.invisible);
 
+const isTower = (u: Unit) => !!u.structure && u.structure.tier !== 'barracks' && u.structure.tier !== 'shrine' && u.structure.tier !== 'fountain';
+
+/** How far a tower shoots, measured from its centre. Its sight is exactly the same. */
+export const towerZoneRadius = (u: Unit) => u.attackRange + u.radius + 0.7;
+
 /**
- * How far this unit shows invisible things to its team (0 = it can't): towers within their attack
- * range, the Shrine and the fountain around them, and sentry wards. True sight only unmasks what
- * the team can already see, so it never gives vision by itself.
+ * How far this unit has true sight (0 = none): towers in their attack zone, the fountain, and
+ * sentry totems. These are the things that wear the green eye.
  */
 export function trueSightRadius(u: Unit): number {
   if (!u.alive) return 0;
   if (u.ward) return u.ward.kind === 'sentry' ? TRUE_SIGHT_RADIUS : 0;
-  const tier = u.structure?.tier;
-  if (!tier || tier === 'barracks') return 0;
-  return tier === 'shrine' ? SHRINE_TRUE_SIGHT : u.attackRange + u.radius;
+  if (isTower(u)) return towerZoneRadius(u);
+  return u.structure?.tier === 'fountain' ? u.attackRange : 0;
 }
 
 export class Vision {
   readonly grids: [Uint8Array, Uint8Array];
-  /** Where each team can see invisible things (sentry wards, towers, Shrine, fountain). */
+  /** Where each team can see invisible things (sentry wards, fountain). */
   readonly trueSight: [Uint8Array, Uint8Array];
+  /** Each team's tower attack zones: enemies in here are seen, even invisible and in fog. */
+  readonly towerZones: [Uint8Array, Uint8Array];
   /** Per radius (in half-cells): offsets in range + the cells each sight line crosses. */
   private patterns = new Map<number, { dx: Int16Array; dy: Int16Array; lineStart: Int32Array; lineX: Int16Array; lineY: Int16Array }>();
 
@@ -53,6 +59,7 @@ export class Vision {
   ) {
     this.grids = [new Uint8Array(grid * grid), new Uint8Array(grid * grid)];
     this.trueSight = [new Uint8Array(grid * grid), new Uint8Array(grid * grid)];
+    this.towerZones = [new Uint8Array(grid * grid), new Uint8Array(grid * grid)];
     const inside: number[] = [];
     if (house) {
       this.house = house;
@@ -78,6 +85,7 @@ export class Vision {
       const ts = this.trueSight[team];
       g.fill(0);
       ts.fill(0);
+      this.towerZones[team].fill(0);
       const hs = this.house;
       let inside = false;
       for (const u of w.units) {
@@ -88,13 +96,30 @@ export class Vision {
           continue;
         }
         const blindSentry = u.ward?.kind === 'sentry' && w.time - u.ward.placedAt > SENTRY_VISION_SECONDS;
-        const r = blindSentry ? 0 : night ? u.visionNight : u.visionDay;
+        if (isTower(u)) {
+          this.disc(this.towerZones[team], u.x, u.y, towerZoneRadius(u));
+          continue;
+        }
+        let r = blindSentry ? 0 : night ? u.visionNight : u.visionDay;
+        if (u.ward?.kind === 'observer' && this.onMountain(u)) r = OBSERVER_MOUNTAIN_VISION[night ? 1 : 0];
         if (r > 0) this.reveal(g, u.x, u.y, r);
         const sight = trueSightRadius(u);
         if (sight > 0) this.disc(ts, u.x, u.y, sight);
       }
       if (hs) for (const c of this.houseCells) g[c] = inside ? 1 : 0;
     }
+  }
+
+  private onMountain(u: Unit): boolean {
+    return this.height[Math.floor(u.y / this.cell) * this.grid + Math.floor(u.x / this.cell)] === 3;
+  }
+
+  /** Is this spot inside an attack zone of one of `team`'s towers? */
+  inTowerZone(team: Team, x: number, y: number): boolean {
+    const cx = Math.floor(x / this.cell);
+    const cy = Math.floor(y / this.cell);
+    if (cx < 0 || cy < 0 || cx >= this.grid || cy >= this.grid) return false;
+    return this.towerZones[team][cy * this.grid + cx] === 1;
   }
 
   private disc(g: Uint8Array, x: number, y: number, r: number) {
@@ -190,6 +215,7 @@ export class Vision {
   /** Own units and buildings are always known; others only inside vision (and true sight if invisible). */
   sees(team: Team, u: Unit): boolean {
     if (u.team === team || u.kind === 'structure') return true;
+    if (u.kind !== 'ward' && u.kind !== 'neutral' && this.inTowerZone(team, u.x, u.y)) return true;
     if (!this.seesPoint(team, u.x, u.y)) return false;
     if (isInvisible(u)) {
       const cx = Math.floor(u.x / this.cell);
