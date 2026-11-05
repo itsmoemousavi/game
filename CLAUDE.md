@@ -66,7 +66,7 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
   `three/hero-anims.ts` (hand-made hero animations: idle, walk,
   attacks, every spell, buffs, deaths), `three/spell-fx.ts` (projectile trails, area spells),
   `three/fx.ts` (dust, sparks, slashes, roots, meteor, whirlpool, camera shake), `three/world-art.ts` (map look: ground detail, flowing river, swaying trees and grass, rocks, walls, fireflies; all decoration, never reacts to units), `three/hero-models.ts` +
-  `three/models.ts` (low-poly placeholder models, baked into few meshes with animatable joints; still the fallback), `menu3d.ts` (start screen 3D hero + portraits), `hud.ts`, `input.ts`, `items-ui.ts`
+  `three/models.ts` (our own models sculpted in code; every model goes through one paint finish when baked into few meshes with animatable joints, so new models match automatically), `menu3d.ts` (start screen 3D hero + portraits), `hud.ts`, `input.ts`, `items-ui.ts`
   (shop), `audio.ts` (synthesized sounds), `tutorial.ts`.
 - `tests/` vitest. Positions in tests are on the 300 m map. Long full-match tests must `await` a
   `setTimeout(0)` now and then, or vitest's worker heartbeat times out on CI.

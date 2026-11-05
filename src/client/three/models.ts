@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { HeroId, RuneKind, StructureTier } from '../../sim';
-import { HERO_BUILDERS, M, add, box, cone, cyl, glow, grp, humanoid, mesh, resetFx, rot, sph } from './hero-models';
+import { HERO_BUILDERS, M, add, box, cloth, cone, cyl, glow, grp, hood, humanoid, lathe, lumpy, mesh, resetFx, rot, skirt, sph, taper } from './hero-models';
 
 export const TEAM_HEX = [0x3d8bfd, 0xe5484d] as const;
 
@@ -121,7 +121,7 @@ export function bake(top: THREE.Object3D, finish: Finish = FINISH.unit): THREE.G
     const make = (list: THREE.BufferGeometry[], material: THREE.Material, shadow: boolean) => {
       if (!list.length) return;
       const merged = mergeGeometries(list, false)!;
-      if (material === LIT) softenNormals(merged);
+      if (material === LIT) softenNormals(merged, finish.soft ?? 0.62);
       merged.computeBoundingSphere();
       const me = new THREE.Mesh(merged, material);
       me.castShadow = shadow;
@@ -155,11 +155,14 @@ export interface Finish {
   grimeHeight: number;
   /** Moss on upward faces (0 = none). */
   moss: number;
+  /** How soft the shading is, 0 = hard facets (chiselled stone) to 1 = fully smooth. */
+  soft?: number;
 }
 export const FINISH = {
   hero: { mute: 0.14, value: 0.95, blotch: 0.1, grime: 0.34, grimeHeight: 0.3, moss: 0 },
   unit: { mute: 0.24, value: 0.86, blotch: 0.14, grime: 0.4, grimeHeight: 0.35, moss: 0 },
   monster: { mute: 0.1, value: 0.86, blotch: 0.2, grime: 0.42, grimeHeight: 0.4, moss: 0.14 },
+  stone: { mute: 0.1, value: 1, blotch: 0.2, grime: 0.42, grimeHeight: 0.4, moss: 0.1, soft: 0.12 },
   building: { mute: 0.12, value: 1, blotch: 0.24, grime: 0.55, grimeHeight: 0.3, moss: 0.5 },
 } satisfies Record<string, Finish>;
 
@@ -240,7 +243,8 @@ function finishOf(key: string): Finish {
   const kind = key.split(':')[0];
   if (kind === 'hero') return FINISH.hero;
   if (kind === 'structure' || kind === 'rubble') return FINISH.building;
-  if (kind === 'brute' || kind === 'imp' || kind === 'warden') return FINISH.monster;
+  if (kind === 'warden') return FINISH.stone;
+  if (kind === 'brute' || kind === 'imp') return FINISH.monster;
   return FINISH.unit;
 }
 
@@ -283,40 +287,44 @@ function build(key: string): THREE.Object3D {
 function creep(type: 'melee' | 'ranged', team: 0 | 1): THREE.Object3D {
   const tc = TEAM_HEX[team];
   const dark = team === 0 ? 0x1c3566 : 0x661c20;
-  const b = humanoid({ skin: 0xb89272, cloth: dark, cloth2: 0x2e2a26, boots: 0x221e1a, hip: 0.8, slim: 0.9 });
-  const steel = M(0x8d959e, { metalness: 0.65, roughness: 0.4 });
-  const iron = M(0x4b5058, { metalness: 0.6 });
+  const b = humanoid({ skin: 0xb89272, cloth: dark, cloth2: 0x2e2a26, boots: 0x221e1a, hip: 0.8, slim: 0.9, sculpt: true, lite: true });
+  const steel = M(0x7c848d, { metalness: 0.65, roughness: 0.4 });
+  const iron = M(0x3f4349, { metalness: 0.6 });
   const leather = M(0x4a3524);
+  const team1 = M(tc);
   if (type === 'melee') {
-    add(b.head, mesh(sph(0.24, 0), steel), 0, 0.07, 0).scale.set(1, 0.85, 1.05);
-    add(b.head, mesh(box(0.05, 0.22, 0.06), iron), 0, -0.02, 0.22);
-    add(b.torso, mesh(cyl(0.3, 0.25, 0.42, 8), steel), 0, 0.46, 0);
-    add(b.torso, mesh(box(0.32, 0.5, 0.04), M(tc)), 0, 0.05, 0.25);
-    for (const arm of [b.armL, b.armR]) add(arm, mesh(sph(0.13, 0), iron), 0, 0.03, 0).scale.set(1.2, 0.8, 1.1);
+    // Rounded helm with a nose guard, breastplate, team tabard.
+    add(b.head, mesh(lathe([[0.001, 0.27], [0.12, 0.23], [0.215, 0.1], [0.235, -0.02], [0.215, -0.07]], 8), steel), 0, 0, 0);
+    add(b.head, mesh(box(0.05, 0.2, 0.05), iron), 0, -0.01, 0.215);
+    add(b.torso, mesh(lathe([[0.235, 0.22], [0.3, 0.46], [0.315, 0.56], [0.2, 0.68]], 8), steel), 0, 0, 0).scale.set(1, 1, 0.78);
+    add(b.torso, mesh(cloth(0.3, 0.72, 1, 3, (_x, y) => [0, 0, (1 - y) * 0.07]), team1), 0, -0.05, 0.215);
+    for (const arm of [b.armL, b.armR]) add(arm, mesh(new THREE.SphereGeometry(0.15, 7, 4, 0, Math.PI * 2, 0, Math.PI * 0.55), iron), 0, 0.03, 0).scale.set(1.15, 0.75, 1.05);
+    // Short sword with a guard.
     const w = add(b.armR, grp(), 0, -0.62, 0.02);
     w.name = 'weapon';
-    add(w, mesh(box(0.05, 0.14, 0.05), leather), 0, 0, 0);
-    add(w, mesh(box(0.22, 0.04, 0.06), iron), 0, 0.09, 0);
-    add(w, mesh(box(0.06, 0.72, 0.03), steel), 0, 0.47, 0);
-    add(w, mesh(cone(0.04, 0.12, 4), steel), 0, 0.89, 0);
+    add(w, mesh(cyl(0.024, 0.028, 0.15, 5), leather), 0, 0, 0);
+    add(w, mesh(box(0.22, 0.035, 0.05), iron), 0, 0.09, 0);
+    add(w, mesh(lathe([[0.001, 0.92], [0.038, 0.8], [0.042, 0.1]], 4), steel), 0, 0, 0).scale.set(1, 1, 0.3);
     rot(w, 0.6, 0, 0);
     rot(b.armR, -0.35, 0, 0.08);
+    // Round shield in the team colour with an iron rim and boss.
     const sh = add(b.armL, grp(), 0.02, -0.45, 0.14);
-    add(sh, rot(mesh(cyl(0.34, 0.34, 0.06, 10), M(tc)), Math.PI / 2, 0, 0), 0, 0, 0);
-    add(sh, rot(mesh(cyl(0.36, 0.36, 0.04, 10), iron), Math.PI / 2, 0, 0), 0, 0, -0.02);
-    add(sh, mesh(sph(0.07, 0), steel), 0, 0, 0.05);
+    add(sh, rot(mesh(lathe([[0.001, 0.05], [0.26, 0.03], [0.33, -0.015]], 9), team1), Math.PI / 2, 0, 0), 0, 0, 0);
+    add(sh, mesh(new THREE.TorusGeometry(0.335, 0.025, 4, 12), iron), 0, 0, -0.015);
+    add(sh, mesh(sph(0.075, 0), steel), 0, 0, 0.05);
     rot(b.armL, -0.6, 0, -0.15);
   } else {
-    add(b.root, mesh(cone(0.42, 0.85, 8), M(dark)), 0, 0.42, 0);
+    // Casters: hooded robe with team bands and a crystal staff.
+    add(b.root, mesh(skirt(0.21, 0.44, 0.86, 6, 0.08, 12), M(dark)), 0, 0, 0);
     b.legL.visible = b.legR.visible = false;
-    add(b.head, mesh(sph(0.25, 1), M(dark)), 0, 0.05, -0.05).scale.set(1, 1.05, 1.1);
-    add(b.head, rot(mesh(cone(0.12, 0.3, 6), M(dark)), -1.2, 0, 0), 0, 0.12, -0.25);
-    add(b.torso, mesh(cyl(0.27, 0.24, 0.5, 8), M(dark)), 0, 0.38, 0);
-    add(b.torso, mesh(box(0.08, 0.45, 0.04), M(tc)), 0, 0.38, 0.25);
+    hood(b.head, 0.25, M(dark), M(0x0c0a0a), 0.58, 0.3);
+    add(b.torso, mesh(lathe([[0.22, 0.1], [0.24, 0.3], [0.29, 0.52], [0.18, 0.66]], 8), M(dark)), 0, 0, 0).scale.set(1, 1, 0.82);
+    add(b.torso, mesh(cloth(0.09, 0.56, 1, 2, () => [0, 0, 0]), team1), 0, 0.36, 0.23);
+    for (const arm of [b.armL, b.armR]) add(arm, mesh(lathe([[0.09, 0], [0.1, -0.2], [0.14, -0.5], [0.15, -0.55]], 7), M(dark)), 0, 0, 0);
     const w = add(b.armR, grp(), 0, -0.62, 0.02);
     w.name = 'weapon';
-    add(w, mesh(cyl(0.03, 0.035, 1.5, 5), M(0x4a3020)), 0, 0.3, 0);
-    add(w, mesh(new THREE.OctahedronGeometry(0.11), glow(team === 0 ? 0x9ccbff : 0xffa3a3, 2.5)), 0, 1.1, 0).scale.set(1, 1.5, 1);
+    add(w, mesh(taper([[0, -0.45, 0], [0.015, 0.3, 0], [0, 1.03, 0]], 0.028, 0.038, 6, 5), M(0x3d2819)), 0, 0, 0);
+    add(w, mesh(new THREE.OctahedronGeometry(0.11), glow(team === 0 ? 0x62aef0 : 0xf07a5a, 2.3)), 0, 1.13, 0).scale.set(1, 1.5, 1);
     rot(b.armR, -0.3, 0, 0.1);
     rot(w, 0.3, 0, 0);
   }
@@ -330,23 +338,26 @@ function creep(type: 'melee' | 'ranged', team: 0 | 1): THREE.Object3D {
 
 /** Jungle brute: a hunched ogre with tusks, a hide loincloth and a spiked club ('weapon'). */
 function brute(): THREE.Object3D {
-  const b = humanoid({ skin: 0x6e5e4c, cloth: 0x4a3d30, cloth2: 0x3a3028, boots: 0x2e251d, bulk: 1.5, hip: 0.7, torsoH: 0.75, eyes: 0xffb347 });
-  const hide = M(0x5a4530);
+  const skin = 0x665745;
+  const b = humanoid({ skin, cloth: 0x4a3d30, cloth2: 0x3a3028, boots: 0x2e251d, bulk: 1.5, hip: 0.7, torsoH: 0.75, eyes: 0xffb347, sculpt: true, lite: true });
+  const hide = M(0x4e3b28);
   b.torso.rotation.x = 0.35;
-  add(b.torso, mesh(cyl(0.55, 0.42, 0.6, 8), M(0x6e5e4c)), 0, 0.42, 0.04).scale.set(1, 1, 0.9);
-  add(b.torso, mesh(box(0.6, 0.4, 0.05), hide), 0, -0.1, 0.32);
-  add(b.torso, mesh(sph(0.3, 0), M(0x5e4f40)), 0, 0.72, -0.2).scale.set(1.5, 0.7, 1);
+  // Heavy chest and belly, a hump of hair and a hide loincloth.
+  add(b.torso, mesh(lathe([[0.42, 0.1], [0.46, 0.28], [0.58, 0.55], [0.6, 0.68], [0.4, 0.85]], 10), M(skin)), 0, 0, 0.03).scale.set(1, 1, 0.85);
+  add(b.torso, mesh(cloth(0.62, 0.48, 3, 3, (x, y) => [0, 0, (1 - y) * 0.08 + Math.sin(x * 9) * 0.015]), hide), 0, -0.16, 0.32);
+  add(b.torso, mesh(lumpy(new THREE.IcosahedronGeometry(0.32, 1), 0.2, 2), M(0x4a3d2e)), 0, 0.74, -0.2).scale.set(1.5, 0.72, 1);
   for (const s of [-1, 1]) {
-    add(b.head, rot(mesh(cone(0.06, 0.3, 5), M(0xe8dcc0)), -0.6, 0, -s * 0.5), s * 0.12, -0.12, 0.18);
-    add(b.head, rot(mesh(cone(0.05, 0.22, 4), M(0xcfc3a6)), 0, 0, -s * 0.9), s * 0.22, 0.14, 0);
+    add(b.head, mesh(taper([[s * 0.1, -0.12, 0.17], [s * 0.15, -0.08, 0.28], [s * 0.13, 0.12, 0.31]], 0.05, 0.006, 5, 5), M(0xbdb092)), 0, 0, 0);
+    add(b.head, mesh(taper([[s * 0.18, 0.12, 0], [s * 0.3, 0.22, 0.02], [s * 0.34, 0.36, 0]], 0.05, 0.006, 4, 4), M(0xa89c80)), 0, 0, 0);
   }
-  add(b.head, mesh(box(0.34, 0.07, 0.1), M(0x4e4236)), 0, 0.08, 0.17);
+  add(b.head, mesh(taper([[-0.17, 0.09, 0.14], [0, 0.11, 0.21], [0.17, 0.09, 0.14]], 0.05, 0.05, 5, 4), M(0x4e4236)), 0, 0, 0);
+  // Knotted club studded with iron.
   const w = add(b.armR, grp(), 0, -0.62, 0.02);
   w.name = 'weapon';
-  add(w, mesh(cyl(0.09, 0.17, 1.0, 7), M(0x4a3524)), 0, 0.45, 0);
+  add(w, mesh(lumpy(lathe([[0.075, -0.05], [0.09, 0.3], [0.17, 0.72], [0.15, 0.96], [0.03, 1.02]], 8), 0.06, 3), M(0x43301f)), 0, 0, 0);
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * Math.PI * 2;
-    add(w, rot(mesh(cone(0.04, 0.16, 4), M(0x9aa0a6, { metalness: 0.6 })), 0, 0, Math.PI / 2), Math.cos(a) * 0.16, 0.75 + (i % 2) * 0.12, Math.sin(a) * 0.16).lookAt(Math.cos(a) * 2, 0.8, Math.sin(a) * 2);
+    add(w, rot(mesh(cone(0.04, 0.16, 4), M(0x70757a, { metalness: 0.6 })), 0, 0, Math.PI / 2), Math.cos(a) * 0.16, 0.7 + (i % 2) * 0.14, Math.sin(a) * 0.16).lookAt(Math.cos(a) * 2, 0.8, Math.sin(a) * 2);
   }
   rot(w, 0.4, 0, 0);
   rot(b.armL, -0.3, 0, -0.2);
@@ -356,14 +367,16 @@ function brute(): THREE.Object3D {
 
 /** Jungle goblin: small, wiry, long ears, a crude spear ('weapon'). */
 function imp(): THREE.Object3D {
-  const b = humanoid({ skin: 0x7a9650, cloth: 0x5a4226, cloth2: 0x3e3020, boots: 0x2e251d, hip: 0.55, torsoH: 0.5, slim: 0.8, eyes: 0xffe066 });
-  for (const s of [-1, 1]) add(b.head, rot(mesh(cone(0.07, 0.35, 4), M(0x7a9650)), 0, 0, -s * 1.3), s * 0.27, 0.05, 0);
-  add(b.head, rot(mesh(cone(0.06, 0.16, 4), M(0x6a8444)), Math.PI / 2, 0, 0), 0, -0.02, 0.24);
-  add(b.torso, mesh(box(0.36, 0.3, 0.26), M(0x4a3620)), 0, 0.2, 0);
+  const skin = 0x667f44;
+  const b = humanoid({ skin, cloth: 0x5a4226, cloth2: 0x3e3020, boots: 0x2e251d, hip: 0.55, torsoH: 0.5, slim: 0.8, eyes: 0xffe066, sculpt: true, lite: true });
+  for (const s of [-1, 1]) add(b.head, mesh(taper([[s * 0.17, 0.03, -0.01], [s * 0.33, 0.1, -0.04], [s * 0.5, 0.2, -0.08]], 0.075, 0.006, 5, 4), M(skin)), 0, 0, 0).scale.set(1, 1, 0.5);
+  add(b.head, mesh(taper([[0, 0, 0.19], [0, -0.03, 0.29], [0, -0.07, 0.34]], 0.05, 0.008, 3, 4), M(0x5a7338)), 0, 0, 0);
+  add(b.torso, mesh(cloth(0.34, 0.42, 2, 2, (_x, y) => [0, 0, (1 - y) * 0.05]), M(0x4a3620)), 0, 0.17, 0.17);
+  add(b.torso, mesh(lathe([[0.19, -0.03], [0.21, 0.05], [0.19, 0.09]], 8), M(0x2e2214)), 0, 0, 0).scale.set(1, 1, 0.8);
   const w = add(b.armR, grp(), 0, -0.62, 0.02);
   w.name = 'weapon';
-  add(w, mesh(cyl(0.025, 0.025, 1.3, 4), M(0x5a3d26)), 0, 0.3, 0);
-  add(w, mesh(cone(0.05, 0.22, 4), M(0xa0a0a0, { metalness: 0.5 })), 0, 1.05, 0);
+  add(w, mesh(taper([[0, -0.35, 0], [0.012, 0.3, 0], [0, 0.97, 0]], 0.022, 0.02, 5, 4), M(0x4e3522)), 0, 0, 0);
+  add(w, mesh(lathe([[0.001, 1.2], [0.052, 1.02], [0.018, 0.94]], 4), M(0x7f8084, { metalness: 0.5 })), 0, 0, 0).scale.set(1, 1, 0.4);
   rot(b.armR, -0.6, 0, 0.1);
   rot(w, 0.9, 0, 0);
   return b.root;
@@ -372,26 +385,35 @@ function imp(): THREE.Object3D {
 /** The Warden: a towering stone golem with violet crystals growing from its back and shoulders. */
 function warden(): THREE.Object3D {
   const stone = 0x4b4560;
-  const b = humanoid({ skin: stone, cloth: 0x3b3550, cloth2: 0x332e45, boots: 0x2a2638, bulk: 1.9, hip: 1.0, torsoH: 1.0, eyes: 0xd8b4fe });
+  const b = humanoid({ skin: stone, cloth: 0x3b3550, cloth2: 0x332e45, boots: 0x2a2638, bulk: 1.9, hip: 1.0, torsoH: 1.0, eyes: 0xd8b4fe, sculpt: true });
   const crystal = glow(0xa78bfa, 2.2);
   const rock = M(0x3e3952);
-  add(b.torso, mesh(cyl(0.75, 0.55, 0.9, 7), M(stone)), 0, 0.55, 0);
-  add(b.torso, mesh(new THREE.OctahedronGeometry(0.18), crystal), 0, 0.6, 0.6).scale.set(0.8, 1.3, 0.4);
+  const slab = (r: number, seed: number) => lumpy(new THREE.DodecahedronGeometry(r, 0), 0.08, seed);
+  // Chest of fitted stone slabs.
+  add(b.torso, mesh(slab(0.74, 3), M(stone)), 0, 0.6, 0).scale.set(1.05, 0.92, 0.76);
+  add(b.torso, mesh(slab(0.32, 5), rock), -0.24, 0.72, 0.42).scale.set(1, 0.72, 0.5);
+  add(b.torso, mesh(slab(0.32, 6), rock), 0.26, 0.74, 0.42).scale.set(1, 0.7, 0.5);
+  add(b.torso, mesh(slab(0.4, 7), rock), 0, 0.14, 0.2).scale.set(1.25, 0.7, 0.85);
+  add(b.torso, mesh(new THREE.OctahedronGeometry(0.18), crystal), 0, 0.5, 0.58).scale.set(0.8, 1.3, 0.4);
   for (const s of [-1, 1]) {
-    add(b.torso, rot(mesh(new THREE.OctahedronGeometry(0.28), crystal), 0, 0, s * 0.4), s * 0.75, 1.15, 0).scale.set(0.6, 1.4, 0.6);
-    add(b.torso, rot(mesh(new THREE.OctahedronGeometry(0.18), crystal), 0.3, 0, s * 0.7), s * 0.55, 1.25, -0.25).scale.set(0.6, 1.4, 0.6);
-    add(b.torso, rot(mesh(new THREE.OctahedronGeometry(0.22), crystal), -0.4, 0, s * 0.3), s * 0.3, 1.0, -0.5).scale.set(0.6, 1.6, 0.6);
+    add(b.torso, rot(mesh(new THREE.OctahedronGeometry(0.34), crystal), 0, 0, s * 0.4), s * 0.78, 1.28, 0).scale.set(0.6, 1.6, 0.6);
+    add(b.torso, rot(mesh(new THREE.OctahedronGeometry(0.24), crystal), 0.3, 0, s * 0.7), s * 0.55, 1.34, -0.28).scale.set(0.6, 1.5, 0.6);
+    add(b.torso, rot(mesh(new THREE.OctahedronGeometry(0.28), crystal), -0.4, 0, s * 0.3), s * 0.3, 1.1, -0.56).scale.set(0.6, 1.7, 0.6);
   }
   for (const arm of [b.armL, b.armR]) {
-    add(arm, mesh(sph(0.34, 0), rock), 0, 0.05, 0).scale.set(1.2, 0.9, 1.1);
-    add(arm, mesh(cyl(0.2, 0.25, 0.45, 6), rock), 0, -0.4, 0);
+    add(arm, mesh(slab(0.36, 2), rock), 0, 0.05, 0).scale.set(1.2, 0.9, 1.1);
+    add(arm, mesh(slab(0.25, 4), rock), 0, -0.34, 0).scale.set(1, 1.3, 1);
   }
-  add(b.head, mesh(sph(0.3, 0), rock), 0, 0.02, 0).scale.set(1.2, 0.9, 1);
-  for (let i = -1; i <= 1; i++) add(b.head, mesh(cone(0.07, 0.3, 4), M(0xffd23f, { metalness: 0.6 })), i * 0.12, 0.3, 0);
+  add(b.head, mesh(slab(0.31, 8), rock), 0, 0.02, 0).scale.set(1.2, 0.9, 1);
+  add(b.head, mesh(new THREE.TorusGeometry(0.24, 0.035, 5, 14), M(0x7c6130, { metalness: 0.6 })), 0, 0.14, 0).rotation.x = Math.PI / 2;
+  for (let i = -1; i <= 1; i++) add(b.head, mesh(taper([[i * 0.13, 0.16, 0.1], [i * 0.15, 0.3, 0.11], [i * 0.16, 0.44 - Math.abs(i) * 0.07, 0.1]], 0.05, 0.005, 3, 4), M(0x96753a, { metalness: 0.6 })), 0, 0, 0);
   rot(b.armL, -0.3, 0, -0.25);
   rot(b.armR, -0.3, 0, 0.25);
-  for (const h of [b.handL, b.handR]) add(h, mesh(sph(0.34, 0), M(stone)), 0, -0.05, 0);
-  for (const leg of [b.legL, b.legR]) add(leg, mesh(cyl(0.3, 0.34, 0.5, 6), rock), 0, -0.6, 0);
+  for (const h of [b.handL, b.handR]) add(h, mesh(slab(0.36, 9), M(stone)), 0, -0.05, 0);
+  for (const leg of [b.legL, b.legR]) {
+    add(leg, mesh(slab(0.34, 3), rock), 0, -0.3, 0).scale.set(1, 1.1, 1);
+    add(leg, mesh(slab(0.36, 5), rock), 0, -0.74, 0.05).scale.set(1, 0.85, 1.15);
+  }
   const g = grp();
   g.add(b.root);
   g.scale.setScalar(1.25);

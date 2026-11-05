@@ -25,6 +25,11 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.11.x · New map art
 
+### 0.11.3
+*2026-11-05*
+- **Every unit has a new body:** Vexa, Orin, Syl, Grom, Kaela, lane soldiers and casters, the jungle brute and goblin, and the Warden. Their animations, sizes and stats are the same.
+- Hooded heroes now show a face under a proper hood, and Orin has a real beard.
+
 ### 0.11.2
 *2026-11-05*
 - **New shop:** clearer tabs, every item shows its name, and items are sorted into basic and combined. One row at the bottom holds your items, scrolls and courier.

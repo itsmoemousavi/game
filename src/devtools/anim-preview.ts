@@ -22,6 +22,15 @@ scene.add(ground);
 const cam = new THREE.PerspectiveCamera(35, W / H, 0.5, 200);
 const fx = new Fx3D(scene, () => 0);
 
+/** Triangles per model (for checking the phone budget). */
+(window as any).tris = (key: string) => {
+  let n = 0;
+  model(key).traverse((c) => {
+    const g = (c as THREE.Mesh).geometry as THREE.BufferGeometry | undefined;
+    if (g) n += (g.index ? g.index.count : g.attributes.position.count) / 3;
+  });
+  return Math.round(n);
+};
 (window as any).run = (hero: HeroId, scenario: string, t: number, view = 'front', slotArg = 0) => {
   for (const c of [...scene.children]) if (c.userData.hero) scene.remove(c);
   const o = model(`hero:${hero}`);
@@ -146,7 +155,7 @@ import { animateMonster, monsterCorpse, monsterKind } from '../client/three/mons
     fx.update(1 / 60, i / 60);
   }
   const k = key === 'warden' ? 1.6 : 1;
-  const views: any = { front: [9 * k, 3.4 * k, 1.5 * k], side: [0.5, 3.4 * k, 9 * k] };
+  const views: any = { front: [9 * k, 3.4 * k, 1.5 * k], side: [0.5, 3.4 * k, 9 * k], three: [7.2 * k, 5 * k, 6.6 * k] };
   const v = views[view];
   cam.position.set(v[0], v[1], v[2]);
   cam.lookAt(0, 1.6 * k, 0);
