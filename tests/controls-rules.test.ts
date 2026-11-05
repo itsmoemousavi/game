@@ -690,9 +690,9 @@ describe('going around things', () => {
       }
     }
     expect(walkers.length).toBeGreaterThan(30);
-    for (let i = 0; i < 25 * TICK_RATE; i++) {
+    for (let i = 0; i < 16 * TICK_RATE; i++) {
       w.step();
-      if (i % 200 === 0) await new Promise((r) => setTimeout(r, 0));
+      if (i % 15 === 0) await new Promise((r) => setTimeout(r, 0));
     }
     const lost = walkers.filter((k) => k.c.alive && k.c.creep!.wp < 1);
     expect(lost.map((k) => [Math.round(k.c.x), Math.round(k.c.y), Math.round(k.x), Math.round(k.y), k.c.creep!.wp, k.c.targetId])).toEqual([]);

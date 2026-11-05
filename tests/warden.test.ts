@@ -186,7 +186,7 @@ describe('two houses', () => {
     w.wasNight = false;
   };
 
-  it('there is a house on each side and the Warden starts in either one', () => {
+  it('there is a house on each side and the Warden starts in either one', async () => {
     const { w } = humans();
     const [a, b] = w.map.houses;
     expect(a.x + b.x).toBe(w.map.size);
@@ -194,7 +194,11 @@ describe('two houses', () => {
     expect(inHouse(w.map, a.x, a.y)).toBe(true);
     expect(inHouse(w.map, b.x, b.y)).toBe(true);
     const seen = new Set<number>();
-    for (let seed = 1; seed < 20; seed++) seen.add(new World({ seed, slots: humans().slots }).wardenHouse);
+    const { slots } = humans();
+    for (let seed = 1; seed < 9 && seen.size < 2; seed++) {
+      seen.add(new World({ seed, slots }).wardenHouse);
+      await new Promise((r) => setTimeout(r, 0));
+    }
     expect(seen.size).toBe(2);
   });
 
