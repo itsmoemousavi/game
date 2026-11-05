@@ -56,6 +56,9 @@ export class Hud {
       'gold',
       'kda',
       'portrait',
+      'channel-bar',
+      'channel-fill',
+      'channel-text',
       'respawn',
       'respawn-time',
       'daynight',
@@ -427,11 +430,27 @@ export class Hud {
     setTimeout(() => d.remove(), 3300);
   }
 
+  /** The bar over the health bar: anything being charged up (a teleport, a spell's wind-up). */
+  private updateChannelBar(me: Unit) {
+    const h = me.hero!;
+    const bar = this.el['channel-bar'];
+    const c = h.channel;
+    const wind = h.windup && me.castLock > 0 ? h.windup : null;
+    const left = c ? c.t : wind ? me.castLock : 0;
+    const total = c ? c.total : (wind?.total ?? 1);
+    const show = me.alive && left > 0;
+    bar.classList.toggle('hidden', !show);
+    if (!show) return;
+    this.el['channel-fill'].style.width = `${Math.min(100, (1 - left / total) * 100)}%`;
+    this.el['channel-text'].textContent = `${c ? 'Teleporting' : wind!.name}  ${left.toFixed(1)}`;
+  }
+
   update(w: World, me: Unit, myTeam: Team) {
     const h = me.hero!;
     this.updateAbilities(me);
     this.updateTeamButtons(w, me, myTeam);
     this.updateStatus(w, me);
+    this.updateChannelBar(me);
     const key = [
       w.teamKills[0],
       w.teamKills[1],

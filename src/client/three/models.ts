@@ -255,7 +255,7 @@ function build(key: string): THREE.Object3D {
     case 'hero':
       return HERO_BUILDERS[a as HeroId]();
     case 'creep':
-      return creep(a as 'melee' | 'ranged', Number(b) as 0 | 1);
+      return creep(a as 'melee' | 'ranged', Number(b) as 0 | 1, c === 'mega');
     case 'brute':
       return brute();
     case 'imp':
@@ -288,7 +288,7 @@ function build(key: string): THREE.Object3D {
  * Lane creeps: helmeted soldiers in the team colour (sword and round shield), and robed
  * casters with a crystal staff. Weapons are the 'weapon' joint so attacks can swing them.
  */
-function creep(type: 'melee' | 'ranged', team: 0 | 1): THREE.Object3D {
+function creep(type: 'melee' | 'ranged', team: 0 | 1, mega = false): THREE.Object3D {
   const tc = TEAM_HEX[team];
   const dark = team === 0 ? 0x1c3566 : 0x661c20;
   const b = humanoid({ skin: 0xb89272, cloth: dark, cloth2: 0x2e2a26, boots: 0x221e1a, hip: 0.8, slim: 0.9, sculpt: true, lite: true });
@@ -331,6 +331,17 @@ function creep(type: 'melee' | 'ranged', team: 0 | 1): THREE.Object3D {
     add(w, mesh(new THREE.OctahedronGeometry(0.11), glow(team === 0 ? 0x62aef0 : 0xf07a5a, 2.3)), 0, 1.13, 0).scale.set(1, 1.5, 1);
     rot(b.armR, -0.3, 0, 0.1);
     rot(w, 0.3, 0, 0);
+  }
+  if (mega) {
+    // Mega Creeps: horns, spiked shoulders and burning eyes in the team's colour.
+    const fire = glow(team === 0 ? 0x62aef0 : 0xf07a5a, 2.6);
+    const horn = M(0xa89c80);
+    for (const s of [-1, 1]) {
+      add(b.head, mesh(taper([[s * 0.17, 0.14, 0], [s * 0.3, 0.3, 0.02], [s * 0.3, 0.5, 0]], 0.055, 0.006, 5, 5), horn), 0, 0, 0);
+      add(b.head, mesh(sph(0.026, 0), fire), s * 0.075, 0.02, 0.2);
+    }
+    for (const arm of [b.armL, b.armR]) for (const z of [-0.08, 0.08]) add(arm, mesh(taper([[0, 0.08, z], [0, 0.32, z]], 0.05, 0.005, 2, 4), iron), 0, 0, 0);
+    add(b.torso, mesh(new THREE.OctahedronGeometry(0.09), fire), 0, 0.5, 0.27);
   }
   const g = grp();
   g.add(b.root);

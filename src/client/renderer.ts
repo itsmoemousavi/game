@@ -3,6 +3,9 @@ import { ATTACK_AIM, type Aim } from './input';
 import { itemImage } from './icons';
 import { bakeMap } from './map-art';
 
+/** How many meters of the map fit top to bottom at the default zoom (bigger = farther out). */
+const DEFAULT_VIEW_METERS = 52;
+
 /**
  * 2D top-down renderer. It only READS the simulation; swapping it for a 3D renderer
  * (Three.js / Babylon.js) later does not touch game logic. World (x, y) maps to the
@@ -154,11 +157,12 @@ export class Renderer {
     this.canvas.width = Math.round(this.cssW * this.dpr);
     this.canvas.height = Math.round(this.cssH * this.dpr);
     // Show ~44 m vertically on any screen (phone landscape ≈ 9 px/m).
-    this.zoom = (Math.min(this.cssH, this.cssW * 0.75) / 44) * this.zoomFactor;
+    this.zoom = (Math.min(this.cssH, this.cssW * 0.75) / DEFAULT_VIEW_METERS) * this.zoomFactor;
   }
 
   setZoomFactor(f: number) {
-    this.zoomFactor = Math.max(0.5, Math.min(2.2, f));
+    // 1 is the default view, the farthest out you can go; you can only zoom in from there.
+    this.zoomFactor = Math.max(1, Math.min(2.2, f));
     this.resize();
   }
 
@@ -1133,6 +1137,22 @@ export class Renderer {
     ctx.globalAlpha = 1;
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(this.fogCanvas, x, y, size, size);
+    // Jungle camps: a small marker, always shown, so they're easy to find.
+    ctx.fillStyle = '#e8c872';
+    ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+    ctx.lineWidth = 0.8;
+    for (const c of w.map.camps) {
+      const cx = x + c.x * k;
+      const cy = y + c.y * k;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 2.6);
+      ctx.lineTo(cx + 2.6, cy);
+      ctx.lineTo(cx, cy + 2.6);
+      ctx.lineTo(cx - 2.6, cy);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
     for (const u of w.units) {
       if (!u.alive && u.kind !== 'structure') continue;
       if (!w.canSee(viewTeam, u)) continue;
@@ -1150,10 +1170,19 @@ export class Renderer {
         ctx.stroke();
       } else ctx.fillRect(ux - 1, uy - 1, 2, 2);
     }
+    // Couriers out on the map: a dot smaller than a creep's (enemies only see those outside their fog).
+    for (const h of w.heroes) {
+      const c = h.hero!.courier;
+      if (c.mode === 'home' || (h.team !== viewTeam && !w.vision.seesPoint(viewTeam, c.x, c.y))) continue;
+      ctx.fillStyle = h === focus ? '#ffe066' : TEAM_COLORS[h.team];
+      ctx.beginPath();
+      ctx.arc(x + c.x * k, y + c.y * k, 1.1, 0, Math.PI * 2);
+      ctx.fill();
+    }
     // Teleports in progress: a pulsing marker where the hero will arrive (enemies see it only outside their fog).
     for (const h of w.heroes) {
       const c = h.hero!.channel;
-      const t = c?.kind === 'tp' && h.alive ? w.unit(c.targetId) : undefined;
+      const t = c?.kind === 'tp' && h.alive ? { x: c.x, y: c.y } : undefined;
       if (!t || (h.team !== viewTeam && !w.vision.seesPoint(viewTeam, t.x, t.y))) continue;
       const pulse = (((w.time * 2) % 1) + 1) % 1; // the clock is negative during the warm-up
       ctx.strokeStyle = TEAM_COLORS[h.team];

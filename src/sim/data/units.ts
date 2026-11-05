@@ -56,6 +56,8 @@ export const SUMMONS: Record<'wolf', CombatStats> = {
 
 /** Multiplier applied to creeps of a lane whose enemy barracks has fallen. */
 export const SUPER_CREEP_MULT = { hp: 1.6, damage: 1.6, gold: 0.6 };
+/** All six enemy barracks down: every creep of that team is a Mega Creep. Replaces the multiplier above. */
+export const MEGA_CREEP_MULT = { hp: 3.2, damage: 3, gold: 0.4 };
 
 const tower = (hp: number, damage: number): CombatStats => ({
   hp,

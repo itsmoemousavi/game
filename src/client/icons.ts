@@ -152,6 +152,18 @@ const ICONS: Record<ItemId | 'tp' | 'shop' | 'courier', string> = {
     '<path d="M16 4L7 18" stroke="#57340f" stroke-width="2" stroke-linecap="round"/><circle cx="16.5" cy="5" r="2.6" fill="#a3e635" stroke="#1a2e05" stroke-width="1"/><path d="M3 18.5c2-1.6 3.5 1.2 5.5 0s3.5-1.4 5.5 0 3.5 1 7 0v3H3z" fill="#4d7c0f" stroke="#1a2e05" stroke-width=".8"/>',
     '#1a2e05',
   ),
+  manaFlask: svg(
+    '<path d="M10 3h4v1.5l-.7.5V8l4.2 7.3A3.2 3.2 0 0 1 14.7 20H9.3a3.2 3.2 0 0 1-2.8-4.7L10.7 8V5l-.7-.5z" fill="#60a5fa" stroke="#172554" stroke-width="1"/><path d="M8.6 14h6.8l1 2.2a2 2 0 0 1-1.8 2.8H9.4a2 2 0 0 1-1.8-2.8z" fill="#bfdbfe" fill-opacity=".85"/><circle cx="11" cy="16.2" r=".8" fill="#fff"/><circle cx="13.6" cy="15.3" r=".55" fill="#fff"/>',
+    '#172554',
+  ),
+  longScope: svg(
+    '<path d="M4 15.5l12.5-8 2 3-12.5 8z" fill="#a16207" stroke="#422006" stroke-width="1"/><path d="M15.8 6.5l3-1.9 2.7 4-3 1.9z" fill="#fde68a" stroke="#422006" stroke-width="1"/><path d="M3.7 15.7l1.7 2.7-1.6 1-1.7-2.7z" fill="#1c1917"/><path d="M9.5 15v3.5M7.5 20.5h4" stroke="#78716c" stroke-width="1.3"/>',
+    '#292012',
+  ),
+  wayfarerBoots: svg(
+    '<path d="M7 4h6v8l5 2.5c1 .5 1.6 1.3 1.6 2.4V18H5.2l-.2-2 2-3z" fill="#7dd3fc" stroke="#0c4a6e" stroke-width="1"/><path d="M5 18h14.6v1.8H5z" fill="#0c4a6e"/><path d="M7 7.5h6M7 10h6" stroke="#0c4a6e" stroke-width=".9"/><path d="M3 4.5c1.6 1.1 1.6 3.4 0 4.5M1.2 3.5c2.5 1.8 2.5 4.7 0 6.5" fill="none" stroke="#e0f2fe" stroke-width="1.1" stroke-linecap="round"/><circle cx="16" cy="9" r="2.1" fill="#bae6fd" stroke="#0c4a6e" stroke-width=".7"/><path d="M16 6v6M13 9h6" stroke="#0c4a6e" stroke-width=".5"/>',
+    '#082f49',
+  ),
   wardenCharm: svg(
     '<circle cx="12" cy="7.5" r="3.5" fill="none" stroke="#fcd34d" stroke-width="2"/><path d="M12 11v10M7.5 14h9" stroke="#fcd34d" stroke-width="2" stroke-linecap="round"/>',
     '#422006',
@@ -191,6 +203,7 @@ const STATUS_ICONS: Record<StatusId, string> = {
   silenced: ICONS.hushBell,
   sunder: ICONS.sunderPike,
   ghostShroud: ICONS.ghostShroud,
+  manaFlask: ICONS.manaFlask,
   aegis: svg(
     '<path d="M12 3l7.5 2.5v5.7c0 4.8-3.2 8.2-7.5 9.8-4.3-1.6-7.5-5-7.5-9.8V5.5z" fill="#a8d8ee" fill-opacity=".85" stroke="#0c4a6e" stroke-width="1"/><path d="M12 6.5v11M7.8 11h8.4" stroke="#fef3c7" stroke-width="1.6" stroke-linecap="round"/>',
     '#0c2233',

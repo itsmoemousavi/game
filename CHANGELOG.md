@@ -9,6 +9,7 @@ The version you're playing is shown in **Settings → View** in the game.
 
 | Version | Milestone | Date |
 |---|---|---|
+| [0.14.x](#014x--new-controls-and-rules) | New controls and rules | 2026-11-05 |
 | [0.13.x](#013x--three-new-heroes) | Three new heroes | 2026-11-05 |
 | [0.12.x](#012x--new-items) | 8 new items | 2026-11-05 |
 | [0.11.x](#011x--new-map-art) | New map art and a living world | 2026-11-05 |
@@ -22,6 +23,34 @@ The version you're playing is shown in **Settings → View** in the game.
 | [0.3.x](#03x--hero-balance) | Hero balance | 2026-11-01 |
 | [0.2.x](#02x--six-heroes-and-smarter-bots) | Six heroes and smarter bots | 2026-11-01 |
 | [0.1.x](#01x--first-playable-prototype) | First playable prototype (2D) | 2026-11-01 |
+
+---
+
+## 0.14.x · New controls and rules
+
+### 0.14.0
+*2026-11-05*
+
+**Attacking works in a new way:**
+- **Auto attack on:** your hero hits the nearest target in range by itself, also while walking, and stays on it while it's in range. Pick another enemy by holding Attack and dragging: it comes first until it dies or leaves your range. Auto attack never denies and doesn't wake up jungle camps.
+- **Auto attack off:** one attack per tap. Holding Attack only aims, and the attack happens when you let go. Tapping faster than your attack speed does nothing extra.
+- **Denies** are always one attack, in both modes.
+
+**Teleporting:**
+- A bar over your health bar shows anything charging up: teleports and long spell wind-ups.
+- Moving no longer cancels a teleport. Your hero stays frozen until it lands, or until you tap the new X on the teleport slot.
+- If the tower you're teleporting to falls, you still arrive there.
+
+**New items:**
+- **Wayfarer Boots:** the fastest boots. You always have 1 teleport that's never used up, with half the cooldown, and you can teleport to allied heroes and creeps too. You can't buy scrolls while you have them; drop them and you keep 1.
+- **Clearwater Flask:** restores mana over time.
+- **Long Scope:** a cheap early item: more attack range for ranged heroes, and a little attack speed.
+
+**Also:**
+- **Mega Creeps:** when all 6 of a team's barracks have fallen, the enemy sends huge horned creeps that are far stronger.
+- The camera starts further out, and that's now the furthest it goes: you can only zoom in.
+- The minimap marks jungle camps, and shows couriers out on the map as small dots.
+- Joystick sizes are further apart, and the joystick shows on screen when you pick a size in Settings.
 
 ---
 

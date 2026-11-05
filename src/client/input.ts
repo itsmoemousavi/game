@@ -26,7 +26,9 @@ const TAP_SLOP = 12;
  *
  * Mobile (primary):
  *  - Left half of the screen: floating virtual joystick.
- *  - Attack button: attack nearest (heroes first). Tap an enemy to attack it.
+ *  - Attack button: tap = nearest target; hold = aim with an arrow, the attack happens on release.
+ *    Auto attack on: a picked enemy comes first until it dies or leaves range. Off: one attack per
+ *    tap or release. Denies are always one attack. Tap an enemy to attack it.
  *  - Ability buttons: TAP = quick-cast on the best target; DRAG = aim, release to cast,
  *    release over "Cancel" to abort. The small "+" learns the ability.
  *  - Minimap: hold/drag to look somewhere else; release to snap back to your hero.
@@ -120,23 +122,19 @@ export class Input {
   }
 
   private attackPointer: number | null = null;
-  private attackSince = 0;
-  private attackRelease: ReturnType<typeof setTimeout> | null = null;
 
   /** Attack button held: where it was pressed (for aiming by dragging) and whether it moved. */
   private attackDrag: { ox: number; oy: number; moved: boolean } | null = null;
 
   private attackDown(pointerId: number, at?: { x: number; y: number }) {
-    if (this.attackRelease) clearTimeout(this.attackRelease);
     this.attackPointer = pointerId;
-    this.attackSince = performance.now();
-    this.queue.push({ type: 'attackHold', unitId: this.heroId(), held: true });
-    // Holding Attack shows an arrow at the best target; drag it to pick another one.
+    // Holding only aims: an arrow at the nearest target, drag it to pick another one. The attack
+    // happens when the finger lets go.
     if (at) {
       this.attackDrag = { ox: at.x, oy: at.y, moved: false };
       const w = this.world();
       const me = w.unit(this.heroId());
-      const t = me && w.pickAutoTarget(me);
+      const t = me && w.nearestAttackTarget(me);
       if (me && t) this.aimAttack(t.x - me.x, t.y - me.y, Math.min(1, Math.hypot(t.x - me.x, t.y - me.y) / ATTACK_AIM_REACH), false);
     }
   }
@@ -171,30 +169,27 @@ export class Input {
 
   private attackUp(cancelled = false) {
     this.attackPointer = null;
-    // Release with a target under the arrow: that's the next attack (it walks over if needed).
-    // Holding only aims; the attack starts on release. Standing still: the target under the arrow
-    // (a plain tap = the best target nearby) is attacked until it dies or you walk away.
-    // While steering, a tap still gets a swing on the move (see the timer below).
     const aim = this.aim?.slot === ATTACK_AIM ? this.aim : null;
-    const steering = Math.hypot(this.lastDir.dx, this.lastDir.dy) > 0.15;
+    const moved = !!this.attackDrag?.moved;
     this.aim = null;
-    this.cancelZone.classList.remove('show');
-    if (!cancelled && !aim?.cancel && !steering) {
-      let targetId = aim?.targetId;
-      if (targetId === undefined && !this.attackDrag?.moved) {
-        const w = this.world();
-        const me = w.unit(this.heroId());
-        targetId = me ? w.pickAutoTarget(me)?.id : undefined;
-      }
-      if (targetId !== undefined) this.queue.push({ type: 'attack', unitId: this.heroId(), targetId });
-    }
     this.attackDrag = null;
-    // A quick tap still gets at least one swing in.
-    const wait = Math.max(0, 600 - (performance.now() - this.attackSince));
-    this.attackRelease = setTimeout(() => {
-      this.queue.push({ type: 'attackHold', unitId: this.heroId(), held: false });
-      this.attackRelease = null;
-    }, wait);
+    this.cancelZone.classList.remove('show');
+    if (cancelled || aim?.cancel) return;
+    const w = this.world();
+    const me = w.unit(this.heroId());
+    if (!me?.hero) return;
+    // Pointed at someone with the arrow: them. A plain tap: the nearest target.
+    let target = aim?.targetId !== undefined ? w.unit(aim.targetId) : undefined;
+    if (!target && !moved) target = w.nearestAttackTarget(me);
+    if (!target) {
+      // Nothing to aim at yet: let the game pick the nearest when the swing is ready.
+      if (!moved && !me.hero.autoAttack) this.queue.push({ type: 'attackOnce', unitId: me.id });
+      return;
+    }
+    // Auto attack on: an enemy you pick comes first until it dies or leaves your range. Denies, and
+    // everything with auto attack off, are one attack per tap or release.
+    if (me.hero.autoAttack && target.team !== me.team) this.queue.push({ type: 'attack', unitId: me.id, targetId: target.id, priority: true });
+    else this.queue.push({ type: 'attackOnce', unitId: me.id, targetId: target.id });
   }
 
   /** Joystick radius in px (settings: S / M / L). */
@@ -207,6 +202,18 @@ export class Input {
     this.joyKnob.style.width = this.joyKnob.style.height = `${knob}px`;
     this.joyKnob.style.left = this.joyKnob.style.top = `${(size - knob) / 2 - 2}px`;
   }
+
+  /** Show the joystick for a moment beside the settings, so a new size can be seen straight away. */
+  previewJoystick() {
+    if (this.previewTimer) clearTimeout(this.previewTimer);
+    this.joyBase.style.zIndex = '40';
+    this.showJoystick(this.canvas.clientWidth * 0.14, this.canvas.clientHeight * 0.5, 0, 0);
+    this.previewTimer = setTimeout(() => {
+      this.joyBase.style.zIndex = '';
+      if (!this.joy) this.joyBase.style.display = 'none';
+    }, 1600);
+  }
+  private previewTimer: ReturnType<typeof setTimeout> | null = null;
 
   private hideTip() {
     if (!this.tip) return;
@@ -234,6 +241,13 @@ export class Input {
       if (this.keys.has('arrowdown')) dy += 1;
     }
     const moving = Math.hypot(dx, dy) > 0.15;
+    // Teleporting: the hero is frozen. Once it's over, a held stick starts walking straight away.
+    if (w.unit(id)?.hero?.channel) {
+      this.lastDir = { dx: 0, dy: 0 };
+      for (const c of this.queue) w.enqueue(c);
+      this.queue.length = 0;
+      return;
+    }
     const wasMoving = Math.hypot(this.lastDir.dx, this.lastDir.dy) > 0.15;
     if (moving && (Math.abs(dx - this.lastDir.dx) > 0.05 || Math.abs(dy - this.lastDir.dy) > 0.05)) {
       w.enqueue({ type: 'moveDir', unitId: id, dx, dy });
@@ -442,7 +456,7 @@ export class Input {
       .filter((u) => u.alive && w.canAttack(me, u) && near(u) < reach(u))
       .sort((a, b) => near(a) - near(b))[0];
     const item = this.groundItemAt(w, me, sx, sy, Math.max(34, 1.3 * this.renderer.zoom));
-    if (enemy) this.queue.push({ type: 'attack', unitId: me.id, targetId: enemy.id });
+    if (enemy) this.queue.push(me.hero?.autoAttack ? { type: 'attack', unitId: me.id, targetId: enemy.id } : { type: 'attackOnce', unitId: me.id, targetId: enemy.id });
     else if (item) this.queue.push({ type: 'pickUp', unitId: me.id, groundId: item.id });
     else if (walk) {
       const p = this.renderer.screenToWorld(sx, sy);

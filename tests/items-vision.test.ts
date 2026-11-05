@@ -124,7 +124,7 @@ describe('teleport', () => {
     expect(v.hero!.channel).toBeNull(); // on cooldown
   });
 
-  it('moving or a stun cancels the channel; cannot teleport to enemy buildings', () => {
+  it('moving does not stop a teleport, the X or a stun does; cannot teleport to enemy buildings', () => {
     const { w, hero } = humans();
     const v = hero(0, 'vexa');
     w.applyCommand({ type: 'buyTp', unitId: v.id });
@@ -135,7 +135,12 @@ describe('teleport', () => {
     w.applyCommand({ type: 'teleport', unitId: v.id, targetId: mine.id });
     expect(v.hero!.channel).not.toBeNull();
     run(w, 1);
+    const x = v.x;
     w.applyCommand({ type: 'moveDir', unitId: v.id, dx: 1, dy: 0 });
+    run(w, 0.2);
+    expect(v.hero!.channel).not.toBeNull(); // frozen, still charging
+    expect(v.x).toBe(x);
+    w.applyCommand({ type: 'cancelChannel', unitId: v.id });
     expect(v.hero!.channel).toBeNull();
     expect(v.hero!.tpCount).toBe(2); // starting scroll + the one bought: none used up
     w.applyCommand({ type: 'teleport', unitId: v.id, targetId: mine.id });
@@ -329,7 +334,7 @@ describe('jungle camps', () => {
     expect(v.hp).toBeLessThan(v.maxHp); // the camp fought back
     // Run away: they give up and go home.
     w.applyCommand({ type: 'moveTo', unitId: v.id, x: 20, y: 150 });
-    run(w, 10);
+    run(w, 18);
     for (const n of neutrals.filter((x) => x.alive)) {
       expect(Math.hypot(n.x - n.neutral!.homeX, n.y - n.neutral!.homeY)).toBeLessThan(1);
     }

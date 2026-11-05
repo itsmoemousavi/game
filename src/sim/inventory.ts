@@ -1,5 +1,5 @@
 import { Side, Team } from './constants';
-import { BLINK_DAMAGE_LOCK, COURIER_SLOTS, INVENTORY_SLOTS, ITEMS, ItemId, ItemStats, SALVE, SHOP_RADIUS, TELEPORT } from './data/items';
+import { BLINK_DAMAGE_LOCK, COURIER_SLOTS, INVENTORY_SLOTS, ITEMS, ItemId, ItemStats, MANA_FLASK, SALVE, SHOP_RADIUS, TELEPORT } from './data/items';
 import { dist } from './math';
 import { cellCenter, nearestWalkableCell } from './pathfinding';
 import { onHillTop } from './objectives';
@@ -63,6 +63,8 @@ export function itemBonuses(items: (ItemSlot | null)[]): Required<ItemStats> {
     sunderArmor: 0,
     chainChance: 0,
     buildingDamagePct: 0,
+    attackRange: 0,
+    teleportBoots: false,
   };
   for (const slot of items) {
     if (!slot) continue;
@@ -91,6 +93,8 @@ export function itemBonuses(items: (ItemSlot | null)[]): Required<ItemStats> {
     b.sunderArmor = Math.max(b.sunderArmor, s.sunderArmor ?? 0);
     b.chainChance = Math.max(b.chainChance, s.chainChance ?? 0);
     b.buildingDamagePct = Math.max(b.buildingDamagePct, s.buildingDamagePct ?? 0);
+    b.attackRange = Math.max(b.attackRange, s.attackRange ?? 0);
+    b.teleportBoots ||= !!s.teleportBoots;
   }
   return b;
 }
@@ -223,8 +227,9 @@ function addToCourier(w: World, u: Unit, id: ItemId | 'tp', paid: number, parts:
 }
 
 /** Why a teleport scroll can't be bought right now, or null. */
-export function tpBuyBlocker(w: World, u: Unit): 'gold' | 'courierFull' | null {
+export function tpBuyBlocker(w: World, u: Unit): 'boots' | 'gold' | 'courierFull' | null {
   const h = u.hero!;
+  if (h.bonus.teleportBoots) return 'boots';
   if (h.gold < TELEPORT.cost) return 'gold';
   if (!atShop(w, u) && !fitsCourier(h, 'tp', 0)) return 'courierFull';
   return null;
@@ -384,6 +389,12 @@ export function useItem(w: World, u: Unit, slot: number, x?: number, y?: number)
     s.cooldown = active.cooldown;
     return true;
   }
+  if (s.id === 'manaFlask') {
+    w.addBuff(u, { key: 'manaFlask', t: MANA_FLASK.duration, manaPerSec: MANA_FLASK.mana / MANA_FLASK.duration });
+    s.count--;
+    if (s.count <= 0) h.items[slot] = null;
+    return true;
+  }
   if (s.id === 'healingSalve') {
     w.addBuff(u, { key: 'salve', t: SALVE.duration, healPerSec: SALVE.heal / SALVE.duration });
     s.count--;
@@ -406,9 +417,9 @@ export function buyTeleport(w: World, u: Unit): boolean {
   return true;
 }
 
-/** Allied buildings a hero may teleport to. */
-export function teleportTargets(w: World, team: Team): Unit[] {
-  return w.units.filter((s) => s.structure && s.alive && s.team === team);
+/** Where a hero may teleport: allied buildings, and with Wayfarer Boots allied heroes and creeps too. */
+export function teleportTargets(w: World, team: Team, boots = false): Unit[] {
+  return w.units.filter((s) => s.alive && s.team === team && (s.structure || (boots && (s.hero || s.creep))));
 }
 
 export function tpBlocker(u: Unit): 'none' | 'cooldown' | 'busy' | null {
@@ -419,18 +430,29 @@ export function tpBlocker(u: Unit): 'none' | 'cooldown' | 'busy' | null {
   return null;
 }
 
+/** Where you arrive: on the home side of a building, right beside a hero or creep. */
+function landingPoint(w: World, team: Team, t: Unit) {
+  const f = w.map.fountains[team];
+  const d = dist(t.x, t.y, f.x, f.y) || 1;
+  const off = t.structure ? t.radius + TELEPORT.offset : t.radius + 1.2;
+  return { x: t.x + ((f.x - t.x) / d) * off, y: t.y + ((f.y - t.y) / d) * off };
+}
+
 export function startTeleport(w: World, u: Unit, targetId: number): boolean {
-  const t = w.unit(targetId);
-  if (tpBlocker(u) || !t || !t.structure || !t.alive || t.team !== u.team) return false;
   const h = u.hero!;
-  h.channel = { kind: 'tp', t: TELEPORT.channel, total: TELEPORT.channel, targetId };
+  const t = w.unit(targetId);
+  if (tpBlocker(u) || !t || t === u || !teleportTargets(w, u.team as Team, h.bonus.teleportBoots).includes(t)) return false;
+  // The destination is decided now: if a building falls during the channel you still arrive there.
+  const p = landingPoint(w, u.team as Team, t);
+  h.channel = { kind: 'tp', t: TELEPORT.channel, total: TELEPORT.channel, targetId, x: p.x, y: p.y };
   w.events.push({ type: 'teleportStart', unitId: u.id, targetId });
   h.order = { type: 'idle' };
   u.path = null;
+  u.targetId = null;
   return true;
 }
 
-/** Runs every tick while channelling. Returns true while the hero is busy. */
+/** Runs every tick while channelling. Returns true while the hero is busy (frozen in place). */
 export function updateChannel(w: World, u: Unit, dt: number): boolean {
   const h = u.hero!;
   const c = h.channel;
@@ -439,24 +461,26 @@ export function updateChannel(w: World, u: Unit, dt: number): boolean {
     h.channel = null;
     return false;
   }
+  // Heading for a hero or creep: follow them while they live, then keep the last place they stood.
+  const t = w.unit(c.targetId);
+  if (t?.alive && !t.structure) {
+    const p = landingPoint(w, u.team as Team, t);
+    c.x = p.x;
+    c.y = p.y;
+  }
   c.t -= dt;
   if (c.t > 0) return true;
   h.channel = null;
-  const t = w.unit(c.targetId);
-  if (!t || !t.alive) return false;
-  // Land on the home side of the building so you arrive behind it, not in front.
-  const f = w.map.fountains[u.team as Team];
-  const d = dist(t.x, t.y, f.x, f.y) || 1;
-  const off = t.radius + TELEPORT.offset;
-  const gx = t.x + ((f.x - t.x) / d) * off;
-  const gy = t.y + ((f.y - t.y) / d) * off;
-  const cell = nearestWalkableCell(w.nav, gx, gy);
-  const p = cell >= 0 ? cellCenter(w.nav, cell) : { x: gx, y: gy };
+  const cell = nearestWalkableCell(w.nav, c.x, c.y);
+  const p = cell >= 0 ? cellCenter(w.nav, cell) : { x: c.x, y: c.y };
   u.x = u.px = p.x;
   u.y = u.py = p.y;
   u.path = null;
-  h.tpCount--;
-  h.tpCooldown = TELEPORT.cooldown;
+  if (h.bonus.teleportBoots) h.tpCooldown = TELEPORT.bootsCooldown;
+  else {
+    h.tpCount--;
+    h.tpCooldown = TELEPORT.cooldown;
+  }
   w.events.push({ type: 'teleport', unitId: u.id });
   return false;
 }

@@ -3,7 +3,7 @@ import { CREEPS, Team, Unit, World } from '../sim';
 /** Spawn a stationary training dummy for the enemy team (doesn't fight back, gives no gold). */
 export function spawnDummy(w: World, x: number, y: number, team: Team = 1): Unit {
   const d = w.spawnUnit('creep', team, { x, y }, { ...CREEPS.melee, hp: 1200, damage: 0, acquireRange: 0, bountyGold: 0, bountyXp: 20 });
-  d.creep = { type: 'melee', lane: 'mid', path: [{ x, y }], wp: 1, super: false };
+  d.creep = { type: 'melee', lane: 'mid', path: [{ x, y }], wp: 1, super: false, mega: false };
   d.visionDay = d.visionNight = 0;
   return d;
 }
@@ -61,7 +61,7 @@ export class Tutorial {
         done: (_w, _me, t) => t.spellHit,
       },
       {
-        text: 'Now tap the Attack button: your hero keeps hitting the dummy until it falls (walking away stops it). Hold Attack and drag to pick a different target; while steering with the joystick, holding Attack hits on the move.',
+        text: 'Your hero hits whatever is in range by itself. Tap the Attack button to hit the nearest target. Hold Attack and drag to pick a different target; while steering with the joystick, holding Attack hits on the move.',
         marker: (w) => w.unit(this.dummyId) ?? null,
         done: (w) => !w.unit(this.dummyId)?.alive,
       },

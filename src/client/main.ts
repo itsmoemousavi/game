@@ -197,7 +197,7 @@ interface Settings {
   quality: Quality;
 }
 const settings: Settings = { autoAttack: true, sound: true, autoLearn: false, leftHanded: false, vibrate: true, joystick: 'M', zoom: 1, graphics: '3d', quality: 'medium' };
-const JOY_RADIUS = { S: 42, M: 55, L: 72 };
+const JOY_RADIUS = { S: 38, M: 58, L: 84 };
 try {
   Object.assign(settings, JSON.parse(localStorage.getItem('shrinefall-settings') ?? '{}'));
 } catch {
@@ -319,9 +319,11 @@ document.querySelectorAll<HTMLElement>('#set-joy button').forEach((b) =>
     settings.joystick = b.dataset.v as Settings['joystick'];
     saveSettings();
     applySettings();
+    input?.previewJoystick();
   }),
 );
 const zoomInput = $<HTMLInputElement>('#set-zoom');
+settings.zoom = Math.max(1, settings.zoom); // saved by older versions, which could zoom out further
 zoomInput.value = String(settings.zoom);
 zoomInput.addEventListener('input', () => {
   settings.zoom = Number(zoomInput.value);
@@ -389,12 +391,17 @@ app.addEventListener('pointerdown', (e) => {
 });
 
 /** Announcements for big moments. */
+function announceMega(team: Team) {
+  hud.toast(team === myTeam ? 'All enemy barracks are down: your creeps are now Mega Creeps!' : 'All your barracks are down: the enemy now sends Mega Creeps!', team === myTeam ? '#ffd23f' : '#ff7b7f');
+}
+
 function announce(w: World, events: GameEvent[]) {
   const name = (id: number) => {
     const u = w.unit(id);
     return u?.hero ? HERO_DEFS[u.hero.defId].name : 'Someone';
   };
   for (const e of events) {
+    if (e.type === 'megaCreeps') announceMega(e.team);
     if (e.type === 'goldLost' && e.unitId === myHeroId) {
       hud.goldLost(e.amount);
       continue;

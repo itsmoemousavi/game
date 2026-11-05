@@ -34,7 +34,7 @@ import {
   otherTeam,
 } from './constants';
 import { HEROES, HeroId, maxAbilityLevel } from './data/heroes';
-import { BARRACKS, CREEPS, CombatStats, HERO_VISION, NEUTRALS, STRUCTURES, SUPER_CREEP_MULT } from './data/units';
+import { BARRACKS, CREEPS, CombatStats, HERO_VISION, MEGA_CREEP_MULT, NEUTRALS, STRUCTURES, SUPER_CREEP_MULT } from './data/units';
 import { ITEMS, ItemId, ItemStats, TELEPORT } from './data/items';
 import { GroundItem, ItemSlot, charmSlot, updateItemAuras, buyItem, buyTeleport, dropItem, emptyInventory, expireGroundItems, itemBonuses, pickUpItem, sellCourierItem, sellItem, startTeleport, swapItems, updateChannel, useItem } from './inventory';
 import { CourierState, courierGround, dropCourierItem, newCourier, sendCourier, updateCouriers } from './courier';
@@ -62,7 +62,8 @@ export type Order =
   | { type: 'idle' }
   | { type: 'dir'; dx: number; dy: number }
   | { type: 'move'; x: number; y: number }
-  | { type: 'attack'; targetId: number }
+  | { type: 'attack'; targetId: number; leash?: boolean; reached?: boolean }
+  | { type: 'attackOnce'; targetId: number }
   | { type: 'cast'; slot: number; targetId?: number; x?: number; y?: number }
   | { type: 'ward'; slot: number; x: number; y: number }
   | { type: 'pickUp'; groundId: number };
@@ -71,14 +72,17 @@ export type Order =
 export type Command =
   | { type: 'moveDir'; unitId: number; dx: number; dy: number }
   | { type: 'moveTo'; unitId: number; x: number; y: number }
-  | { type: 'attack'; unitId: number; targetId: number }
+  | { type: 'attack'; unitId: number; targetId: number; priority?: boolean }
   | { type: 'attackNearest'; unitId: number }
   /**
    * Attack button held (mobile): while steering (joystick or a walk order), hit the best enemy
    * in reach on the move. Holding it while standing still only aims (the client picks the target
    * and sends 'attack' on release), so nothing is attacked before the player lets go.
    */
-  | { type: 'attackHold'; unitId: number; held: boolean }
+  /** One attack (auto attack off, and every deny): the nearest target if none is given. Ignored while the attack is cooling down. */
+  | { type: 'attackOnce'; unitId: number; targetId?: number }
+  /** Cancel a teleport in progress (the X on the teleport slot). */
+  | { type: 'cancelChannel'; unitId: number }
   /** Player setting: automatically attack enemies that come into range while idle. */
   | { type: 'setAutoAttack'; unitId: number; enabled: boolean }
   /** Player setting: spend skill points automatically (ultimate first). */
@@ -125,6 +129,8 @@ export interface AbilityState {
 
 /** Sunder Pike: how long the lowered armor lasts. Storm Blade: lightning damage and how far it jumps. */
 const SUNDER_SECONDS = 4;
+/** A single attack tap this close to the swing being ready still counts (fingers aren't perfect). */
+const ONCE_GRACE = 0.1;
 /** Morra's wolves: how far they stray from her. Red Wolf: her reach while she's melee. */
 const SUMMON_LEASH = 22;
 const SUMMON_BUILDING_MULT = 0.5;
@@ -248,6 +254,7 @@ export interface HeroState {
   assists: number;
   lastHits: number;
   denies: number;
+  hadTeleportBoots?: boolean;
   /** Morra is the Red Wolf right now. */
   wolfForm?: boolean;
   /** All gold earned this match (for gold-per-minute). */
@@ -281,11 +288,13 @@ export interface HeroState {
   /** This hero's courier and its 3 slots. */
   courier: CourierState;
   tpCooldown: number;
-  channel: { kind: 'tp'; t: number; total: number; targetId: number } | null;
+  channel: { kind: 'tp'; t: number; total: number; targetId: number; x: number; y: number } | null;
+  /** A spell being wound up that shows on the channel bar. */
+  windup: { name: string; total: number } | null;
   /** Item bonuses currently applied (cooldown reduction, spell amp, lifesteal, ult upgrade...). */
   bonus: Required<ItemStats>;
-  /** Attack button is being held (see Command 'attackHold'). */
-  attackHeld: boolean;
+  /** One attack queued while steering (see Command 'attackOnce'). */
+  onceTarget: number | null;
   buybackCooldown: number;
   /** Set when a revive charm saves the hero: respawn here instead of the fountain. */
   reviveAt: Vec2 | null;
@@ -317,6 +326,8 @@ export interface CreepState {
   path: Vec2[];
   wp: number;
   super: boolean;
+  /** All enemy barracks are down: a Mega Creep. */
+  mega: boolean;
 }
 
 export interface StructureState {
@@ -447,6 +458,7 @@ export type GameEvent =
   | { type: 'itemActive'; unitId: number; kind: 'manaBurst' | 'frostNova' | 'stoneskin' | 'silence' | 'teamHeal' | 'vanish' | 'mire'; targetId?: number }
   | { type: 'chainLightning'; sourceId: number; targetIds: number[] }
   | { type: 'shieldBreak'; unitId: number }
+  | { type: 'megaCreeps'; team: Team }
   | { type: 'summon'; unitId: number; kind: 'wolf' }
   | { type: 'wolfForm'; unitId: number; on: boolean }
   | { type: 'feralBond'; unitId: number; ids: number[] }
@@ -516,6 +528,7 @@ export class World {
   /** Set when the match ended by surrender (the team that gave up). */
   surrendered: Team | null = null;
   private nextCampSpawn = CAMP_FIRST_SPAWN;
+  private megaAnnounced: [boolean, boolean] = [false, false];
   runes: Rune[] = [];
   /** Items heroes dropped on the ground. */
   groundItems: GroundItem[] = [];
@@ -640,9 +653,8 @@ export class World {
     // Shopping works while dead (you respawn at the fountain); everything else needs a living hero.
     const whileDead = ['buy', 'sell', 'buyTp', 'sellCourier', 'dropCourier', 'swapItems', 'learn', 'buyback', 'glyph', 'surrender', 'setAutoAttack', 'setAutoLearn', 'ping'];
     if (!u.alive && !whileDead.includes(cmd.type)) return;
-    if (h.channel && (cmd.type === 'moveDir' || cmd.type === 'moveTo' || cmd.type === 'attack' || cmd.type === 'attackNearest' || cmd.type === 'cast' || cmd.type === 'stop')) {
-      if (cmd.type !== 'moveDir' || Math.hypot(cmd.dx, cmd.dy) >= 0.15) h.channel = null;
-    }
+    // Teleporting: the hero is frozen in place. Only the X on the teleport slot stops it.
+    if (h.channel && ['moveDir', 'moveTo', 'attack', 'attackOnce', 'attackNearest', 'cast', 'stop', 'useItem', 'placeWard', 'pickUp', 'teleport'].includes(cmd.type)) return;
     switch (cmd.type) {
       case 'moveDir': {
         const l = Math.hypot(cmd.dx, cmd.dy);
@@ -659,7 +671,12 @@ export class World {
         break;
       case 'attack': {
         const t = this.unit(cmd.targetId);
-        if ((this.canAttack(u, t) && this.canSee(u.team, t)) || this.canDeny(u, t)) h.order = { type: 'attack', targetId: cmd.targetId };
+        // Steering: that target simply comes first while it stays in range.
+        if (cmd.priority && h.order.type === 'dir') {
+          if (this.canAttack(u, t) && this.canSee(u.team, t)) u.targetId = t.id;
+          break;
+        }
+        if ((this.canAttack(u, t) && this.canSee(u.team, t)) || this.canDeny(u, t)) h.order = { type: 'attack', leash: cmd.priority, targetId: cmd.targetId };
         break;
       }
       case 'attackNearest': {
@@ -688,9 +705,18 @@ export class World {
           this.events.push({ type: 'gameOver', winner: this.winner });
         }
         break;
-      case 'attackHold':
-        h.attackHeld = cmd.held;
+      case 'cancelChannel':
+        h.channel = null;
         break;
+      case 'attackOnce': {
+        // Tapping faster than the attack speed does nothing: the swing has to be ready.
+        if (u.attackTimer > ONCE_GRACE) break;
+        const t = cmd.targetId !== undefined ? this.unit(cmd.targetId) : this.nearestAttackTarget(u);
+        if (!t || !((this.canAttack(u, t) && this.canSee(u.team, t)) || this.canDeny(u, t))) break;
+        if (h.order.type === 'dir') h.onceTarget = t.id;
+        else h.order = { type: 'attackOnce', targetId: t.id };
+        break;
+      }
       case 'stop':
         h.order = { type: 'idle' };
         break;
@@ -807,6 +833,26 @@ export class World {
   }
 
   /** Mobile "attack button" targeting: enemy hero first, then nearest anything. */
+  /**
+   * Auto attack's choice: the target it already has while that stays in range, otherwise the
+   * nearest one in range. It never denies, and doesn't wake up jungle camps by itself.
+   */
+  autoTarget(u: Unit): Unit | undefined {
+    const cur = this.unit(u.targetId);
+    if (this.canAttack(u, cur) && !cur.ward && this.canSee(u.team, cur) && this.inReach(u, cur)) return cur;
+    return this.enemiesNear(u, u.x, u.y, u.attackRange + u.radius + 3, (e) => e.kind !== 'ward' && this.canSee(u.team, e) && (e.kind !== 'neutral' || (e.neutral?.aggroUntil ?? -1e9) > this.time))
+      .filter((e) => this.inReach(u, e))
+      .sort((a, b) => dist(u.x, u.y, a.x, a.y) - dist(u.x, u.y, b.x, b.y))[0];
+  }
+
+  /** The Attack button's choice: the nearest target in range (jungle monsters too), else the best one close by. */
+  nearestAttackTarget(u: Unit): Unit | undefined {
+    const inRange = this.enemiesNear(u, u.x, u.y, u.attackRange + u.radius + 3, (e) => e.kind !== 'ward' && this.canSee(u.team, e))
+      .filter((e) => this.inReach(u, e))
+      .sort((a, b) => dist(u.x, u.y, a.x, a.y) - dist(u.x, u.y, b.x, b.y))[0];
+    return inRange ?? this.pickAutoTarget(u);
+  }
+
   pickAutoTarget(u: Unit): Unit | undefined {
     const reach = Math.max(u.attackRange + 4, 8);
     const seen = (e: Unit) => this.canSee(u.team, e) && e.kind !== 'ward';
@@ -921,7 +967,8 @@ export class World {
       tpCooldown: 0,
       channel: null,
       bonus: itemBonuses([]),
-      attackHeld: false,
+      onceTarget: null,
+      windup: null,
       buybackCooldown: 0,
       reviveAt: null,
       bot: { thinkTimer: (index % 6) * 0.05, retreating: false, buildIndex: 0, difficulty: slot.difficulty ?? 'normal' },
@@ -943,6 +990,12 @@ export class World {
     const def = HEROES[h.defId];
     const lv = h.level - 1;
     const b = (h.bonus = itemBonuses(h.items));
+    // Wayfarer Boots: exactly one teleport while you have them, and one to keep when they go.
+    if (b.teleportBoots) {
+      h.tpCount = 1;
+      h.tpCooldown = Math.min(h.tpCooldown, TELEPORT.bootsCooldown);
+    } else if (h.hadTeleportBoots) h.tpCount = 1;
+    h.hadTeleportBoots = b.teleportBoots;
     const oldMax = u.maxHp;
     const oldMana = u.maxMana;
     u.maxHp = def.baseHp + def.hpPerLevel * lv + b.hp;
@@ -954,7 +1007,7 @@ export class World {
     const form = u.buffs.find((f) => f.key === 'redWolf');
     h.wolfForm = !!form;
     u.damage = def.baseDamage + def.damagePerLevel * lv + b.damage + (form?.formDamage ?? 0);
-    u.attackRange = form ? WOLF_FORM_RANGE : def.attackRange;
+    u.attackRange = form ? WOLF_FORM_RANGE : def.attackRange + (def.projectileSpeed > 0 ? b.attackRange : 0);
     u.projectileSpeed = form ? 0 : def.projectileSpeed;
     u.attackInterval = Math.max(0.45, (def.attackInterval - def.attackIntervalPerLevel * lv) / (1 + b.attackSpeedPct / 100));
     u.moveSpeed = def.moveSpeed * (1 + b.moveSpeedPct / 100);
@@ -1007,16 +1060,26 @@ export class World {
           };
           const u = this.newUnit('creep', team, pos, CREEPS[type]);
           const enemyRaxDown = raxDown(type);
+          const mega = this.findStructure(otherTeam(team), 'barracks').every((r) => !r.alive);
           // Creeps grow stronger as the match goes on, so games can't stall forever.
           const grow = 1 + CREEP_GROWTH_PER_5MIN * Math.floor(this.time / 300);
           u.maxHp = u.hp = Math.round(u.hp * grow);
           u.damage = Math.round(u.damage * grow);
-          if (enemyRaxDown) {
+          if (mega) {
+            u.maxHp = u.hp = Math.round(u.hp * MEGA_CREEP_MULT.hp);
+            u.damage = Math.round(u.damage * MEGA_CREEP_MULT.damage);
+            u.bountyGold = Math.round(u.bountyGold * MEGA_CREEP_MULT.gold);
+            u.radius *= 1.25;
+            if (!this.megaAnnounced[team]) {
+              this.megaAnnounced[team] = true;
+              this.events.push({ type: 'megaCreeps', team });
+            }
+          } else if (enemyRaxDown) {
             u.maxHp = u.hp = Math.round(u.hp * SUPER_CREEP_MULT.hp);
             u.damage = Math.round(u.damage * SUPER_CREEP_MULT.damage);
             u.bountyGold = Math.round(u.bountyGold * SUPER_CREEP_MULT.gold);
           }
-          u.creep = { type, lane, path, wp: 1, super: enemyRaxDown };
+          u.creep = { type, lane, path, wp: 1, super: enemyRaxDown, mega };
           u.facing = Math.atan2(dy, dx);
         });
       }
@@ -1114,6 +1177,7 @@ export class World {
       h.goldEarned += PASSIVE_GOLD_PER_SEC * DT;
     }
     for (const a of h.abilities) if (a.cooldown > 0) a.cooldown = Math.max(0, a.cooldown - DT);
+    if (h.bonus.teleportBoots) h.tpCount = 1;
     // The Red Wolf ended (time ran out, or she died): back to human, and ranged again.
     if (h.wolfForm && !u.buffs.some((f) => f.key === 'redWolf')) {
       this.applyHeroStats(u);
@@ -1199,33 +1263,25 @@ export class World {
     const h = u.hero!;
     this.unstick(u);
     const o = h.order;
-    // Holding Attack while steering: hit whatever is in range, otherwise keep walking.
-    if (h.attackHeld && (o.type === 'dir' || o.type === 'move')) {
-      let t = this.unit(u.targetId);
-      if (!this.canAttack(u, t) || !this.canSee(u.team, t) || !this.inReach(u, t)) {
-        const reach = u.attackRange + u.radius + 1.5;
-        t = this.enemiesNear(u, u.x, u.y, reach, (e) => e.kind !== 'ward' && this.canSee(u.team, e))
-          .filter((e) => this.inReach(u, e))
-          .sort((a, b) => Number(!!b.hero) - Number(!!a.hero) || dist(u.x, u.y, a.x, a.y) - dist(u.x, u.y, b.x, b.y))[0];
+    // Walking: shoot on the move at whatever is in range, without stopping (bots walk with a purpose).
+    if (o.type === 'dir' || (o.type === 'move' && h.controller === 'human')) {
+      let t: Unit | undefined;
+      if (h.onceTarget !== null) {
+        const q = this.unit(h.onceTarget);
+        if (q && ((this.canAttack(u, q) && this.canSee(u.team, q)) || this.canDeny(u, q)) && this.inReach(u, q)) t = q;
+        else h.onceTarget = null;
       }
-      if (o.type === 'dir') {
-        // Steering with the joystick: keep walking and shoot on the move whenever the
-        // attack is ready and something is in reach (the hero doesn't stop to fight).
-        if (t && this.inReach(u, t) && u.attackTimer <= 0) this.tryAttack(u, t);
-        u.targetId = t?.id ?? null;
-        this.stepMove(u, o.dx, o.dy, this.speedOf(u) * DT);
-        return;
+      if (!t && h.autoAttack && !isInvisible(u)) t = this.autoTarget(u);
+      u.targetId = t?.id ?? null;
+      if (t && u.attackTimer <= 0) {
+        this.tryAttack(u, t);
+        if (t.id === h.onceTarget) h.onceTarget = null;
       }
-      if (t && this.tryAttack(u, t)) {
-        u.targetId = t.id;
-        return;
-      }
+      if (o.type === 'dir') this.stepMove(u, o.dx, o.dy, this.speedOf(u) * DT);
+      else if (this.navigate(u, o.x, o.y, 0.3)) h.order = { type: 'idle' };
+      return;
     }
     switch (o.type) {
-      case 'dir':
-        this.stepMove(u, o.dx, o.dy, this.speedOf(u) * DT);
-        u.targetId = null;
-        break;
       case 'move':
         if (this.navigate(u, o.x, o.y, 0.3)) h.order = { type: 'idle' };
         u.targetId = null;
@@ -1237,7 +1293,37 @@ export class World {
           break;
         }
         u.targetId = t.id;
+        // A target picked with the Attack arrow counts until it dies or leaves your range; then back to normal.
+        if (o.leash) {
+          const reach = this.inReach(u, t);
+          if (reach) o.reached = true;
+          else if (o.reached) {
+            h.order = { type: 'idle' };
+            u.targetId = null;
+            break;
+          }
+        }
         if (!this.tryAttack(u, t)) this.navigate(u, t.x, t.y, 0);
+        break;
+      }
+      case 'attackOnce': {
+        const t = this.unit(o.targetId);
+        if (!((this.canAttack(u, t) && this.canSee(u.team, t)) || this.canDeny(u, t))) {
+          h.order = { type: 'idle' };
+          break;
+        }
+        u.targetId = t.id;
+        if (!this.inReach(u, t)) {
+          this.navigate(u, t.x, t.y, 0);
+          break;
+        }
+        // In range: one swing as soon as it's ready, then stand still.
+        u.facing = Math.atan2(t.y - u.y, t.x - u.x);
+        u.path = null;
+        if (u.attackTimer <= 0) {
+          this.tryAttack(u, t);
+          h.order = { type: 'idle' };
+        }
         break;
       }
       case 'cast': {
@@ -1265,12 +1351,7 @@ export class World {
           u.targetId = null;
           break;
         }
-        let t = this.unit(u.targetId);
-        if (!this.canAttack(u, t) || !this.inReach(u, t)) {
-          t = this.enemiesNear(u, u.x, u.y, u.attackRange + u.radius + 0.3, (e) => e.kind !== 'neutral' && e.kind !== 'ward' && this.canSee(u.team, e)).sort(
-            (a, b) => dist(u.x, u.y, a.x, a.y) - dist(u.x, u.y, b.x, b.y),
-          )[0];
-        }
+        const t = this.autoTarget(u);
         u.targetId = t ? t.id : null;
         if (t) this.tryAttack(u, t);
         break;

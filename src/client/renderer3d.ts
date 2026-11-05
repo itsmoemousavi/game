@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { GLYPH_DURATION, GameMap, HEROES, HERO_IDS, TELEPORT, Team, Unit, World, courierFlying, isInvisible, isNight } from '../sim';
+import { GLYPH_DURATION, GameMap, HEROES, HERO_IDS, Team, Unit, World, courierFlying, isInvisible, isNight } from '../sim';
 import type { Aim } from './input';
 import { Renderer, TEAM_COLORS } from './renderer';
 import { JOINTS, Joint, TEAM_HEX, model } from './three/models';
@@ -230,7 +230,7 @@ export class Renderer3D extends Renderer {
     const keys = [
       ...HERO_IDS.map((h) => `hero:${h}`),
       'wolf:0', 'wolf:1', 'redwolf:0', 'redwolf:1', 'shot:rebuke', 'shot:spiritbolt', 'shot:crossbolt',
-      ...[0, 1].flatMap((t) => [`creep:melee:${t}`, `creep:ranged:${t}`]),
+      ...[0, 1].flatMap((t) => [`creep:melee:${t}`, `creep:ranged:${t}`, `creep:melee:${t}:mega`, `creep:ranged:${t}:mega`]),
       'brute', 'imp', 'warden', 'ward:observer', 'ward:sentry', 'courier:walk:0', 'courier:walk:1', 'courier:fly:0', 'courier:fly:1',
       ...['haste', 'doubleDamage', 'regen', 'invisibility', 'bounty'].map((r) => `rune:${r}`),
       'shot:fireball', 'shot:piercingArrow', 'shot:tidalWave', 'shot:spell', 'shot:shot0', 'shot:shot1',
@@ -507,7 +507,7 @@ export class Renderer3D extends Renderer {
   private keyOf(u: Unit): { key: string; scale: number } | null {
     if (u.hero?.wolfForm) return { key: `redwolf:${u.team === 1 ? 1 : 0}`, scale: HERO_SCALE };
     if (u.kind === 'hero') return { key: `hero:${u.hero!.defId}`, scale: HERO_SCALE };
-    if (u.creep) return { key: `creep:${u.creep.type}:${u.team === 1 ? 1 : 0}`, scale: u.creep.super ? CREEP_SCALE * 1.2 : CREEP_SCALE };
+    if (u.creep) return { key: `creep:${u.creep.type}:${u.team === 1 ? 1 : 0}${u.creep.mega ? ':mega' : ''}`, scale: u.creep.mega ? CREEP_SCALE * 1.55 : u.creep.super ? CREEP_SCALE * 1.2 : CREEP_SCALE };
     if (u.summon) return { key: `${u.summon.kind}:${u.team === 1 ? 1 : 0}`, scale: 1.7 };
     if (u.neutral) return { key: u.neutral.boss ? 'warden' : u.radius > 0.9 ? 'brute' : 'imp', scale: u.neutral.boss ? 1.8 : 1.6 };
     return null;
@@ -770,12 +770,8 @@ export class Renderer3D extends Renderer {
       const col = TEAM_HEX[h.team === 1 ? 1 : 0];
       if (!this.tpFrom.has(h.id)) this.tpFrom.set(h.id, { x: h.x, y: h.y });
       if (w.canSee(team, h)) this.fx3.beam('from' + h.id, h.x, h.y, col, k);
-      const t = w.unit(c.targetId);
-      if (t) {
-        const dest = tpLanding(w, h.team as Team, t);
-        // Enemies only see the arrival beam if that spot is outside their fog.
-        if (h.team === team || w.vision.seesPoint(team, dest.x, dest.y)) this.fx3.beam('to' + h.id, dest.x, dest.y, col, k);
-      }
+      // Enemies only see the arrival beam if that spot is outside their fog.
+      if (h.team === team || w.vision.seesPoint(team, c.x, c.y)) this.fx3.beam('to' + h.id, c.x, c.y, col, k);
     }
   }
 
@@ -1015,13 +1011,6 @@ interface Obj {
 }
 
 /** Where a teleport lands: on the home side of the target building (same rule as the simulation). */
-function tpLanding(w: World, team: Team, t: Unit) {
-  const f = w.map.fountains[team];
-  const d = Math.hypot(t.x - f.x, t.y - f.y) || 1;
-  const off = t.radius + TELEPORT.offset;
-  return { x: t.x + ((f.x - t.x) / d) * off, y: t.y + ((f.y - t.y) / d) * off };
-}
-
 function jointsOf(o: THREE.Object3D): Partial<Record<Joint, THREE.Object3D>> {
   const j: Partial<Record<Joint, THREE.Object3D>> = {};
   for (const n of JOINTS) {

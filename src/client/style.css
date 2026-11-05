@@ -180,6 +180,14 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #itembar .tp .lbl { color: #fff; text-shadow: none; }
 #itembar .tp.none { opacity: 0.55; }
 #itembar .tp.channel { border-color: #fff; animation: pulse 0.4s infinite alternate; }
+/* Teleporting: an X over the scroll; tapping it stops the teleport. */
+#itembar .tp.channel::after { content: '✕'; position: absolute; inset: 0; z-index: 3; display: grid; place-items: center; background: rgba(20,8,8,0.62); color: #ff9a9a; font-size: 20px; font-weight: 900; border-radius: 5px; }
+/* The bar over the health bar while something charges up. */
+.bars { position: relative; }
+#channel-bar { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); height: 16px; border-radius: 8px; overflow: hidden; background: rgba(10,12,16,0.85); border: 1px solid rgba(214,177,99,0.7); box-shadow: 0 2px 8px rgba(0,0,0,0.5); z-index: 4; }
+#channel-bar.hidden { display: none; }
+#channel-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(180deg, #9fd0ff, #3f8ae0); }
+#channel-text { position: absolute; inset: 0; display: grid; place-items: center; font-size: 10.5px; font-weight: 800; letter-spacing: 0.03em; color: #fff; text-shadow: 0 1px 2px #000; font-variant-numeric: tabular-nums; }
 #itembar .tp .cd { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,0.6); border-radius: 5px; font-size: 13px; font-weight: 800; }
 #itembar .tp .cd:empty { display: none; }
 /* Shop: a round button sitting on the panel's bottom-right corner. */

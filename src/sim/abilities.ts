@@ -470,6 +470,8 @@ function execute(w: World, u: Unit, slot: number, def: AbilityDef, x: number, y:
     case 'huntersRhythm':
       break;
   }
+  // A longer wind-up shows on the channel bar, like a teleport does.
+  h.windup = u.castLock > 0.3 ? { name: def.name, total: u.castLock } : null;
 }
 
 // ------------------------------------------------------------------ passives

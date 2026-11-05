@@ -40,7 +40,10 @@ export type ItemId =
   | 'stormBlade'
   | 'ghostShroud'
   | 'siegeMaul'
-  | 'mireStaff';
+  | 'mireStaff'
+  | 'wayfarerBoots'
+  | 'manaFlask'
+  | 'longScope';
 
 export interface ItemStats {
   damage?: number;
@@ -75,6 +78,10 @@ export interface ItemStats {
   chainChance?: number;
   /** Your attacks deal this % more to buildings. */
   buildingDamagePct?: number;
+  /** Extra attack range in meters, ranged heroes only. */
+  attackRange?: number;
+  /** Always carries one teleport scroll, with a shorter cooldown and more destinations (Wayfarer Boots). */
+  teleportBoots?: boolean;
 }
 
 /** Aura carried by an item: nearby allied heroes (and the holder) get these bonuses. */
@@ -110,6 +117,38 @@ export interface ItemDef {
 }
 
 export const ITEMS: Record<ItemId, ItemDef> = {
+  manaFlask: {
+    id: 'manaFlask',
+    name: 'Clearwater Flask',
+    short: 'Flask',
+    cost: 90,
+    icon: '#60a5fa',
+    stats: {},
+    consumable: { maxStack: 3 },
+    summary: 'Use: restores 150 mana over 8 seconds. Stacks up to 3.',
+  },
+  longScope: {
+    id: 'longScope',
+    name: 'Long Scope',
+    short: 'Scope',
+    cost: 400,
+    icon: '#fcd34d',
+    stats: { attackRange: 1.5, attackSpeedPct: 8 },
+    tab: 'attack',
+    summary: 'Ranged heroes only: +1.5 m attack range. Everyone: +8% attack speed.',
+  },
+  wayfarerBoots: {
+    id: 'wayfarerBoots',
+    name: 'Wayfarer Boots',
+    short: 'Wayfarer',
+    cost: 2300,
+    icon: '#7dd3fc',
+    stats: { moveSpeedPct: 30, teleportBoots: true },
+    recipe: ['swiftBoots'],
+    tab: 'upgrade',
+    summary:
+      '+30% move speed. You always have 1 teleport, which is never used up, with a 30 s cooldown (instead of 60 s). You can teleport to allied heroes and creeps too, not only buildings. If you drop or sell them you keep 1 teleport. Upgraded from Swift Boots.',
+  },
   healingSalve: {
     id: 'healingSalve',
     name: 'Herbal Poultice',
@@ -506,6 +545,8 @@ export const TELEPORT = {
   cost: 50,
   channel: 3,
   cooldown: 60,
+  /** Cooldown with Wayfarer Boots. */
+  bootsCooldown: 30,
   /** Units appear this far from the target building, on its base side. */
   offset: 4.5,
 };
@@ -514,18 +555,19 @@ export const TELEPORT = {
 export const SHOP_RADIUS = 22;
 
 export const SALVE = { heal: 350, duration: 8 };
+export const MANA_FLASK = { mana: 150, duration: 8 };
 
 /** Default build orders (also the "recommended" list in the shop). */
 export const BUILDS: Record<'brakk' | 'vexa' | 'orin' | 'syl' | 'grom' | 'kaela' | 'morra' | 'seren' | 'rhen', ItemId[]> = {
-  morra: ['healingSalve', 'swiftBoots', 'manaCrystal', 'arcaneBoots', 'vitalStone', 'mendersCenser', 'focusLens', 'bannerOfValor', 'crownOfAscension', 'soulChalice'],
+  morra: ['healingSalve', 'manaFlask', 'swiftBoots', 'manaCrystal', 'arcaneBoots', 'vitalStone', 'mendersCenser', 'focusLens', 'bannerOfValor', 'crownOfAscension', 'soulChalice'],
   seren: ['healingSalve', 'swiftBoots', 'vitalStone', 'manaCrystal', 'arcaneBoots', 'mendersCenser', 'guardPlate', 'bannerOfValor', 'hushBell', 'crownOfAscension'],
-  rhen: ['healingSalve', 'swiftBoots', 'ironBlade', 'quickGloves', 'fleetBoots', 'twinBlades', 'keenEdge', 'stormBlade', 'reaperEdge', 'crownOfAscension'],
+  rhen: ['healingSalve', 'longScope', 'swiftBoots', 'ironBlade', 'quickGloves', 'fleetBoots', 'twinBlades', 'keenEdge', 'stormBlade', 'reaperEdge', 'crownOfAscension'],
   brakk: ['healingSalve', 'swiftBoots', 'vitalStone', 'guardPlate', 'platedBoots', 'ironBlade', 'quickGloves', 'cleavingAxe', 'shadowStep', 'brambleMail', 'crownOfAscension', 'stoneskinAmulet'],
-  vexa: ['healingSalve', 'swiftBoots', 'ironBlade', 'keenEdge', 'fleetBoots', 'quickGloves', 'twinBlades', 'stormBlade', 'ironBlade', 'reaperEdge', 'crownOfAscension', 'lifedrinker'],
-  orin: ['healingSalve', 'swiftBoots', 'manaCrystal', 'arcaneBoots', 'vitalStone', 'manaCrystal', 'soulChalice', 'hushBell', 'arcaneAmplifier', 'crownOfAscension', 'focusLens'],
+  vexa: ['healingSalve', 'longScope', 'swiftBoots', 'ironBlade', 'keenEdge', 'fleetBoots', 'quickGloves', 'twinBlades', 'stormBlade', 'ironBlade', 'reaperEdge', 'crownOfAscension', 'lifedrinker'],
+  orin: ['healingSalve', 'manaFlask', 'swiftBoots', 'manaCrystal', 'arcaneBoots', 'vitalStone', 'manaCrystal', 'soulChalice', 'hushBell', 'arcaneAmplifier', 'crownOfAscension', 'focusLens'],
   syl: ['healingSalve', 'swiftBoots', 'ironBlade', 'keenEdge', 'shadowStep', 'fleetBoots', 'ghostShroud', 'sunderPike', 'ironBlade', 'reaperEdge', 'lifedrinker', 'crownOfAscension'],
   grom: ['healingSalve', 'swiftBoots', 'vitalStone', 'guardPlate', 'platedBoots', 'guardPlate', 'vitalStone', 'bannerOfValor', 'brambleMail', 'frostHorn', 'crownOfAscension', 'titanHeart'],
-  kaela: ['healingSalve', 'swiftBoots', 'manaCrystal', 'arcaneBoots', 'guardPlate', 'vitalStone', 'bannerOfValor', 'mendersCenser', 'mireStaff', 'focusLens', 'frostHorn', 'crownOfAscension'],
+  kaela: ['healingSalve', 'manaFlask', 'swiftBoots', 'manaCrystal', 'arcaneBoots', 'guardPlate', 'vitalStone', 'bannerOfValor', 'mendersCenser', 'mireStaff', 'focusLens', 'frostHorn', 'crownOfAscension'],
 };
 
 /** Blink can't be used this long after taking damage from an enemy hero. */

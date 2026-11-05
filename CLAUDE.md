@@ -81,9 +81,10 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
   (melee: tougher; ranged). A fallen barracks powers up only that creep type of the attackers.
   Shrine towers 11 m from the Shrine. Glyph = invulnerable buildings + 2× tower attack speed.
   Fountain shoots heroes anywhere in its healing area.
-- Controls: joystick moves; holding Attack while steering attacks **on the move**; holding Attack while standing still
-  only aims (attack starts on release); a chosen target is attacked until it dies or you move (auto attack off too);
-  tapping the ground does **not** walk (only while holding the minimap, or with a mouse); tap an enemy to attack it.
+- Controls: joystick moves; tapping the ground does **not** walk (only while holding the minimap, or with a mouse); tap an enemy to attack it.
+- Attack (owner's spec, 2026-11-05). Auto attack ON: nearest target in range by itself, also while walking, sticks to it while it stays in range (walking past creeps doesn't switch); an enemy picked with the Attack arrow comes first until it dies or leaves range; never denies, doesn't wake jungle camps. Auto attack OFF: one attack per tap (nearest) or per release of a hold (aimed target); tapping faster than attack speed does nothing extra; holding never attacks until release. Denies are one attack per tap/release in both modes.
+- Teleport: hero is frozen while channelling, only the X on the TP slot (or a stun) stops it, no walking cancels it; the destination is fixed when it starts, so a tower falling mid-channel doesn't matter. Channel bar over the health bar shows anything charging. Wayfarer Boots: always 1 TP, never used up, 30 s cooldown, allied heroes and creeps as targets too, can't buy scrolls; drop them and you keep 1.
+- Mega Creeps when all 6 enemy barracks are down. Camera: default is the farthest, can only zoom in.
 - Every hero starts the match with 1 TP scroll.
 - Shop: tabs + grid + detail panel with BUY/SELL; taps only select (no accidental buys when scrolling);
   sell = full refund within 10 s, then half; dead heroes can shop; **no quick-buy**.

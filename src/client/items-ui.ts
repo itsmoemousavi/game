@@ -124,6 +124,11 @@ export class ItemsUi {
       const c = this.ctx();
       if (!c) return;
       const h = c.me.hero!;
+      // Teleporting: this slot shows an X, and tapping it stops the teleport.
+      if (h.channel) {
+        this.send({ type: 'cancelChannel', unitId: c.me.id });
+        return;
+      }
       // With no scrolls left this opens the shop with the scroll picked, one tap from buying.
       if (h.tpCount > 0) this.openPicker();
       else this.select({ kind: 'tp' });
@@ -359,7 +364,7 @@ export class ItemsUi {
     if (sel.kind === 'tp') {
       box.innerHTML = `
         <div class="d-top"><i>${itemIcon('tp')}</i><div><b>Teleport Scroll</b><span class="d-cost">${TELEPORT.cost} gold</span></div></div>
-        <p class="d-sum">Channel, then teleport to any allied building. Keep one with you to get back to a fight.</p>
+        <p class="d-sum">Stand still for 3 s, then teleport to any allied building. You can't move while it charges, and tapping the X stops it.</p>
         <div class="d-acts"><button id="shop-act"></button></div>
         <small id="shop-why"></small>`;
       onTap(box.querySelector('#shop-act')!, () => {
@@ -475,7 +480,7 @@ export class ItemsUi {
       btn.disabled = b !== null;
       const have = `You have ${h.tpCount}`;
       why.textContent =
-        b === 'gold' ? `Need ${Math.ceil(TELEPORT.cost - h.gold)} more gold · ${have}` : b === 'courierFull' ? "Your courier's 3 slots are full" : atShop ? have : `${have} · goes on your courier`;
+        b === 'boots' ? 'Your Wayfarer Boots already give you a teleport' : b === 'gold' ? `Need ${Math.ceil(TELEPORT.cost - h.gold)} more gold · ${have}` : b === 'courierFull' ? "Your courier's 3 slots are full" : atShop ? have : `${have} · goes on your courier`;
       return;
     }
     if (this.sel.kind === 'courier') {
@@ -582,7 +587,7 @@ export class ItemsUi {
       this.tpSlot.querySelector('.cd')!.textContent = cd > 0 ? String(cd) : '';
       this.tpSlot.classList.toggle('none', h.tpCount === 0);
       this.tpSlot.classList.toggle('channel', !!h.channel);
-      this.tpSlot.title = `Teleport (${TELEPORT.cost} gold each). Tap to choose an allied building.`;
+      this.tpSlot.title = h.channel ? 'Tap to stop teleporting' : `Teleport (${TELEPORT.cost} gold each). Tap to choose where to go.`;
     }
     if (this.shopOpen) {
       const own = this.sel?.kind === 'own' ? h.items[this.sel.slot] : null;
@@ -697,16 +702,18 @@ export class ItemsUi {
       g.fill();
       g.stroke();
     }
-    for (const s of teleportTargets(c.w, c.team)) {
+    for (const s of teleportTargets(c.w, c.team, c.me.hero!.bonus.teleportBoots)) {
+      if (s === c.me) continue;
+      const big = s.structure ? 1 : s.hero ? 0.8 : 0.45;
       g.fillStyle = 'rgba(140,200,255,0.35)';
       g.beginPath();
-      g.arc(s.x * k, s.y * k, S * 0.04, 0, Math.PI * 2);
+      g.arc(s.x * k, s.y * k, S * 0.04 * big, 0, Math.PI * 2);
       g.fill();
       g.fillStyle = TEAM_COLORS[s.team];
       g.strokeStyle = '#fff';
       g.lineWidth = S * 0.004;
       g.beginPath();
-      g.arc(s.x * k, s.y * k, S * 0.018, 0, Math.PI * 2);
+      g.arc(s.x * k, s.y * k, S * 0.018 * big, 0, Math.PI * 2);
       g.fill();
       g.stroke();
     }
@@ -719,7 +726,8 @@ export class ItemsUi {
     const r = localRect(this.pickerCanvas);
     const wx = ((p.x - r.x) / r.w) * c.w.map.size;
     const wy = ((p.y - r.y) / r.h) * c.w.map.size;
-    const best = teleportTargets(c.w, c.team)
+    const best = teleportTargets(c.w, c.team, c.me.hero!.bonus.teleportBoots)
+      .filter((s) => s !== c.me)
       .map((s) => ({ s, d: Math.hypot(s.x - wx, s.y - wy) }))
       .sort((a, b) => a.d - b.d)[0];
     if (best && best.d < 14) {

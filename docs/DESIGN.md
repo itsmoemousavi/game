@@ -195,6 +195,10 @@ Buying a combined item uses up the parts you own, and you pay the difference; th
 | Hush Bell (1750) | Mana Crystal + Guard Plate + 800 | +200 mana, +3 armor. **Use:** enemy heroes within 7 m can't cast abilities for 3 s (items still work; spell immunity protects). 30 s cooldown |
 | Mire Staff (1300) | Mana Crystal + 850 | +200 mana, +1.5 mana regen. **Use:** tap the item, then an enemy within 9 m: 50 damage and 60% slower for 3.5 s. A tap that finds nobody doesn't use it. 18 s cooldown |
 
+| Wayfarer Boots (2300) | Swift Boots + 1850 | +30% move speed. Always 1 teleport that's never used up, 30 s cooldown, allied heroes and creeps as destinations too; can't buy scrolls while you have them. Drop or sell them and you keep 1 teleport |
+| Long Scope (400) | bought directly | +1.5 m attack range (ranged heroes only), +8% attack speed |
+| Clearwater Flask (90) | consumable | restores 150 mana over 8 s, stacks to 3 |
+
 Special effects of the same kind don't stack: the best item counts.
 
 Item slots show their cooldown. Bots use Warded Cloak when hurt in a fight and Shadow Step to jump onto heroes.

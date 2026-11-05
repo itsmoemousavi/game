@@ -39,7 +39,8 @@ export type StatusId =
   | 'hawkMark'
   | 'boltStorm'
   | 'feralBond'
-  | 'redWolf';
+  | 'redWolf'
+  | 'manaFlask';
 
 export interface Status {
   id: StatusId;
@@ -83,6 +84,7 @@ export const STATUS_INFO: Record<StatusId, { name: string; good: boolean }> = {
   boltStorm: { name: 'Bolt Storm: firing at nearby enemies', good: true },
   feralBond: { name: 'Feral Bond: faster', good: true },
   redWolf: { name: 'Red Wolf: melee, faster and stronger', good: true },
+  manaFlask: { name: 'Clearwater Flask', good: true },
 };
 
 const BUFF_STATUS: Record<string, StatusId> = {
@@ -105,6 +107,7 @@ const BUFF_STATUS: Record<string, StatusId> = {
   boltStorm: 'boltStorm',
   feralBond: 'feralBond',
   redWolf: 'redWolf',
+  manaFlask: 'manaFlask',
 };
 
 export function statusEffects(w: World, u: Unit): Status[] {
