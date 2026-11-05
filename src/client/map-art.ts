@@ -350,6 +350,20 @@ export function bakeMap(map: GameMap): HTMLCanvasElement {
     }
   }
 
+  // 7b. Buildings stand in worn earth and their own soft shade, so they sit in the ground.
+  {
+    const earth = softStamp(46, 38, 26);
+    const shade = softStamp(10, 10, 8);
+    for (const b of map.structures) {
+      const r = (b.tier === 'shrine' ? 8.5 : b.tier === 'barracks' ? 6 : b.tier === 'fountain' ? 5.5 : 4.2) * px;
+      g.globalAlpha = 0.55;
+      g.drawImage(earth, b.pos.x * px - r * 1.25, b.pos.y * px - r * 1.25, r * 2.5, r * 2.5);
+      g.globalAlpha = 0.6;
+      g.drawImage(shade, b.pos.x * px - r, b.pos.y * px - r, r * 2, r * 2);
+    }
+    g.globalAlpha = 1;
+  }
+
   // 8. The Warden's house: flagstone floor and stone wall ring with a doorway.
   {
     const h = map.house;

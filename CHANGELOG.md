@@ -25,6 +25,13 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.11.x · New map art
 
+### 0.11.1
+*2026-11-05*
+- **Everything matches now:** heroes, creeps, monsters and buildings share the map's painted look, with soft shading, muted colours and grime near the ground.
+- **Buildings rebuilt:** towers, barracks, the Shrine and fountains are real stonework in the same stone as the map's walls, and they stand in worn earth instead of sitting on top of the ground.
+- **Crystals** look like solid gems in the team's colour.
+- Your hero's picture has a dark backdrop instead of a bright disc.
+
 ### 0.11.0
 *2026-11-05*
 - **New map art:** painted grass and earth, roads with worn edges, new trees and undergrowth, weathered river stones and real stone walls at the Warden's house and the fountain yards.

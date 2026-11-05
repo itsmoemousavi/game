@@ -129,9 +129,9 @@ function pineGeo(seed: number, tiers: number): THREE.BufferGeometry {
 /** Broadleaf: overlapping rounded clumps, shadowed below and warm where the sun lands on top. */
 function oakGeo(seed: number): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [trunkPart(2.5, 0.3, 0.17, 0x47341f)];
-  const low = rgb(0x10190d);
-  const mid = rgb(0x273a1a);
-  const high = rgb(0x52642c);
+  const low = rgb(0x0e160c);
+  const mid = rgb(0x213219);
+  const high = rgb(0x435428);
   const count = 8;
   for (let i = 0; i < count; i++) {
     const a = (i / (count - 1)) * 6.28 + rnd(seed, i) * 1.1;
@@ -286,14 +286,14 @@ function wallGeo(height: number, seed: number): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
   const stone = (x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, k: number, moss: number) => {
     const box = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0).translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
-    const tone = 0.7 + rnd(seed, k, 4) * 0.55;
+    const tone = 0.78 + rnd(seed, k, 4) * 0.4;
     const warm = (rnd(seed, k, 5) - 0.5) * 0.02;
     const isMoss = rnd(seed, k, 6) < moss;
-    const m = rgb(0x26331a);
+    const m = rgb(0x1e2a15);
     parts.push(
       paint(box, (_x, y, _z, c) => {
         const shade = lerp(0.5, 1, smooth(0, height, y));
-        c.setRGB((0.135 + warm) * tone * shade, 0.127 * tone * shade, (0.112 - warm) * tone * shade);
+        c.setRGB((0.092 + warm) * tone * shade, 0.086 * tone * shade, (0.074 - warm) * tone * shade);
         if (isMoss && y > y0 + (y1 - y0) * 0.4) c.lerp(m, 0.55);
       }),
     );

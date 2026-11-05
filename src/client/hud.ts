@@ -80,7 +80,8 @@ export class Hud {
     const face = this.el.portrait.querySelector<HTMLElement>('.face')!;
     const pic = heroPortraits[me.hero!.defId];
     face.innerHTML = pic ? `<img alt="" src="${pic}">` : def.name[0];
-    this.el.portrait.style.background = def.color;
+    this.el.portrait.style.background = `radial-gradient(circle at 50% 38%, color-mix(in srgb, ${def.color} 48%, #14171a) 0%, #14171a 82%)`;
+    this.el.portrait.style.borderColor = `color-mix(in srgb, ${def.color} 62%, #c9c2ad)`;
     def.abilities.forEach((a, i) => {
       const b = this.buttons[i];
       b.querySelector('.pic')!.innerHTML = abilityIcon(a.id);
