@@ -11,10 +11,12 @@ import {
   WARD_CAST_RANGE,
   WARD_DURATION,
   buybackCost,
+  WARDEN_MOVE_SECONDS,
 } from './constants';
 import { BOSS, WARDS } from './data/units';
 import { inHouse, isWalkable } from './map';
 import { dist } from './math';
+import { isNight } from './vision';
 import type { Unit, World } from './world';
 
 /**
@@ -60,6 +62,8 @@ export function updateObjectives(w: World) {
       }
     }
   }
+
+  updateWardenMove(w);
 
   // Boss respawn.
   if (w.bossRespawnAt !== null && w.time >= w.bossRespawnAt) {
@@ -121,9 +125,59 @@ function pickRune(w: World, h: Unit, r: Rune) {
 }
 
 export function spawnBoss(w: World) {
-  const p = w.map.bossPit;
-  const u = w.spawnUnit('neutral', 2, p, BOSS);
+  w.wardenHouse = w.rng.next() < 0.5 ? 0 : 1;
+  const p = w.map.houses[w.wardenHouse];
+  const u = w.spawnUnit('neutral', 2, { x: p.x, y: p.y }, BOSS);
   u.neutral = { camp: -1, homeX: p.x, homeY: p.y, boss: true, aggroUntil: -1e9 };
+}
+
+/** Put the Warden in a house at once, calm again. */
+export function moveWardenTo(w: World, u: Unit, house: number) {
+  const p = w.map.houses[house];
+  const n = u.neutral!;
+  w.wardenHouse = house;
+  u.x = u.px = p.x;
+  u.y = u.py = p.y;
+  u.path = null;
+  u.targetId = null;
+  n.homeX = p.x;
+  n.homeY = p.y;
+  n.aggroUntil = -1e9;
+  n.moveAt = null;
+  n.slamLand = null;
+}
+
+/**
+ * As day turns to night the Warden teleports to its other house. A stun during those few seconds
+ * stops it and it stays where it is until the next nightfall; otherwise the fight has to follow it.
+ */
+function updateWardenMove(w: World) {
+  const night = isNight(w.time);
+  const dusk = night && !w.wasNight;
+  w.wasNight = night;
+  const u = w.units.find((e) => e.alive && e.neutral?.boss);
+  if (!u) return;
+  const n = u.neutral!;
+  const watched = (): [boolean, boolean] => [0, 1].map((t) => w.units.some((e) => e.alive && e.team === t && e.kind === 'hero' && dist(e.x, e.y, u.x, u.y) < 25)) as [boolean, boolean];
+  const event = (phase: 'start' | 'stopped' | 'arrive', fromX: number, fromY: number, seen: [boolean, boolean]) =>
+    w.events.push({ type: 'wardenMove', unitId: u.id, phase, x: u.x, y: u.y, fromX, fromY, watched: seen });
+  if (dusk && n.moveAt == null) {
+    n.moveAt = w.time + WARDEN_MOVE_SECONDS;
+    n.slamLand = null;
+    u.targetId = null;
+    event('start', u.x, u.y, watched());
+  }
+  if (n.moveAt == null) return;
+  if (u.stunTimer > 0) {
+    n.moveAt = null;
+    event('stopped', u.x, u.y, watched());
+  } else if (w.time >= n.moveAt) {
+    const fromX = u.x;
+    const fromY = u.y;
+    const seen = watched();
+    moveWardenTo(w, u, w.wardenHouse === 0 ? 1 : 0);
+    event('arrive', fromX, fromY, seen);
+  }
 }
 
 // ------------------------------------------------------------------ wards

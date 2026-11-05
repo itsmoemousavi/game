@@ -80,6 +80,8 @@ export const WARD_CAST_RANGE = 7;
 export const TRUE_SIGHT_RADIUS = 10;
 /** A fresh sentry also gives a little normal vision, only this long; after that it shows nothing by itself. */
 export const SENTRY_VISION_SECONDS = 5;
+/** How long the Warden gathers itself before teleporting to its other house (a stun stops it). */
+export const WARDEN_MOVE_SECONDS = 4;
 /** A Watcher totem on a mountain sees much farther: [day, night] metres. */
 export const OBSERVER_MOUNTAIN_VISION: [number, number] = [34, 26];
 

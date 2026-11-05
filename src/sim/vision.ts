@@ -6,7 +6,8 @@ import type { Unit, World } from './world';
  * Fog of war. Each team has a coarse grid (same cells as the walk grid) of what it
  * can currently see. Vision comes from the team's living heroes, creeps, wards, barracks, Shrine
  * and fountain, and shrinks at night. Towers light up nothing: the ground around them stays in
- * fog, but any enemy who steps into a tower's attack zone is seen by that tower's whole team. Enemy units outside it are hidden from players and bots.
+ * fog, but any enemy (invisible or a ward too) in a tower's attack zone, with no trees in between,
+ * is seen by that tower's whole team. Enemy units outside it are hidden from players and bots.
  *
  * Trees (wall cells) block line of sight: a cell is visible only if the straight line
  * from the viewer to it crosses no tree. The first trees along a line are lit, so you
@@ -55,24 +56,21 @@ export class Vision {
     private cell: number,
     private walkable: Uint8Array,
     private height: Uint8Array,
-    house?: House,
+    houses: House[] = [],
   ) {
     this.grids = [new Uint8Array(grid * grid), new Uint8Array(grid * grid)];
     this.trueSight = [new Uint8Array(grid * grid), new Uint8Array(grid * grid)];
     this.towerZones = [new Uint8Array(grid * grid), new Uint8Array(grid * grid)];
-    const inside: number[] = [];
-    if (house) {
-      this.house = house;
+    this.houses = houses.map((h) => {
+      const cells: number[] = [];
       for (let cy = 0; cy < grid; cy++)
-        for (let cx = 0; cx < grid; cx++)
-          if (Math.hypot((cx + 0.5) * cell - house.x, (cy + 0.5) * cell - house.y) < house.inner + cell * 0.5) inside.push(cy * grid + cx);
-    }
-    this.houseCells = Int32Array.from(inside);
+        for (let cx = 0; cx < grid; cx++) if (Math.hypot((cx + 0.5) * cell - h.x, (cy + 0.5) * cell - h.y) < h.inner + cell * 0.5) cells.push(cy * grid + cx);
+      return { h, cells: Int32Array.from(cells) };
+    });
   }
 
-  private house: House | null = null;
-  /** Cells of the house floor (hidden unless your team is inside). */
-  private houseCells: Int32Array;
+  /** Each house and its floor cells (hidden unless your team is inside that house). */
+  private houses: { h: House; cells: Int32Array }[];
 
   /** Goes up every time the grids are recomputed (lets the 3D view skip rebuilding its fog texture). */
   version = 0;
@@ -86,18 +84,19 @@ export class Vision {
       g.fill(0);
       ts.fill(0);
       this.towerZones[team].fill(0);
-      const hs = this.house;
-      let inside = false;
+      const inside = this.houses.map(() => false);
       for (const u of w.units) {
         if (!u.alive || u.team !== team) continue;
         // Inside the house you only see the house: its walls block sight both ways.
-        if (hs && Math.hypot(u.x - hs.x, u.y - hs.y) < hs.inner) {
-          inside = true;
+        const home = this.houses.findIndex(({ h }) => Math.hypot(u.x - h.x, u.y - h.y) < h.inner);
+        if (home >= 0) {
+          inside[home] = true;
           continue;
         }
         const blindSentry = u.ward?.kind === 'sentry' && w.time - u.ward.placedAt > SENTRY_VISION_SECONDS;
         if (isTower(u)) {
-          this.disc(this.towerZones[team], u.x, u.y, towerZoneRadius(u));
+          // Same sight lines as everyone: trees between the tower and you hide you from it.
+          this.reveal(this.towerZones[team], u.x, u.y, towerZoneRadius(u));
           continue;
         }
         let r = blindSentry ? 0 : night ? u.visionNight : u.visionDay;
@@ -106,7 +105,9 @@ export class Vision {
         const sight = trueSightRadius(u);
         if (sight > 0) this.disc(ts, u.x, u.y, sight);
       }
-      if (hs) for (const c of this.houseCells) g[c] = inside ? 1 : 0;
+      this.houses.forEach(({ cells }, i) => {
+        for (const c of cells) g[c] = inside[i] ? 1 : 0;
+      });
     }
   }
 
@@ -215,7 +216,7 @@ export class Vision {
   /** Own units and buildings are always known; others only inside vision (and true sight if invisible). */
   sees(team: Team, u: Unit): boolean {
     if (u.team === team || u.kind === 'structure') return true;
-    if (u.kind !== 'ward' && u.kind !== 'neutral' && this.inTowerZone(team, u.x, u.y)) return true;
+    if (u.kind !== 'neutral' && this.inTowerZone(team, u.x, u.y)) return true;
     if (!this.seesPoint(team, u.x, u.y)) return false;
     if (isInvisible(u)) {
       const cx = Math.floor(u.x / this.cell);

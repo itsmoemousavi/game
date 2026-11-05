@@ -6,6 +6,7 @@
     <meta name="theme-color" content="#0d150f" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Ovra</title>
     <meta name="apple-mobile-web-app-title" content="Ovra" />
     <link rel="icon" type="image/png" sizes="32x32" href="./ovra-favicon-32.png" />
@@ -15,7 +16,7 @@
     <style>
       /* Here and not in the stylesheet, so it shows from the very first moment. */
       html, body { background: #0d0f0e; }
-      #loading { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; color: #e7e2d3; font-family: Georgia, 'Times New Roman', serif; background: radial-gradient(ellipse at 50% 42%, #2a2118 0%, #12110e 55%, #090a09 100%); transition: opacity 0.35s; }
+      #loading { position: absolute; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; color: #e7e2d3; font-family: Georgia, 'Times New Roman', serif; background: radial-gradient(ellipse at 50% 42%, #2a2118 0%, #12110e 55%, #090a09 100%); transition: opacity 0.35s; }
       #loading.done { opacity: 0; pointer-events: none; }
       #loading .l-logo { font-size: 64px; font-weight: 700; letter-spacing: 0.28em; padding-left: 0.28em; color: #e9d7a8; text-shadow: 0 0 34px rgba(255,150,70,0.5), 0 2px 0 #3a2a14; }
       #loading .l-bar { width: min(320px, 56vw); height: 5px; border-radius: 3px; background: rgba(255,255,255,0.09); overflow: hidden; box-shadow: 0 0 0 1px rgba(214,177,99,0.3); }
@@ -24,12 +25,21 @@
     </style>
   </head>
   <body>
+    <div id="root">
+    <script>
+      // Turn the screen sideways before anything is drawn, so loading is already landscape.
+      (function () {
+        var r = document.getElementById('root'), w = innerWidth, h = innerHeight, up = h > w;
+        r.style.width = (up ? h : w) + 'px';
+        r.style.height = (up ? w : h) + 'px';
+        if (up) r.style.transform = 'rotate(90deg) translateY(-100%)';
+      })();
+    </script>
     <div id="loading">
       <div class="l-logo">OVRA</div>
       <div class="l-bar"><div id="l-fill"></div></div>
       <div id="l-text">Waking the Shrines</div>
     </div>
-    <div id="root">
     <section id="select">
       <div id="menu-art"></div>
       <div id="menu-embers"></div>
@@ -60,8 +70,7 @@
 
       <div id="topbar" title="Scoreboard">
         <span class="team t0" id="score-0">0</span>
-        <span id="clock">0:00</span>
-        <span id="daynight" title="Day">☀</span>
+        <span id="clock-disc"><span id="daynight" title="Day">☀</span><i></i><span id="clock">0:00</span></span>
         <span class="team t1" id="score-1">0</span>
       </div>
 

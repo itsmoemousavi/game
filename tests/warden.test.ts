@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { CHARM_DURATION, HERO_IDS, LANE_IDS, PlayerSlot, TICK_RATE, Team, Unit, WARDEN_GOLD, WARDEN_LEASH, World, inHouse, isWalkable } from '../src/sim';
+import { DAY_SECONDS, WARDEN_MOVE_SECONDS, CHARM_DURATION, HERO_IDS, LANE_IDS, PlayerSlot, TICK_RATE, Team, Unit, WARDEN_GOLD, WARDEN_LEASH, World, inHouse, isWalkable } from '../src/sim';
+import { moveWardenTo } from '../src/sim/objectives';
 
 function humans() {
   const slots: PlayerSlot[] = [];
   for (const team of [0, 1] as Team[]) HERO_IDS.slice(0, 3).forEach((heroId, i) => slots.push({ team, heroId, controller: 'human', lane: LANE_IDS[i] }));
   const w = new World({ seed: 11, slots });
+  moveWardenTo(w, w.units.find((u) => u.neutral?.boss)!, 0);
   const hero = (team: Team, id: string) => w.heroes.find((h) => h.team === team && h.hero!.defId === id)!;
   const boss = () => w.units.find((u) => u.neutral?.boss && u.alive)!;
-  return { w, hero, boss };
+  return { w, hero, boss, slots };
 }
 const place = (u: Unit, x: number, y: number) => {
   u.x = u.px = x;
@@ -174,5 +176,51 @@ describe("the Warden's reward", () => {
     expect(b.hero!.items.some((s) => s?.id === 'wardenCharm')).toBe(true);
     run(w, 3);
     expect(b.hero!.items.some((s) => s?.id === 'wardenCharm')).toBe(false);
+  });
+});
+
+describe('two houses', () => {
+  const boss = (w: World) => w.units.find((u) => u.alive && u.neutral?.boss)!;
+  const dusk = (w: World) => {
+    w.time = DAY_SECONDS - 0.05;
+    w.wasNight = false;
+  };
+
+  it('there is a house on each side and the Warden starts in either one', () => {
+    const { w } = humans();
+    const [a, b] = w.map.houses;
+    expect(a.x + b.x).toBe(w.map.size);
+    expect(a.y + b.y).toBe(w.map.size);
+    expect(inHouse(w.map, a.x, a.y)).toBe(true);
+    expect(inHouse(w.map, b.x, b.y)).toBe(true);
+    const seen = new Set<number>();
+    for (let seed = 1; seed < 20; seed++) seen.add(new World({ seed, slots: humans().slots }).wardenHouse);
+    expect(seen.size).toBe(2);
+  });
+
+  it('as night falls it teleports to the other house, keeping its wounds', () => {
+    const { w } = humans();
+    const u = boss(w);
+    u.hp -= 500;
+    const hp = u.hp;
+    const [, other] = w.map.houses;
+    dusk(w);
+    run(w, WARDEN_MOVE_SECONDS + 0.5);
+    expect(w.wardenHouse).toBe(1);
+    expect(Math.hypot(u.x - other.x, u.y - other.y)).toBeLessThan(1);
+    expect(u.hp).toBeGreaterThan(hp - 1);
+  });
+
+  it('a stun stops the teleport and it stays until the next nightfall', () => {
+    const { w } = humans();
+    const u = boss(w);
+    dusk(w);
+    run(w, 1);
+    expect(u.neutral!.moveAt).not.toBeNull();
+    w.stun(u, 1);
+    run(w, WARDEN_MOVE_SECONDS + 2);
+    expect(u.neutral!.moveAt).toBeNull();
+    expect(w.wardenHouse).toBe(0);
+    expect(Math.hypot(u.x - w.map.houses[0].x, u.y - w.map.houses[0].y)).toBeLessThan(6);
   });
 });

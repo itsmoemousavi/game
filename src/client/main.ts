@@ -488,6 +488,14 @@ function announce(w: World, events: GameEvent[]) {
   for (const e of events) {
     if (e.type === 'megaCreeps') announceMega(e.team);
     if (e.type === 'goldLost') continue;
+    if (e.type === 'wardenMove') {
+      if (e.watched[myTeam]) {
+        if (e.phase === 'start') hud.toast('Night falls: the Warden is teleporting! Stun it to keep it here', '#c79bff');
+        if (e.phase === 'stopped') hud.toast('The Warden was stopped and stays here', '#e9d5ff');
+        if (e.phase === 'arrive') hud.toast('The Warden moved to its other house', '#c79bff');
+      }
+      continue;
+    }
     if (e.type === 'ping') {
       if (e.ping.team !== myTeam) continue;
       const st = PING_STYLE[e.ping.kind];

@@ -3,7 +3,7 @@
   "short_name": "Ovra",
   "description": "3v3 lane-strategy game for phones",
   "start_url": "./",
-  "display": "standalone",
+  "display": "fullscreen",
   "orientation": "landscape",
   "background_color": "#07070a",
   "theme_color": "#0d150f",

@@ -133,6 +133,7 @@ const SUNDER_SECONDS = 4;
 const ONCE_GRACE = 0.1;
 /** Morra's wolves: how far they stray from her. Red Wolf: her reach while she's melee. */
 const SUMMON_LEASH = 14;
+const ATTACK_TOWER_REVEAL = 3;
 const SUMMON_BUILDING_MULT = 0.5;
 const WOLF_FORM_RANGE = 1.6;
 /** Rhen's Bolt Storm: one bolt this often, at enemies within this range. */
@@ -310,6 +311,8 @@ export interface NeutralState {
   homeX: number;
   homeY: number;
   boss?: boolean;
+  /** The Warden is teleporting to its other house and arrives at this time. */
+  moveAt?: number | null;
   /** Stays angry until this time (refreshed whenever it is hit). */
   aggroUntil: number;
   /** Warden: when its next ground slam may start. */
@@ -454,6 +457,7 @@ export type GameEvent =
   | { type: 'itemExpire'; unitId: number; itemId: ItemId }
   /** The Warden's ground slam: 'windup' when it raises its arms, 'hit' when it lands. */
   | { type: 'wardenSlam'; unitId: number; phase: 'windup' | 'hit'; x: number; y: number; radius: number }
+  | { type: 'wardenMove'; unitId: number; phase: 'start' | 'stopped' | 'arrive'; x: number; y: number; fromX: number; fromY: number; watched: [boolean, boolean] }
   | { type: 'goldLost'; unitId: number; amount: number }
   | { type: 'ping'; ping: Ping }
   | { type: 'blink'; unitId: number; fromX: number; fromY: number }
@@ -540,6 +544,10 @@ export class World {
   groundItems: GroundItem[] = [];
   nextRune = RUNE_FIRST;
   bossRespawnAt: number | null = null;
+  /** Which house the Warden lives in right now. */
+  wardenHouse = 0;
+  /** Night last tick (the Warden moves as day turns to night). */
+  wasNight = false;
   glyphCooldown: [number, number] = [0, 0];
   private nextWave = FIRST_WAVE_TIME;
   private pending: Command[] = [];
@@ -556,7 +564,7 @@ export class World {
     const seeThrough = new Uint8Array(this.map.walkable);
     this.map.cliff.forEach((c, i) => c && (seeThrough[i] = 1));
     this.map.hillTop.forEach((c, i) => c && (seeThrough[i] = 1));
-    this.vision = new Vision(this.map.grid, this.map.cell, seeThrough, this.map.height, this.map.house);
+    this.vision = new Vision(this.map.grid, this.map.cell, seeThrough, this.map.height, this.map.houses);
     for (const s of this.map.structures) this.spawnStructure(s.team, s.tier, s.lane, s.pos, s.rax);
     this.refreshVulnerability();
     this.rebuildNav();
@@ -1526,6 +1534,7 @@ export class World {
    */
   private updateWarden(u: Unit) {
     const n = u.neutral!;
+    if (n.moveAt != null) return; // gathering itself to teleport: see objectives.ts
     if (n.slamLand != null) {
       if (this.time < n.slamLand) return; // arms raised: stands still
       n.slamLand = null;
@@ -1764,7 +1773,8 @@ export class World {
     u.attackTimer = (u.attackInterval / (1 + hurry / 100)) * (u.structure && u.structure.glyph > 0 ? 0.5 : 1);
     this.events.push({ type: 'attack', sourceId: u.id, targetId: t.id });
     this.breakInvisibility(u);
-    this.reveal(u);
+    // Hitting a building gives you away for longer, wherever you stand and whoever is around.
+    this.reveal(u, t.structure ? ATTACK_TOWER_REVEAL : 1.5);
     let damage = applyAttackPassives(this, u, t);
     const crit = !!u.hero?.lastCrit;
     // High ground: ranged attacks from lower ground onto higher ground miss 25% of the time (melee never does).

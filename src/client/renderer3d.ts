@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { GLYPH_DURATION, GameMap, HEROES, HERO_IDS, Team, Unit, World, courierFlying, isInvisible, isNight, trueSightRadius } from '../sim';
+import { GLYPH_DURATION, WARDEN_MOVE_SECONDS, GameMap, HEROES, HERO_IDS, Team, Unit, World, courierFlying, isInvisible, isNight, trueSightRadius } from '../sim';
 import type { Aim } from './input';
 import { Renderer, TEAM_COLORS, drawTrueSightEye } from './renderer';
 import { JOINTS, Joint, TEAM_HEX, model } from './three/models';
@@ -240,7 +240,7 @@ export class Renderer3D extends Renderer {
     this.art.detailGround(groundMat);
     this.art.softFog(fog.material as THREE.MeshBasicMaterial, n);
     this.buildBridges(map);
-    this.art.buildWall(map.house);
+    for (const h of map.houses) this.art.buildWall(h);
     // Fountain yards: the same stone ring, only where it stands on open ground (forest closes the rest).
     for (const yard of map.fountainYards) {
       this.art.buildWall(yard, (x, y) => {
@@ -691,6 +691,20 @@ export class Renderer3D extends Renderer {
         } else this.spells.onSpellHit(c, src.hero.defId, t.x, t.y);
       } else if (e.type === 'explosion') {
         this.spells.onExplosion(c, w, this.viewTeam, e.x, e.y, e.radius, e.radius < 2 ? exec : -1);
+      } else if (e.type === 'wardenMove') {
+        // The Warden gathering itself, stopped, and vanishing from one house into the other.
+        const seen = (x: number, y: number) => w.vision.seesPoint(this.viewTeam, x, y);
+        if (e.phase === 'arrive') {
+          for (const [x, y] of [[e.fromX, e.fromY], [e.x, e.y]]) {
+            if (!seen(x, y)) continue;
+            this.fx3.flash(x, y, 2.5, 11, 0xc79bff, 0.6);
+            this.fx3.shockwave(x, y, 6, 0xc79bff, 0.6);
+            this.fx3.sparks(x, y, 2, 24, 0xe3cfff, 8);
+          }
+        } else if (seen(e.x, e.y)) {
+          this.fx3.shockwave(e.x, e.y, e.phase === 'start' ? 5 : 3, e.phase === 'start' ? 0xc79bff : 0xffe2a0, 0.5);
+          this.fx3.sparks(e.x, e.y, 2, 12, 0xe3cfff, 5);
+        }
       } else if (e.type === 'wardenSlam') {
         const a = this.anim(e.unitId);
         const u = w.unit(e.unitId);
@@ -1099,6 +1113,8 @@ export class Renderer3D extends Renderer {
         ctx.font = 'bold 11px system-ui, sans-serif';
         ctx.fillStyle = '#e9d5ff';
         ctx.fillText('Warden', p.x, p.y - 4);
+        // Charging up its teleport: anyone watching has these seconds to stun it.
+        if (u.neutral!.moveAt != null) bar(p.x, p.y + 10, 70, 5, 1 - (u.neutral!.moveAt - w.time) / WARDEN_MOVE_SECONDS, '#c79bff');
       } else if (u.creep && focus?.alive && this.oneHitKills(w, focus, u)) {
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 1.5;

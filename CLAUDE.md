@@ -86,7 +86,7 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
 - Spells vs obstacles (owner, 2026-11-05): trees, walls, buildings and mountains block only walking, never spells. Charges/dashes go through and may end anywhere: on a mountain, off one, in or out of a pocket, into the Warden's house. Ending inside something moves you to the nearest open spot.
 - Mountains (owner, 2026-11-05): six, in the woods between forests, never on a lane or trail (`tests/map.test.ts` checks it), open ground all around so anyone can walk to the foot and plant a ward on top. Not walkable at all: up or down only by blink, teleport or charge. Melee can only hit someone up there from up there.
 - Forest: no crowded spots; pockets with no walking way out are on purpose (escape with blink, charge, or a TP brought by courier). Bots are lifted out of pockets and off mountains until they can use them.
-- Tower sight (owner, 2026-11-05): towers give the team NO vision; the ground around them stays fog, and lanes are lit only by heroes, creeps and wards. Sight = attack range: any enemy hero or creep in a tower's attack zone is seen by that tower's whole team and shot, even in fog and even invisible, until they leave the zone. It doesn't reveal wards. Barracks, Shrine and fountain keep normal team vision.
+- Tower sight (owner, 2026-11-05): towers give the team NO vision; the ground around them stays fog, and lanes are lit only by heroes, creeps and wards. Sight = attack range, blocked by trees: any enemy (invisible or a ward too) in a tower's attack zone with no trees in between is seen by that tower's whole team and shot (wards aren't shot), until they leave. Behind trees the tower attacks only if the team has other vision of them. Attacking a building reveals you for 3 s no matter what. Barracks, Shrine and fountain keep normal team vision.
 - True sight: towers, fountain and sentry totems have it and wear a green outlined eye floating on top (never on the ground); the Shrine and barracks do not. A sentry gives vision only for its first 5 s, then only unmasks where the team already sees. Vision is the observer totem's job (24/18 m, 34/26 m on a mountain).
 - Morra's wolves need no control: attack what she attacks (any mode, jungle too), turn on whoever hits her, stay within 14 m, don't dive towers or hit buildings by themselves. Non-human units walk around anything blocking them unless there's truly no way (`goingAround` in world.ts).
 - Match ending: everything freezes (heroes do not walk), the camera glides to the fallen Shrine, it explodes, result banner, then end screen.
@@ -101,7 +101,7 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
   All models are our own (the trial Sketchfab models were removed for good, 2026-11-03).
   Rejected: cute kits (KayKit, Kenney), Grab3D, Mixamo realistic humans. Models must be free for commercial use
   (CC0 / CC BY, no fan art of other games). Owner's Sketchfab API token is in `~/.sketchfab-token` (never commit it).
-- Warden: walled house on the river (bot/mid side), seen and fought only from inside, slam stun, charm anyone can grab.
+- Warden (owner, 2026-11-05): two walled houses on the river, one top and one bottom (`map.houses`), each seen and fought only from inside, slam stun, charm anyone can grab. Starts in a random house. At every dusk it gathers for 4 s (my number) then teleports to the other house, keeping its wounds; a stun in that time stops it until the next dusk (`updateWardenMove` in objectives.ts). After dying it comes back in a random house.
 - Map look (2026-11-03): winding river is low ground (level 0) behind stone curbs (`map.cliff`: block walking, not sight),
   with slopes at lanes (no bridges), around runes, at the Warden's house and where trails meet it; normal speed in water.
   Only mid crosses water: the river ENDS at each side lane's inner edge with a slope (side lanes = solid ground, high
@@ -133,6 +133,8 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
 7. Later: multiplayer (first on owner's MacBook, local only), killable courier + bounty, Capacitor app builds, store release.
 
 ## Gotchas
+
+- iPhone web pages cannot truly hide the status bar: Safari has no fullscreen API on iPhone. Only the Capacitor app can guarantee it. Manifest changes need the home-screen icon re-added.
 
 - Don't `pkill -f <pattern>` where the pattern matches your own shell command (it kills the shell).
 - Headless screenshots: Playwright Chromium with `--use-gl=angle --use-angle=swiftshader` renders WebGL

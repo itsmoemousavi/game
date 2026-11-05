@@ -64,7 +64,10 @@ export interface GameMap {
   /** Where the boss lives (a pit beside the river). */
   bossPit: Vec2;
   /** The Warden's walled house around the boss pit (one doorway facing the map centre). */
+  /** The first Warden's house (tests and fairness checks). */
   house: House;
+  /** Both of the Warden's houses, one on each side of the river's middle. */
+  houses: [House, House];
 }
 
 export interface Tree {
@@ -252,6 +255,7 @@ const HOUSE: House = (() => {
   const d = Math.SQRT1_2;
   return { x: BOSS_PIT.x, y: BOSS_PIT.y, inner: 5, outer: 8, door: { x: -d, y: -d }, doorHalf: 4 };
 })();
+const HOUSES: [House, House] = [HOUSE, { ...HOUSE, x: MAP_SIZE - HOUSE.x, y: MAP_SIZE - HOUSE.y, door: { x: -HOUSE.door.x, y: -HOUSE.door.y } }];
 /** Each fountain's walled yard (same shape as the house: a ring with one doorway toward the centre). */
 const FOUNTAIN_YARDS: [House, House] = (() => {
   const d = Math.SQRT1_2;
@@ -285,6 +289,8 @@ const T2_HARD_LANE_FRACTION = 0.45;
  * past on the outer side, and their reach covers the whole lane.
  */
 const TOWER_SIDE_OFFSET = 3;
+/** The tier-3 tower stands nearly in the middle of the road, in front of its two barracks. */
+const GATE_TOWER_OFFSET = 1;
 /** Tier-3 tower + barracks form a gate this far from where the lane leaves the base. */
 const GATE_DISTANCE = 5 * S;
 
@@ -312,7 +318,7 @@ export function createMap(): GameMap {
     for (let i = 1; i < p.length; i++) carveSeg(p[i - 1], p[i], LANE_WIDTH);
   }
   for (let i = 1; i < RIVER_PATH.length; i++) carveSeg(RIVER_PATH[i - 1], RIVER_PATH[i], RIVER_WIDTH);
-  carveCircle(BOSS_PIT, HOUSE_CLEARING); // the house (walls added below) and, mirrored, an open pit
+  carveCircle(BOSS_PIT, HOUSE_CLEARING); // around both houses (the carving is mirrored; walls added below)
   carveCircle(RUNE_SPOT, 4.5 * S);
   carveCircle(BASE0, BASE_RADIUS);
   for (const room of JUNGLE_ROOMS) carveCircle(room.c, room.r);
@@ -347,8 +353,9 @@ export function createMap(): GameMap {
     for (let cx = 0; cx < GRID; cx++) {
       const x = (cx + 0.5) * CELL;
       const y = (cy + 0.5) * CELL;
-      const d = Math.hypot(x - HOUSE.x, y - HOUSE.y);
-      if (d <= HOUSE_CLEARING) walkable[cy * GRID + cx] = isHouseWallAt(HOUSE, x, y) ? 0 : 1;
+      for (const h of HOUSES) {
+        if (Math.hypot(x - h.x, y - h.y) <= HOUSE_CLEARING) walkable[cy * GRID + cx] = isHouseWallAt(h, x, y) ? 0 : 1;
+      }
     }
   }
 
@@ -392,10 +399,10 @@ export function createMap(): GameMap {
     const t2Pos = { x: t2.at.x + t2.px * TOWER_SIDE_OFFSET, y: t2.at.y + t2.py * TOWER_SIDE_OFFSET };
     // Gate: the tier-3 tower stands out front, the two barracks behind it on either side.
     const front = sideOf(path, GATE_DISTANCE + 4);
-    const t3Pos = { x: front.at.x + front.px * TOWER_SIDE_OFFSET, y: front.at.y + front.py * TOWER_SIDE_OFFSET };
+    const t3Pos = { x: front.at.x + front.px * GATE_TOWER_OFFSET, y: front.at.y + front.py * GATE_TOWER_OFFSET };
     const back = sideOf(path, Math.max(1, GATE_DISTANCE - 3));
-    // Barracks flank the road on both sides (kept at the lane edges so the gate stays wide).
-    const RAX_OFFSET = LANE_WIDTH / 2 + 1;
+    // Barracks flank the road on both sides, close together, with a walkable gap between them.
+    const RAX_OFFSET = LANE_WIDTH / 2 - 1;
     const meleePos = { x: back.at.x + back.px * RAX_OFFSET, y: back.at.y + back.py * RAX_OFFSET };
     const rangedPos = { x: back.at.x - back.px * RAX_OFFSET, y: back.at.y - back.py * RAX_OFFSET };
     structures.push({ team: 0, tier: 'tower1', lane, pos: t1Pos });
@@ -524,7 +531,7 @@ export function createMap(): GameMap {
         if (water && !onSideLane && Math.hypot(x - HOUSE.x, y - HOUSE.y) > HOUSE_CLEARING && Math.hypot(MAP_SIZE - x - HOUSE.x, MAP_SIZE - y - HOUSE.y) > HOUSE_CLEARING) height[i] = 0;
         if (ramp && d > half) continue; // the top of a slope keeps whatever is there
         // The Warden's house sits on the river: its wall stays solid.
-        if (isHouseWallAt(HOUSE, x, y)) continue;
+        if (HOUSES.some((h) => isHouseWallAt(h, x, y))) continue;
         if (d <= half) walkable[i] = 1;
       } else {
         cliff[i] = 1;
@@ -587,6 +594,7 @@ export function createMap(): GameMap {
     runeSpots: [RUNE_SPOT, mirror(RUNE_SPOT)],
     bossPit: BOSS_PIT,
     house: HOUSE,
+    houses: HOUSES,
   };
 }
 
@@ -639,8 +647,7 @@ export function heightAt(map: GameMap, x: number, y: number): number {
 
 /** True for a point inside the Warden's house (on its floor, not in the doorway or the wall). */
 export function inHouse(map: GameMap, x: number, y: number): boolean {
-  const h = map.house;
-  return Math.hypot(x - h.x, y - h.y) < h.inner;
+  return map.houses.some((h) => Math.hypot(x - h.x, y - h.y) < h.inner);
 }
 
 /** True where the house wall stands (the ring between inner and outer, minus the doorway). */

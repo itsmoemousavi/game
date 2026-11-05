@@ -29,6 +29,28 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.15.x · A real start and finish
 
+### 0.15.2
+*2026-11-05*
+
+**The Warden now has two houses:**
+- There is a house at the top and one at the bottom. The Warden starts in one of them at random.
+- When day turns to night it spends 4 seconds gathering itself, then teleports to the other house. A bar over it shows the time left.
+- Stun it during those seconds and it stays where it is until the next nightfall. If nobody does, chase it to the other house and finish the fight there.
+
+**Towers:**
+- Trees now block a tower's sight. If you stand behind trees it won't see or shoot you, unless the enemy has vision of you some other way, like a ward or a hero nearby.
+- Towers also show enemy wards inside their range.
+- Anyone who attacks a building is revealed for 3 seconds, even with nobody around.
+
+**Screen:**
+- The clock and sun or moon now stack in a circle at the top centre, with the team scores on either side.
+- The loading screen is now sideways when the phone is held upright.
+- The health, items and hero panel sits further left.
+- The game asks for full screen where the phone allows it. On iPhone, a web page cannot always hide the top bar.
+
+**Map:**
+- Each lane's two barracks stand closer together, and the tier-3 tower stands closer to the middle of the road.
+
 ### 0.15.1
 *2026-11-05*
 

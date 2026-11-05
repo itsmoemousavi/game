@@ -660,6 +660,8 @@ function wardenMemory(w: World, team: Team): WardenMemory {
 }
 
 const theWarden = (w: World) => w.units.find((u) => u.alive && u.neutral?.boss);
+/** The house the Warden is in now. */
+const wardenSpot = (w: World) => w.map.houses[w.wardenHouse];
 
 /** It respawns 8–11 minutes after dying, unannounced: bots go and check from minute 8. */
 const WARDEN_CHECK_AFTER = 8 * 60;
@@ -675,7 +677,7 @@ function wantWarden(w: World, team: Team, cur: TeamPlan | undefined, ours: numbe
   if (heroes.some((h) => h.hero!.bot.difficulty === 'easy')) return false;
   if (cur?.mode === 'warden') {
     const fit = heroes.filter((h) => h.alive && h.hp > h.maxHp * 0.4).length;
-    const enemiesNear = w.heroes.filter((e) => e.alive && e.team !== team && w.canSee(team, e) && dist(e.x, e.y, w.map.bossPit.x, w.map.bossPit.y) < 25).length;
+    const enemiesNear = w.heroes.filter((e) => e.alive && e.team !== team && w.canSee(team, e) && dist(e.x, e.y, wardenSpot(w).x, wardenSpot(w).y) < 25).length;
     return fit >= 2 && enemiesNear <= fit && w.time < (cur.since ?? 0) + 90;
   }
   const hard = heroes.some((h) => h.hero!.bot.difficulty === 'hard');
@@ -686,7 +688,7 @@ function wantWarden(w: World, team: Team, cur: TeamPlan | undefined, ours: numbe
 
 /** Walk into the house and hit the Warden (enemy heroes in reach come first). */
 function fightWarden(w: World, me: Unit, hpRatio: number): boolean {
-  const pit = w.map.bossPit;
+  const pit = wardenSpot(w);
   const boss = theWarden(w);
   const inside = inHouse(w.map, me.x, me.y);
   if (inside && !boss) {

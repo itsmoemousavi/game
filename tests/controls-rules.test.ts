@@ -456,6 +456,8 @@ describe('spells go through trees, walls and buildings', () => {
   });
 });
 
+type HeroChannel = NonNullable<Unit['hero']>['channel'];
+
 describe('true sight', () => {
   const veil = (u: Unit) => u.buffs.push({ key: 'veil', t: 60, invisible: true } as Unit['buffs'][number]);
 
@@ -463,7 +465,8 @@ describe('true sight', () => {
     for (let a = 0; a < 6.3; a += 0.1) {
       const x = tower.x + Math.cos(a) * r;
       const y = tower.y + Math.sin(a) * r;
-      if (fits(w.nav, x, y, u.radius)) return { x, y };
+      w.vision.update(w);
+      if (fits(w.nav, x, y, u.radius) && (r > trueSightRadius(tower) || w.vision.inTowerZone(tower.team as Team, x, y))) return { x, y };
     }
     throw new Error('no spot');
   };
@@ -478,7 +481,7 @@ describe('true sight', () => {
     let p = zoneSpot(w, tower, r - 2.5, syl);
     place(syl, p.x, p.y);
     w.vision.update(w);
-    expect(w.vision.seesPoint(0, p.x, p.y)).toBe(false); // the ground is still in fog
+    expect(w.vision.seesPoint(0, p.x, p.y)).toBe(false);
     expect(w.canSee(0, syl)).toBe(true);
     const hp = syl.hp;
     run(w, 2);
@@ -490,6 +493,76 @@ describe('true sight', () => {
     syl.buffs.length = 0;
     w.vision.update(w);
     expect(w.canSee(0, syl)).toBe(false);
+  });
+
+  it('trees hide you from a tower, until your enemies can see you there', () => {
+    const { w, hero } = arena(['brakk'], ['orin']);
+    const tower = w.structures.find((s) => s.team === 0 && s.structure!.tier === 'tower1')!;
+    const o = hero(1, 'orin');
+    place(hero(0, 'brakk'), 20, 250);
+    const r = trueSightRadius(tower);
+    w.vision.update(w);
+    let spot: { x: number; y: number } | null = null;
+    for (let a = 0; a < 6.3 && !spot; a += 0.05) {
+      for (let d = 5; d < r - 1 && !spot; d += 1) {
+        const x = tower.x + Math.cos(a) * d;
+        const y = tower.y + Math.sin(a) * d;
+        if (fits(w.nav, x, y, o.radius) && !w.vision.inTowerZone(0, x, y)) spot = { x, y };
+      }
+    }
+    expect(spot).not.toBeNull();
+    place(o, spot!.x, spot!.y);
+    o.hero!.autoAttack = false;
+    const hp = o.hp;
+    w.vision.update(w);
+    expect(w.canSee(0, o)).toBe(false);
+    run(w, 1);
+    place(o, spot!.x, spot!.y);
+    expect(o.hp).toBe(hp);
+    // A ward nearby gives vision, and now the tower shoots.
+    const ward = w.spawnUnit('ward', 0, { x: spot!.x + 1, y: spot!.y }, WARDS.observer);
+    ward.ward = { kind: 'observer', expires: 1e9, placedAt: 0 };
+    w.vision.update(w);
+    expect(w.canSee(0, o)).toBe(true);
+    run(w, 2);
+    expect(o.hp).toBeLessThan(hp);
+  });
+
+  it('wards in a tower zone are seen too', () => {
+    const { w, hero } = arena(['brakk'], ['orin']);
+    const tower = w.structures.find((s) => s.team === 0 && s.structure!.tier === 'tower1')!;
+    place(hero(0, 'brakk'), 20, 250);
+    const ward = w.spawnUnit('ward', 1, { x: tower.x + 4, y: tower.y }, WARDS.observer);
+    ward.ward = { kind: 'observer', expires: 1e9, placedAt: 0 };
+    w.vision.update(w);
+    expect(w.canSee(0, ward)).toBe(true);
+  });
+
+  it('attacking a building reveals you with nobody around', () => {
+    const { w, hero } = arena(['brakk'], ['vexa']);
+    const tower = w.structures.find((s) => s.team === 0 && s.structure!.tier === 'tower1')!;
+    const v = hero(1, 'vexa');
+    place(hero(0, 'brakk'), 20, 250);
+    const p = zoneSpot(w, tower, v.attackRange + tower.radius - 0.5, v);
+    place(v, p.x, p.y);
+    tower.structure!.vulnerable = true;
+    w.vision.update(w);
+    w.applyCommand({ type: 'attack', unitId: v.id, targetId: tower.id, priority: true });
+    run(w, 1);
+    expect(w.canSee(0, v)).toBe(true);
+    expect(v.revealUntil).toBeGreaterThan(w.time + 1);
+  });
+
+  it('a stun cancels a teleport', () => {
+    const { w, hero } = arena(['brakk'], ['orin']);
+    const b = hero(0, 'brakk');
+    place(hero(1, 'orin'), 20, 20);
+    b.hero!.channel = { kind: 'tp', t: 3, total: 3, targetId: 0, x: 40, y: 260 } as unknown as HeroChannel;
+    w.step();
+    expect(b.hero!.channel).not.toBeNull();
+    w.stun(b, 1);
+    w.step();
+    expect(b.hero!.channel).toBeNull();
   });
 
   it('towers give no vision; barracks, Shrine and fountain do. Only towers, fountain and sentries wear the eye', () => {

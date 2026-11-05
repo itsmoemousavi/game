@@ -498,11 +498,12 @@ function bakeSplat(map: GameMap) {
       }
     }
   }
-  const h = map.house;
   g.fillStyle = 'rgb(0,255,0)';
-  g.beginPath();
-  g.arc(h.x, h.y, h.inner, 0, 6.28);
-  g.fill();
+  for (const h of map.houses) {
+    g.beginPath();
+    g.arc(h.x, h.y, h.inner, 0, 6.28);
+    g.fill();
+  }
   return new THREE.CanvasTexture(c);
 }
 

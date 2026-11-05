@@ -376,8 +376,7 @@ export function bakeMap(map: GameMap): HTMLCanvasElement {
   }
 
   // 8. The Warden's house: flagstone floor and stone wall ring with a doorway.
-  {
-    const h = map.house;
+  for (const h of map.houses) {
     const mid = (h.inner + h.outer) / 2;
     const doorAng = Math.atan2(h.door.y, h.door.x);
     const gap = Math.asin(Math.min(1, h.doorHalf / mid));
