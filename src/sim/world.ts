@@ -123,6 +123,11 @@ export interface AbilityState {
   cooldown: number;
 }
 
+/** Sunder Pike: how long the lowered armor lasts. Storm Blade: lightning damage and how far it jumps. */
+const SUNDER_SECONDS = 4;
+const CHAIN_DAMAGE = 80;
+const CHAIN_RADIUS = 7;
+
 /** Timed effect on a unit (slows, speed boosts, heals/damage over time...). */
 export interface Buff {
   key: string;
@@ -140,6 +145,8 @@ export interface Buff {
   invisible?: boolean;
   /** Immune to abilities: no spell damage, stuns or slows. */
   spellImmune?: boolean;
+  /** Can't cast abilities (items still work). */
+  silenced?: boolean;
 }
 
 /** Lingering ground area that ticks damage / slow on enemies inside (Arrow Storm, burning ground). */
@@ -405,7 +412,8 @@ export type GameEvent =
   | { type: 'announce'; unitId: number; victimId: number; firstBlood: boolean; multi: number; streak: number; shutdown: number }
   | { type: 'immunity'; unitId: number }
   /** An item button was used (Arcane Boots, Frost Horn, Stoneskin Amulet). */
-  | { type: 'itemActive'; unitId: number; kind: 'manaBurst' | 'frostNova' | 'stoneskin' }
+  | { type: 'itemActive'; unitId: number; kind: 'manaBurst' | 'frostNova' | 'stoneskin' | 'silence' | 'teamHeal' | 'vanish' | 'mire'; targetId?: number }
+  | { type: 'chainLightning'; sourceId: number; targetIds: number[] }
   | { type: 'miss'; sourceId: number; targetId: number }
   /** Notable damage (spells, critical hits) for floating numbers. */
   | { type: 'damage'; sourceId: number; targetId: number; amount: number; kind: DamageKind; crit: boolean };
@@ -1558,11 +1566,12 @@ export class World {
   /**
    * Attacks are reduced by armor. Spells ignore armor but cannot hurt structures.
    */
-  dealDamage(sourceId: number, target: Unit, raw: number, kind: DamageKind = 'attack', opts: { crit?: boolean; dot?: boolean; cleave?: boolean } = {}) {
+  dealDamage(sourceId: number, target: Unit, raw: number, kind: DamageKind = 'attack', opts: { crit?: boolean; dot?: boolean; cleave?: boolean; reflect?: boolean } = {}) {
     if (!target.alive) return;
     if (target.structure && (!target.structure.vulnerable || kind === 'spell' || target.structure.glyph > 0)) return;
     if (kind === 'spell' && this.isSpellImmune(target)) return;
     const src = this.unit(sourceId);
+    if (kind === 'attack' && target.structure && src?.hero) raw *= 1 + src.hero.bonus.buildingDamagePct / 100;
     // Nothing from outside the Warden's house hurts it (spells and arrows included).
     if (target.neutral?.boss && src && src !== target && !inHouse(this.map, src.x, src.y)) return;
     // Wards ignore spells and splash; every direct attack takes exactly half, so two hits kill one.
@@ -1571,7 +1580,7 @@ export class World {
       raw = target.maxHp / 2;
     }
     let amount = target.ward ? raw : kind === 'attack' ? raw * armorMultiplier(this.armorOf(target)) : raw;
-    if (kind === 'spell' && src?.hero) amount *= 1 + src.hero.bonus.spellAmpPct / 100;
+    if (kind === 'spell' && src?.hero && !opts.reflect) amount *= 1 + src.hero.bonus.spellAmpPct / 100;
     if (!target.ward) amount = damageAfterPassives(this, target, amount, kind);
     // Backdoor protection: buildings shrug off damage when no enemy creeps are pushing them.
     if (target.structure?.backdoor && src?.team !== target.team) {
@@ -1592,7 +1601,7 @@ export class World {
     if (kind === 'attack' && !opts.cleave && src?.hero && src.hero.bonus.lifestealPct > 0) {
       this.heal(src, (amount * src.hero.bonus.lifestealPct) / 100);
     }
-    if (kind === 'spell' && src?.hero && src.team !== target.team && src.hero.bonus.spellLifestealPct > 0) {
+    if (kind === 'spell' && !opts.reflect && src?.hero && src.team !== target.team && src.hero.bonus.spellLifestealPct > 0) {
       this.heal(src, (amount * src.hero.bonus.spellLifestealPct * (target.hero ? 1 : 1 / 3)) / 100);
     }
     // Wake the whole camp when a neutral is hit (and keep it angry while it's being hit).
@@ -1606,7 +1615,7 @@ export class World {
     }
 
     // Towers punish heroes that attack heroes under them.
-    if (src && src.kind === 'hero' && target.kind === 'hero') {
+    if (src && src.kind === 'hero' && target.kind === 'hero' && !opts.reflect) {
       for (const tw of this.units) {
         if (!tw.structure || !tw.alive || tw.team !== target.team || tw.attackInterval <= 0) continue;
         if (this.inReach(tw, src)) {
@@ -1616,6 +1625,29 @@ export class World {
       }
     }
     if (target.hp <= 0) this.kill(target, src);
+    if (kind === 'attack' && !opts.cleave) this.attackItemEffects(src, target, amount);
+  }
+
+  /** What items do when an attack lands: thorns on the target, sundered armor and lightning from the attacker. */
+  private attackItemEffects(src: Unit | undefined, target: Unit, amount: number) {
+    if (!src || src.team === target.team) return;
+    const thorns = target.hero?.bonus.thornsPct ?? 0;
+    if (thorns > 0 && src.alive && src.projectileSpeed === 0 && src.kind !== 'structure') {
+      this.dealDamage(target.id, src, (amount * thorns) / 100, 'spell', { dot: true, reflect: true });
+    }
+    const b = src.hero?.bonus;
+    if (!b || target.ward) return;
+    if (b.sunderArmor > 0 && target.alive) this.addBuff(target, { key: 'sunder', t: SUNDER_SECONDS, armor: -b.sunderArmor });
+    if (b.chainChance > 0 && target.kind !== 'structure' && this.rng.next() * 100 < b.chainChance) {
+      const near = this.units
+        .filter((e) => e !== target && e.alive && e.team !== src.team && e.kind !== 'structure' && !e.ward && dist(e.x, e.y, target.x, target.y) <= CHAIN_RADIUS)
+        .sort((p, q) => dist(p.x, p.y, target.x, target.y) - dist(q.x, q.y, target.x, target.y))
+        .slice(0, 2);
+      const hit = target.alive ? [target, ...near] : near;
+      if (!hit.length) return;
+      this.events.push({ type: 'chainLightning', sourceId: src.id, targetIds: hit.map((e) => e.id) });
+      for (const e of hit) this.dealDamage(src.id, e, CHAIN_DAMAGE, 'spell', { dot: true });
+    }
   }
 
   private kill(u: Unit, killer: Unit | undefined) {

@@ -207,6 +207,7 @@ export class Hud {
       b.classList.toggle('unlearned', st.level === 0);
       b.classList.toggle('nomana', lowMana);
       b.classList.toggle('cooling', blocker === 'cooldown');
+      b.classList.toggle('silenced', blocker === 'silenced');
       b.querySelector('.cd')!.textContent = blocker === 'cooldown' ? String(cd) : '';
       b.querySelectorAll('.pips i').forEach((p, k) => p.classList.toggle('on', k < st.level));
       b.querySelector('.mana')!.textContent = a.targeting === 'passive' ? '' : String(cost);

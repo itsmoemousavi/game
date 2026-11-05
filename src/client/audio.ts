@@ -83,6 +83,8 @@ export type SoundName =
   | 'treeFall'
   | 'bodyFall'
   | 'frostNova'
+  | 'zap'
+  | 'bellToll'
   | 'stoneCrumble'
   | 'wardenPunch'
   | 'impStab';
@@ -351,6 +353,18 @@ const RECIPES: Record<SoundName, Recipe> = {
     s.noise(3.5, 0.3 * v, 'bandpass', 300, 900);
     s.noise(3.5, 0.12 * v, 'highpass', 2500, 4000);
     s.tone('sine', 60, 90, 3.5, 0.15 * v);
+  },
+  /** Storm Blade: a short electric crack. */
+  zap: (s, v) => {
+    s.noise(0.12, 0.3 * v, 'highpass', 3500, 7000);
+    s.tone('sawtooth', 1900, 240, 0.12, 0.08 * v);
+    s.tone('square', 880, 620, 0.06, 0.03 * v, 0.05);
+  },
+  /** Hush Bell: one low toll that swallows the sound around it. */
+  bellToll: (s, v) => {
+    s.tone('sine', 310, 300, 0.95, 0.24 * v);
+    s.tone('sine', 622, 600, 0.6, 0.09 * v);
+    s.tone('triangle', 1240, 1180, 0.25, 0.03 * v);
   },
   /** Frost Horn: a cold blast, a crackle of ice. */
   frostNova: (s, v) => {

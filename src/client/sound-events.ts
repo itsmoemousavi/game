@@ -144,7 +144,21 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
         sfx.play('teleport', near(w.unit(e.unitId)) * 0.7);
         break;
       case 'itemActive':
-        sfx.play(e.kind === 'manaBurst' ? 'brineVeil' : e.kind === 'frostNova' ? 'frostNova' : 'ironClang', near(w.unit(e.unitId)));
+        sfx.play(
+          e.kind === 'manaBurst' || e.kind === 'teamHeal'
+            ? 'brineVeil'
+            : e.kind === 'frostNova' || e.kind === 'mire'
+              ? 'frostNova'
+              : e.kind === 'silence'
+                ? 'bellToll'
+                : e.kind === 'vanish'
+                  ? 'teleport'
+                  : 'ironClang',
+          near(w.unit(e.unitId)),
+        );
+        break;
+      case 'chainLightning':
+        sfx.play('zap', near(w.unit(e.sourceId)));
         break;
       case 'immunity':
         sfx.play('glyph', near(w.unit(e.unitId)));

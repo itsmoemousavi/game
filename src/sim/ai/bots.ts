@@ -360,6 +360,21 @@ function useItems(w: World, me: Unit, target: Unit, d: number): boolean {
     w.applyCommand({ type: 'useItem', unitId: me.id, slot: stone });
     return true;
   }
+  const hush = slotOf('hushBell');
+  if (ready(hush) && target.hero && d < 6.5) {
+    w.applyCommand({ type: 'useItem', unitId: me.id, slot: hush });
+    return true;
+  }
+  const censer = slotOf('mendersCenser');
+  if (ready(censer) && w.heroes.some((a) => a.alive && a.team === me.team && a.hp < a.maxHp * 0.55 && Math.hypot(a.x - me.x, a.y - me.y) < 9)) {
+    w.applyCommand({ type: 'useItem', unitId: me.id, slot: censer });
+    return true;
+  }
+  const mire = slotOf('mireStaff');
+  if (ready(mire) && target.hero && d > 2 && d < 8.5) {
+    w.applyCommand({ type: 'useItem', unitId: me.id, slot: mire, x: target.x, y: target.y });
+    return true;
+  }
   const boots = slotOf('arcaneBoots');
   if (ready(boots) && me.mana < me.maxMana * 0.55) {
     w.applyCommand({ type: 'useItem', unitId: me.id, slot: boots });

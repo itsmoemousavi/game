@@ -211,6 +211,25 @@ export class Fx3D {
     });
   }
 
+  /** A jagged streak of light between two map points (lightning, thrown magic). */
+  bolt(x0: number, y0: number, x1: number, y1: number, color: THREE.ColorRepresentation, h = 1.5) {
+    const a = new THREE.Vector3(x0, this.ground(x0, y0) + h, y0);
+    const b = new THREE.Vector3(x1, this.ground(x1, y1) + h, y1);
+    const steps = Math.max(4, Math.round(a.distanceTo(b) / 0.55));
+    const p = new THREE.Vector3();
+    for (let i = 0; i <= steps; i++) {
+      const k = i / steps;
+      const bend = Math.sin(k * Math.PI) * 0.5;
+      p.lerpVectors(a, b, k);
+      p.x += (Math.random() - 0.5) * bend;
+      p.y += (Math.random() - 0.5) * bend;
+      p.z += (Math.random() - 0.5) * bend;
+      this.particle(p, color, 0.95, 0.22 + Math.random() * 0.1);
+      this.particle(p, 0xffffff, 0.42, 0.16 + Math.random() * 0.06);
+    }
+    this.flashAt(b, 2.2, color, 0.22);
+  }
+
   /** A burst of particles from a world point. */
   burst(p: THREE.Vector3, n: number, color: THREE.ColorRepresentation, speed: number, size = 0.3, dur = 0.45, gravity = 10, additive = true) {
     for (let i = 0; i < n; i++) {

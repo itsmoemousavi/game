@@ -318,7 +318,8 @@ export class Input {
     if (this.wardSlot !== null) {
       const p = this.renderer.screenToWorld(sx, sy);
       const item = this.world().unit(this.heroId())?.hero?.items[this.wardSlot];
-      if (item && ITEMS[item.id].active?.kind === 'blink') {
+      const aimed = item && ITEMS[item.id].active?.kind;
+      if (aimed === 'blink' || aimed === 'mire') {
         this.queue.push({ type: 'useItem', unitId: this.heroId(), slot: this.wardSlot, x: p.x, y: p.y });
       } else {
         this.queue.push({ type: 'placeWard', unitId: this.heroId(), slot: this.wardSlot, x: p.x, y: p.y });

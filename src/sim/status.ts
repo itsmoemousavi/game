@@ -28,7 +28,10 @@ export type StatusId =
   | 'charm'
   | 'ironHide'
   | 'stoneskin'
-  | 'banner';
+  | 'banner'
+  | 'silenced'
+  | 'sunder'
+  | 'ghostShroud';
 
 export interface Status {
   id: StatusId;
@@ -61,6 +64,9 @@ export const STATUS_INFO: Record<StatusId, { name: string; good: boolean }> = {
   ironHide: { name: 'Iron Hide: extra armor while hurt', good: true },
   stoneskin: { name: 'Stoneskin: extra armor', good: true },
   banner: { name: 'Banner of Valor: armor and regeneration', good: true },
+  silenced: { name: "Silenced: can't cast abilities", good: false },
+  sunder: { name: 'Sundered: lower armor', good: false },
+  ghostShroud: { name: 'Ghost Shroud: invisible and faster', good: true },
 };
 
 const BUFF_STATUS: Record<string, StatusId> = {
@@ -74,6 +80,9 @@ const BUFF_STATUS: Record<string, StatusId> = {
   charm: 'charm',
   stoneskin: 'stoneskin',
   'aura:bannerOfValor': 'banner',
+  silenced: 'silenced',
+  sunder: 'sunder',
+  ghostShroud: 'ghostShroud',
 };
 
 export function statusEffects(w: World, u: Unit): Status[] {

@@ -35,12 +35,12 @@ const banner = (c: Ctx): ItemId | null => (c.allyBanner ? null : 'bannerOfValor'
 
 /** Finished items in order, per hero. Functions decide situational slots (null = skip). */
 const PLANS: Record<HeroId, Pick[]> = {
-  brakk: ['platedBoots', 'vitalStone', defensiveIfNeeded, 'shadowStep', banner, 'cleavingAxe', 'crownOfAscension', defensive, 'titanHeart'],
-  grom: ['platedBoots', 'vitalStone', banner, defensiveIfNeeded, 'frostHorn', 'crownOfAscension', 'titanHeart', defensive],
-  vexa: ['fleetBoots', 'twinBlades', defensiveIfNeeded, 'keenEdge', 'reaperEdge', 'crownOfAscension', 'lifedrinker', defensive],
-  syl: ['fleetBoots', 'keenEdge', 'shadowStep', defensiveIfNeeded, 'reaperEdge', 'lifedrinker', 'crownOfAscension', defensive],
-  orin: ['arcaneBoots', 'soulChalice', defensiveIfNeeded, 'focusLens', 'arcaneAmplifier', 'crownOfAscension', 'archmageStaff', defensive],
-  kaela: ['arcaneBoots', banner, 'focusLens', defensiveIfNeeded, 'frostHorn', 'crownOfAscension', 'archmageStaff', defensive],
+  brakk: ['platedBoots', 'vitalStone', defensiveIfNeeded, 'shadowStep', banner, 'cleavingAxe', 'crownOfAscension', 'brambleMail', defensive, 'titanHeart'],
+  grom: ['platedBoots', 'vitalStone', banner, defensiveIfNeeded, 'brambleMail', 'frostHorn', 'crownOfAscension', 'titanHeart', defensive],
+  vexa: ['fleetBoots', 'twinBlades', defensiveIfNeeded, 'stormBlade', 'keenEdge', 'reaperEdge', 'crownOfAscension', 'lifedrinker', defensive],
+  syl: ['fleetBoots', 'keenEdge', 'shadowStep', defensiveIfNeeded, 'reaperEdge', 'sunderPike', 'lifedrinker', 'crownOfAscension', defensive],
+  orin: ['arcaneBoots', 'soulChalice', defensiveIfNeeded, 'hushBell', 'focusLens', 'arcaneAmplifier', 'crownOfAscension', 'archmageStaff', defensive],
+  kaela: ['arcaneBoots', banner, 'focusLens', defensiveIfNeeded, 'mireStaff', 'frostHorn', 'crownOfAscension', 'archmageStaff', defensive],
 };
 
 /** Plays the support role: buys the team's totems. */

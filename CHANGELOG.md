@@ -9,6 +9,7 @@ The version you're playing is shown in **Settings → View** in the game.
 
 | Version | Milestone | Date |
 |---|---|---|
+| [0.12.x](#012x--new-items) | 8 new items | 2026-11-05 |
 | [0.11.x](#011x--new-map-art) | New map art and a living world | 2026-11-05 |
 | [0.10.x](#010x--ovra) | Ovra: new name, app icon, patch notes | 2026-11-04 |
 | [0.9.x](#09x--courier-and-polish) | Courier and polish | 2026-11-03 |
@@ -20,6 +21,26 @@ The version you're playing is shown in **Settings → View** in the game.
 | [0.3.x](#03x--hero-balance) | Hero balance | 2026-11-01 |
 | [0.2.x](#02x--six-heroes-and-smarter-bots) | Six heroes and smarter bots | 2026-11-01 |
 | [0.1.x](#01x--first-playable-prototype) | First playable prototype (2D) | 2026-11-01 |
+
+---
+
+## 0.12.x · New items
+
+### 0.12.0
+*2026-11-05*
+
+Eight new items:
+
+- **Sunder Pike:** your attacks lower the target's armor.
+- **Storm Blade:** attacks sometimes throw lightning at the target and up to 2 enemies near it.
+- **Siege Maul:** your attacks hit buildings much harder.
+- **Ghost Shroud:** use it to turn invisible and move faster for a few seconds.
+- **Bramble Mail:** melee attackers take part of the damage they deal to you.
+- **Mender's Censer:** use it to heal yourself and allied heroes nearby.
+- **Hush Bell:** use it to stop nearby enemy heroes casting abilities for 3 seconds. Items still work, and spell immunity protects them.
+- **Mire Staff:** use it on an enemy for damage and a heavy slow.
+
+Bots use most of them too. Hero win rates stayed balanced, all between 45% and 55% over 120 bot matches.
 
 ---
 

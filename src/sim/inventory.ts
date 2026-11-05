@@ -59,6 +59,10 @@ export function itemBonuses(items: (ItemSlot | null)[]): Required<ItemStats> {
     critMult: 1,
     cleavePct: 0,
     spellLifestealPct: 0,
+    thornsPct: 0,
+    sunderArmor: 0,
+    chainChance: 0,
+    buildingDamagePct: 0,
   };
   for (const slot of items) {
     if (!slot) continue;
@@ -82,6 +86,11 @@ export function itemBonuses(items: (ItemSlot | null)[]): Required<ItemStats> {
     }
     b.cleavePct = Math.max(b.cleavePct, s.cleavePct ?? 0);
     b.spellLifestealPct += s.spellLifestealPct ?? 0;
+    // Special effects don't stack either: the best item counts.
+    b.thornsPct = Math.max(b.thornsPct, s.thornsPct ?? 0);
+    b.sunderArmor = Math.max(b.sunderArmor, s.sunderArmor ?? 0);
+    b.chainChance = Math.max(b.chainChance, s.chainChance ?? 0);
+    b.buildingDamagePct = Math.max(b.buildingDamagePct, s.buildingDamagePct ?? 0);
   }
   return b;
 }
@@ -330,8 +339,45 @@ export function useItem(w: World, u: Unit, slot: number, x?: number, y?: number)
     } else if (active.kind === 'stoneskin') {
       w.addBuff(u, { key: 'stoneskin', t: active.duration ?? 4, armor: active.amount ?? 10 });
       w.events.push({ type: 'itemActive', unitId: u.id, kind: 'stoneskin' });
+    } else if (active.kind === 'silence') {
+      for (const e of w.heroes) {
+        if (!e.alive || e.team === u.team || dist(e.x, e.y, u.x, u.y) > (active.range ?? 7) + e.radius || w.isSpellImmune(e)) continue;
+        w.addBuff(e, { key: 'silenced', t: active.duration ?? 3, silenced: true });
+      }
+      w.events.push({ type: 'itemActive', unitId: u.id, kind: 'silence' });
+    } else if (active.kind === 'teamHeal') {
+      for (const a of w.heroes) {
+        if (!a.alive || a.team !== u.team || dist(a.x, a.y, u.x, u.y) > (active.range ?? 10)) continue;
+        const before = a.hp;
+        w.heal(a, active.amount ?? 0);
+        if (a !== u) h.stats.healing += a.hp - before;
+      }
+      w.events.push({ type: 'itemActive', unitId: u.id, kind: 'teamHeal' });
+    } else if (active.kind === 'vanish') {
+      w.events.push({ type: 'itemActive', unitId: u.id, kind: 'vanish' });
+      w.addBuff(u, { key: 'ghostShroud', t: active.duration ?? 5, invisible: true, moveSpeedPct: active.amount ?? 25 });
+    } else if (active.kind === 'mire') {
+      // The tap picks the nearest enemy you can see around that spot; a miss doesn't use the item up.
+      const px = x ?? u.x;
+      const py = y ?? u.y;
+      const range = active.range ?? 9;
+      let best: Unit | null = null;
+      let bd = 4;
+      for (const e of w.units) {
+        if (!e.alive || e.team === u.team || e.kind === 'structure' || e.ward || w.isSpellImmune(e) || !w.canSee(u.team, e)) continue;
+        if (dist(u.x, u.y, e.x, e.y) > range + e.radius) continue;
+        const d = dist(px, py, e.x, e.y);
+        if (d < bd || (best && !best.hero && e.hero && d < 4)) {
+          best = e;
+          bd = d;
+        }
+      }
+      if (!best) return false;
+      w.dealDamage(u.id, best, active.amount ?? 0, 'spell');
+      w.addBuff(best, { key: 'slow:mireStaff', t: active.duration ?? 3.5, slowPct: 60 });
+      w.events.push({ type: 'itemActive', unitId: u.id, kind: 'mire', targetId: best.id });
     } else if (active.kind === 'immunity') {
-      u.buffs = u.buffs.filter((b) => !b.slowPct); // shrug off slows
+      u.buffs = u.buffs.filter((b) => !b.slowPct && !b.silenced); // shrug off slows and silence
       w.addBuff(u, { key: 'immunity', t: active.duration ?? 4, spellImmune: true });
       w.events.push({ type: 'immunity', unitId: u.id });
     }

@@ -605,9 +605,48 @@ export class Renderer3D extends Renderer {
           this.fx3.shockwave(u.x, u.y, 5, 0xffffff, 0.3, 0.6);
           this.fx3.dust(u.x, u.y, 10, 1.4, 0xe0f2fe, 4, 0.8);
           this.fx3.sparks(u.x, u.y, 1, 18, 0xe0f2fe, 7);
+        } else if (e.kind === 'silence') {
+          // Hush Bell: a dark violet ring rolls outward, with a second one close behind.
+          this.fx3.shockwave(u.x, u.y, 7.5, 0xa78bfa, 0.55, 0.9);
+          this.fx3.shockwave(u.x, u.y, 5.5, 0x4c1d95, 0.42, 0.75);
+          this.fx3.flash(u.x, u.y, 2.2, 3.4, 0xc4b5fd, 0.3);
+        } else if (e.kind === 'teamHeal') {
+          // Mender's Censer: a green wave, and every ally it reaches glows.
+          this.fx3.shockwave(u.x, u.y, 10, 0x86efac, 0.6, 0.75);
+          this.fx3.sparks(u.x, u.y, 1, 12, 0xbbf7d0, 4);
+          for (const a of w.heroes) {
+            if (a.alive && a.team === u.team && Math.hypot(a.x - u.x, a.y - u.y) <= 10) {
+              this.fx3.flash(a.x, a.y, 1.5, 3, 0x4ade80, 0.45);
+              this.fx3.sparks(a.x, a.y, 1.6, 10, 0x86efac, 3);
+            }
+          }
+        } else if (e.kind === 'vanish') {
+          // Ghost Shroud: a puff of pale smoke where the hero fades out.
+          this.fx3.dust(u.x, u.y, 12, 1.6, 0xc4b5fd, 2.4, 0.9);
+          this.fx3.flash(u.x, u.y, 1.5, 3, 0xddd6fe, 0.3);
+        } else if (e.kind === 'mire') {
+          // Mire Staff: a blob of mud flies out and splashes around the target.
+          const t = e.targetId !== undefined ? w.unit(e.targetId) : undefined;
+          if (t) {
+            this.fx3.bolt(u.x, u.y, t.x, t.y, 0x84cc16);
+            this.fx3.dust(t.x, t.y, 10, 1.2, 0x4d7c0f, 2, 0.9);
+            this.fx3.sparks(t.x, t.y, 0.8, 10, 0xa3e635, 3.5);
+          }
         } else {
           this.fx3.flash(u.x, u.y, 2, 5, 0xd6d3d1, 0.4);
           this.fx3.shockwave(u.x, u.y, 2.6, 0xa8a29e, 0.35);
+        }
+      } else if (e.type === 'chainLightning') {
+        // Storm Blade: the lightning jumps attacker → target → the enemies near it.
+        let from = w.unit(e.sourceId);
+        for (const id of e.targetIds) {
+          const t = w.unit(id);
+          if (!t) continue;
+          if (from && w.canSee(this.viewTeam, t)) {
+            this.fx3.bolt(from.x, from.y, t.x, t.y, 0xc7d2fe);
+            this.fx3.sparks(t.x, t.y, 1.4, 5, 0xe0e7ff, 4);
+          }
+          from = t;
         }
       } else if (e.type === 'blink') {
         const u = w.unit(e.unitId);
@@ -664,6 +703,9 @@ export class Renderer3D extends Renderer {
       else if (b.key === 'immunity') this.fx3.heroAura(id, x, y, 'bubble', 0xfbbf24, fade(b.t));
       else if (b.key === 'stoneskin') this.fx3.heroAura(id, x, y, 'shell', 0x8b7d6b, fade(b.t));
       else if (b.key === 'slow:frostHorn') this.fx3.heroAura(id, x, y, 'glow', 0x93c5fd, fade(b.t) * 0.7, 0.8);
+      else if (b.key === 'slow:mireStaff') this.fx3.heroAura(id, x, y, 'glow', 0x65a30d, fade(b.t) * 0.7, 0.8);
+      else if (b.key === 'silenced') this.fx3.heroAura(id, x, y, 'glow', 0xa78bfa, fade(b.t) * 0.8, 0.85);
+      else if (b.key === 'sunder') this.fx3.heroAura(id, x, y, 'glow', 0xf87171, fade(b.t) * 0.4, 0.7);
       else if (b.key === 'rune') {
         if (b.damageMult) this.fx3.heroAura(id + 'dd', x, y, 'glow', 0xff4d4d, fade(b.t));
         else if (b.healPerSec) this.fx3.heroAura(id + 'regen', x, y, 'heal', 0x5eead4, fade(b.t));

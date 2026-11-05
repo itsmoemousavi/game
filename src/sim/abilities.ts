@@ -41,7 +41,7 @@ export function effectiveCooldown(u: Unit, def: AbilityDef, level: number): numb
 }
 
 /** Why an ability can't be used right now, or null if it can. */
-export function castBlocker(u: Unit, slot: number): 'unlearned' | 'passive' | 'cooldown' | 'mana' | 'stunned' | null {
+export function castBlocker(u: Unit, slot: number): 'unlearned' | 'passive' | 'cooldown' | 'mana' | 'stunned' | 'silenced' | null {
   const def = abilityDef(u, slot);
   const st = u.hero?.abilities[slot];
   if (!def || !st || st.level === 0) return 'unlearned';
@@ -49,6 +49,7 @@ export function castBlocker(u: Unit, slot: number): 'unlearned' | 'passive' | 'c
   if (st.cooldown > 0) return 'cooldown';
   if (u.mana < def.manaCost[st.level - 1]) return 'mana';
   if (!u.alive || u.stunTimer > 0 || u.dash) return 'stunned';
+  if (u.buffs.some((b) => b.silenced)) return 'silenced';
   return null;
 }
 

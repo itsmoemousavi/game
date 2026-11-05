@@ -32,7 +32,15 @@ export type ItemId =
   | 'soulChalice'
   | 'bannerOfValor'
   | 'frostHorn'
-  | 'stoneskinAmulet';
+  | 'stoneskinAmulet'
+  | 'brambleMail'
+  | 'sunderPike'
+  | 'hushBell'
+  | 'mendersCenser'
+  | 'stormBlade'
+  | 'ghostShroud'
+  | 'siegeMaul'
+  | 'mireStaff';
 
 export interface ItemStats {
   damage?: number;
@@ -59,6 +67,14 @@ export interface ItemStats {
   cleavePct?: number;
   /** Ability damage returned as health, % (a third as much against creeps and monsters). */
   spellLifestealPct?: number;
+  /** Melee attackers take this % of the damage they deal to you. */
+  thornsPct?: number;
+  /** Your attacks lower the target's armor by this much for a few seconds (doesn't stack). */
+  sunderArmor?: number;
+  /** Chance (%) for an attack to throw lightning at the target and enemies near it. */
+  chainChance?: number;
+  /** Your attacks deal this % more to buildings. */
+  buildingDamagePct?: number;
 }
 
 /** Aura carried by an item: nearby allied heroes (and the holder) get these bonuses. */
@@ -84,11 +100,13 @@ export interface ItemDef {
    */
   recipe?: ItemId[];
   /** Item with a button. */
-  active?: { kind: 'blink' | 'immunity' | 'manaBurst' | 'frostNova' | 'stoneskin'; cooldown: number; range?: number; duration?: number; amount?: number };
+  active?: { kind: 'blink' | 'immunity' | 'manaBurst' | 'frostNova' | 'stoneskin' | 'silence' | 'teamHeal' | 'vanish' | 'mire'; cooldown: number; range?: number; duration?: number; amount?: number };
   aura?: ItemAura;
   summary: string;
   /** Not sold in the shop and can't be sold back (the Warden's revive charm). */
   noShop?: boolean;
+  /** Shop tab, when what it does matters more than the stats it gives. */
+  tab?: 'attack' | 'defense' | 'magic' | 'upgrade';
 }
 
 export const ITEMS: Record<ItemId, ItemDef> = {
@@ -371,6 +389,101 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     active: { kind: 'stoneskin', cooldown: 30, duration: 4, amount: 15 },
     summary: '+250 health, +3 armor. Use: +15 armor for 4 s.',
   },
+  // ---- attackers
+  sunderPike: {
+    id: 'sunderPike',
+    name: 'Sunder Pike',
+    short: 'Pike',
+    cost: 1350,
+    icon: '#94a3b8',
+    stats: { damage: 25, sunderArmor: 5 },
+    recipe: ['ironBlade', 'guardPlate'],
+    tab: 'attack',
+    summary: '+25 damage. Your attacks lower the target\'s armor by 5 for 4 s (doesn\'t stack). Built from Iron Blade + Guard Plate.',
+  },
+  stormBlade: {
+    id: 'stormBlade',
+    name: 'Storm Blade',
+    short: 'Storm',
+    cost: 2100,
+    icon: '#a5b4fc',
+    stats: { damage: 25, attackSpeedPct: 20, chainChance: 25 },
+    recipe: ['ironBlade', 'quickGloves'],
+    tab: 'attack',
+    summary: '+25 damage, +20% attack speed. Attacks have a 25% chance to throw lightning: 80 damage to the target and up to 2 enemies near it (not on buildings). Built from Iron Blade + Quick Gloves.',
+  },
+  siegeMaul: {
+    id: 'siegeMaul',
+    name: 'Siege Maul',
+    short: 'Maul',
+    cost: 1200,
+    icon: '#b45309',
+    stats: { damage: 20, buildingDamagePct: 60 },
+    recipe: ['ironBlade'],
+    tab: 'attack',
+    summary: '+20 damage. Your attacks deal 60% more damage to buildings. Built from Iron Blade.',
+  },
+  ghostShroud: {
+    id: 'ghostShroud',
+    name: 'Ghost Shroud',
+    short: 'Ghost',
+    cost: 1500,
+    icon: '#c4b5fd',
+    stats: { hp: 150, attackSpeedPct: 20 },
+    recipe: ['vitalStone', 'quickGloves'],
+    active: { kind: 'vanish', cooldown: 35, duration: 5, amount: 25 },
+    tab: 'attack',
+    summary: '+150 health, +20% attack speed. Use: turn invisible for 5 s and move 25% faster. Attacking or casting ends it. Built from Vital Stone + Quick Gloves.',
+  },
+  // ---- defenders
+  brambleMail: {
+    id: 'brambleMail',
+    name: 'Bramble Mail',
+    short: 'Bramble',
+    cost: 1500,
+    icon: '#65a30d',
+    stats: { hp: 200, armor: 6, thornsPct: 30 },
+    recipe: ['guardPlate', 'vitalStone'],
+    tab: 'defense',
+    summary: '+200 health, +6 armor. Melee attackers take 30% of the damage they deal to you. Built from Guard Plate + Vital Stone.',
+  },
+  mendersCenser: {
+    id: 'mendersCenser',
+    name: "Mender's Censer",
+    short: 'Censer',
+    cost: 1400,
+    icon: '#86efac',
+    stats: { hp: 150, mana: 150, manaRegen: 1 },
+    recipe: ['vitalStone', 'manaCrystal'],
+    active: { kind: 'teamHeal', cooldown: 32, range: 10, amount: 200 },
+    tab: 'defense',
+    summary: '+150 health, +150 mana, +1 mana regen. Use: you and allied heroes within 10 m heal 200 health. Built from Vital Stone + Mana Crystal.',
+  },
+  // ---- casters
+  hushBell: {
+    id: 'hushBell',
+    name: 'Hush Bell',
+    short: 'Hush',
+    cost: 1750,
+    icon: '#a78bfa',
+    stats: { mana: 200, armor: 3 },
+    recipe: ['manaCrystal', 'guardPlate'],
+    active: { kind: 'silence', cooldown: 30, range: 7, duration: 3 },
+    tab: 'magic',
+    summary: '+200 mana, +3 armor. Use: enemy heroes within 7 m can\'t cast abilities for 3 s. Built from Mana Crystal + Guard Plate.',
+  },
+  mireStaff: {
+    id: 'mireStaff',
+    name: 'Mire Staff',
+    short: 'Mire',
+    cost: 1300,
+    icon: '#4d7c0f',
+    stats: { mana: 200, manaRegen: 1.5 },
+    recipe: ['manaCrystal'],
+    active: { kind: 'mire', cooldown: 18, range: 9, duration: 3.5, amount: 50 },
+    tab: 'magic',
+    summary: '+200 mana, +1.5 mana regen. Use: tap the item, then an enemy within 9 m: 50 damage and 60% slower for 3.5 s. Built from Mana Crystal.',
+  },
   wardenCharm: {
     id: 'wardenCharm',
     name: "Warden's Charm",
@@ -404,12 +517,12 @@ export const SALVE = { heal: 350, duration: 8 };
 
 /** Default build orders (also the "recommended" list in the shop). */
 export const BUILDS: Record<'brakk' | 'vexa' | 'orin' | 'syl' | 'grom' | 'kaela', ItemId[]> = {
-  brakk: ['healingSalve', 'swiftBoots', 'vitalStone', 'guardPlate', 'platedBoots', 'ironBlade', 'quickGloves', 'cleavingAxe', 'shadowStep', 'crownOfAscension', 'stoneskinAmulet'],
-  vexa: ['healingSalve', 'swiftBoots', 'ironBlade', 'keenEdge', 'fleetBoots', 'quickGloves', 'twinBlades', 'ironBlade', 'reaperEdge', 'crownOfAscension', 'lifedrinker'],
-  orin: ['healingSalve', 'swiftBoots', 'manaCrystal', 'arcaneBoots', 'vitalStone', 'manaCrystal', 'soulChalice', 'arcaneAmplifier', 'crownOfAscension', 'focusLens'],
-  syl: ['healingSalve', 'swiftBoots', 'ironBlade', 'keenEdge', 'shadowStep', 'fleetBoots', 'ironBlade', 'reaperEdge', 'lifedrinker', 'crownOfAscension'],
-  grom: ['healingSalve', 'swiftBoots', 'vitalStone', 'guardPlate', 'platedBoots', 'guardPlate', 'vitalStone', 'bannerOfValor', 'frostHorn', 'crownOfAscension', 'titanHeart'],
-  kaela: ['healingSalve', 'swiftBoots', 'manaCrystal', 'arcaneBoots', 'guardPlate', 'vitalStone', 'bannerOfValor', 'focusLens', 'frostHorn', 'crownOfAscension'],
+  brakk: ['healingSalve', 'swiftBoots', 'vitalStone', 'guardPlate', 'platedBoots', 'ironBlade', 'quickGloves', 'cleavingAxe', 'shadowStep', 'brambleMail', 'crownOfAscension', 'stoneskinAmulet'],
+  vexa: ['healingSalve', 'swiftBoots', 'ironBlade', 'keenEdge', 'fleetBoots', 'quickGloves', 'twinBlades', 'stormBlade', 'ironBlade', 'reaperEdge', 'crownOfAscension', 'lifedrinker'],
+  orin: ['healingSalve', 'swiftBoots', 'manaCrystal', 'arcaneBoots', 'vitalStone', 'manaCrystal', 'soulChalice', 'hushBell', 'arcaneAmplifier', 'crownOfAscension', 'focusLens'],
+  syl: ['healingSalve', 'swiftBoots', 'ironBlade', 'keenEdge', 'shadowStep', 'fleetBoots', 'ghostShroud', 'sunderPike', 'ironBlade', 'reaperEdge', 'lifedrinker', 'crownOfAscension'],
+  grom: ['healingSalve', 'swiftBoots', 'vitalStone', 'guardPlate', 'platedBoots', 'guardPlate', 'vitalStone', 'bannerOfValor', 'brambleMail', 'frostHorn', 'crownOfAscension', 'titanHeart'],
+  kaela: ['healingSalve', 'swiftBoots', 'manaCrystal', 'arcaneBoots', 'guardPlate', 'vitalStone', 'bannerOfValor', 'mendersCenser', 'mireStaff', 'focusLens', 'frostHorn', 'crownOfAscension'],
 };
 
 /** Blink can't be used this long after taking damage from an enemy hero. */

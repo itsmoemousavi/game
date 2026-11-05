@@ -183,6 +183,17 @@ Buying a combined item uses up the parts you own, and you pay the difference; th
 | Warded Cloak (1500) | Guard Plate + Mana Crystal + 550 | +6 armor, +150 mana. **Use:** 4 s immune to abilities (no spell damage, stuns or slows; normal attacks still hurt). 50 s cooldown |
 | Shadow Step (1800) | bought directly | **Use:** tap the item, then tap the ground: blink up to 11 m. 12 s cooldown; can't be used for 3 s after taking damage from a hero |
 
+| Sunder Pike (1350) | Iron Blade + Guard Plate + 450 | +25 damage. Attacks lower the target's armor by 5 for 4 s (doesn't stack) |
+| Storm Blade (2100) | Iron Blade + Quick Gloves + 1200 | +25 damage, +20% attack speed. 25% chance per attack: 80 spell damage to the target and up to 2 enemies within 7 m of it (not on buildings) |
+| Siege Maul (1200) | Iron Blade + 800 | +20 damage. Attacks deal 60% more to buildings |
+| Ghost Shroud (1500) | Vital Stone + Quick Gloves + 550 | +150 health, +20% attack speed. **Use:** 5 s invisible and 25% faster; attacking or casting ends it. 35 s cooldown |
+| Bramble Mail (1500) | Guard Plate + Vital Stone + 550 | +200 health, +6 armor. Melee attackers take 30% of the damage they deal to you |
+| Mender's Censer (1400) | Vital Stone + Mana Crystal + 500 | +150 health, +150 mana, +1 mana regen. **Use:** you and allied heroes within 10 m heal 200. 32 s cooldown |
+| Hush Bell (1750) | Mana Crystal + Guard Plate + 800 | +200 mana, +3 armor. **Use:** enemy heroes within 7 m can't cast abilities for 3 s (items still work; spell immunity protects). 30 s cooldown |
+| Mire Staff (1300) | Mana Crystal + 850 | +200 mana, +1.5 mana regen. **Use:** tap the item, then an enemy within 9 m: 50 damage and 60% slower for 3.5 s. A tap that finds nobody doesn't use it. 18 s cooldown |
+
+Special effects of the same kind don't stack: the best item counts.
+
 Item slots show their cooldown. Bots use Warded Cloak when hurt in a fight and Shadow Step to jump onto heroes.
 
 ### Balance pass (match length)

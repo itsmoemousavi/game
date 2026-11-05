@@ -120,6 +120,38 @@ const ICONS: Record<ItemId | 'tp' | 'shop' | 'courier', string> = {
     '<path d="M8 3l4 5 4-5" stroke="#d6d3d1" stroke-width="1.2" fill="none"/><path d="M12 8l6 4-2 7h-8l-2-7z" fill="#a8a29e" stroke="#292524" stroke-width="1"/><path d="M9 12l3 2 3-2M12 14v4" stroke="#57534e" stroke-width="1"/>',
     '#1c1917',
   ),
+  sunderPike: svg(
+    '<path d="M18.5 3.5l2 2-9 9-2-2z" fill="#cbd5e1" stroke="#0f172a" stroke-width="1"/><path d="M11.5 12.5L4 20" stroke="#92400e" stroke-width="2.2" stroke-linecap="round"/><path d="M6 5l3 2-1 2 3 2-1 2" fill="none" stroke="#f87171" stroke-width="1.4" stroke-linejoin="round"/>',
+    '#1e293b',
+  ),
+  stormBlade: svg(
+    '<path d="M17 3l3 1-11 12-2.5-.5-.5-2.5z" fill="#c7d2fe" stroke="#1e1b4b" stroke-width="1"/><path d="M6.5 15.5L3.5 20M4.5 13l5 5" stroke="#a16207" stroke-width="1.8" stroke-linecap="round"/><path d="M18.5 10l-3 4.5h2.8L16 20l5-6.5h-2.8l1.8-3.5z" fill="#fde047" stroke="#713f12" stroke-width=".7"/>',
+    '#1e1b4b',
+  ),
+  siegeMaul: svg(
+    '<path d="M5.5 6.5l8-3 3 8-8 3z" fill="#a8a29e" stroke="#292524" stroke-width="1"/><path d="M11.5 12l6.5 8.5" stroke="#78350f" stroke-width="2.4" stroke-linecap="round"/><path d="M3 18l1.6-1 .9 1.8 1.7-1v3.7H3zM9 21v-2l1.5-.8" fill="#57534e" stroke="#1c1917" stroke-width=".7"/>',
+    '#451a03',
+  ),
+  ghostShroud: svg(
+    '<path d="M12 3.5c-4 0-6.5 3-6.5 7V20l2.2-1.6L10 20l2-1.6 2 1.6 2.3-1.6 2.2 1.6v-9.5c0-4-2.5-7-6.5-7z" fill="#ddd6fe" fill-opacity=".85" stroke="#4c1d95" stroke-width="1"/><circle cx="9.5" cy="10.5" r="1.3" fill="#2e1065"/><circle cx="14.5" cy="10.5" r="1.3" fill="#2e1065"/>',
+    '#2e1065',
+  ),
+  brambleMail: svg(
+    '<path d="M12 3.5l7 2.5v5.3c0 4.5-3 7.7-7 9.2-4-1.5-7-4.7-7-9.2V6z" fill="#3f6212" stroke="#1a2e05" stroke-width="1"/><path d="M7.5 15c2-5 6-4 9-8M9 8.5l-1.5-1M12.5 11l1.7-1.6M10 12.5L8 11.8M14.5 8.5l1.8.6" fill="none" stroke="#bef264" stroke-width="1.2" stroke-linecap="round"/>',
+    '#1a2e05',
+  ),
+  mendersCenser: svg(
+    '<path d="M12 3v3" stroke="#d6d3d1" stroke-width="1.2"/><path d="M6.5 11a5.5 5.5 0 0 1 11 0z" fill="#ca8a04" stroke="#422006" stroke-width="1"/><path d="M6.5 11h11l-1.5 6a4 4 0 0 1-8 0z" fill="#a16207" stroke="#422006" stroke-width="1"/><path d="M12 12.2v4M10 14.2h4" stroke="#bbf7d0" stroke-width="1.5" stroke-linecap="round"/><path d="M8.5 4c-1 1.2 1 1.8 0 3M15.5 4c-1 1.2 1 1.8 0 3" fill="none" stroke="#86efac" stroke-width="1"/>',
+    '#14352a',
+  ),
+  hushBell: svg(
+    '<path d="M12 4a5.5 5.5 0 0 0-5.5 5.5c0 4-1.5 5.5-2 6.5h15c-.5-1-2-2.5-2-6.5A5.5 5.5 0 0 0 12 4z" fill="#a78bfa" stroke="#2e1065" stroke-width="1"/><circle cx="12" cy="18.5" r="1.7" fill="#ddd6fe" stroke="#2e1065" stroke-width=".8"/><path d="M4 4l16 16" stroke="#fda4af" stroke-width="2" stroke-linecap="round"/>',
+    '#1e1b4b',
+  ),
+  mireStaff: svg(
+    '<path d="M16 4L7 18" stroke="#57340f" stroke-width="2" stroke-linecap="round"/><circle cx="16.5" cy="5" r="2.6" fill="#a3e635" stroke="#1a2e05" stroke-width="1"/><path d="M3 18.5c2-1.6 3.5 1.2 5.5 0s3.5-1.4 5.5 0 3.5 1 7 0v3H3z" fill="#4d7c0f" stroke="#1a2e05" stroke-width=".8"/>',
+    '#1a2e05',
+  ),
   wardenCharm: svg(
     '<circle cx="12" cy="7.5" r="3.5" fill="none" stroke="#fcd34d" stroke-width="2"/><path d="M12 11v10M7.5 14h9" stroke="#fcd34d" stroke-width="2" stroke-linecap="round"/>',
     '#422006',
@@ -156,6 +188,9 @@ export function itemImage(id: ItemId): HTMLImageElement {
 const STATUS_ICONS: Record<StatusId, string> = {
   stoneskin: ICONS.stoneskinAmulet,
   banner: ICONS.bannerOfValor,
+  silenced: ICONS.hushBell,
+  sunder: ICONS.sunderPike,
+  ghostShroud: ICONS.ghostShroud,
   stun: svg(
     '<path d="M12 4l1.4 3 3.3.3-2.5 2.2.8 3.2L12 11l-3 1.7.8-3.2-2.5-2.2 3.3-.3z" fill="#fde047" stroke="#713f12" stroke-width="0.8"/><ellipse cx="12" cy="17" rx="7" ry="2.6" fill="none" stroke="#fde047" stroke-width="1.4" stroke-dasharray="2.5 1.5"/>',
     '#3f2a0a',

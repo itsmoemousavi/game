@@ -211,7 +211,7 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #shop-items h4:first-child { margin-top: 0; }
 .shop-item { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 2px 3px; border-radius: 8px; border: 1px solid var(--s-line); background: rgba(0,0,0,0.26); color: var(--s-text); touch-action: pan-y; }
 .shop-item i { width: 36px; height: 36px; border-radius: 6px; overflow: hidden; display: block; position: relative; padding: 0; }
-.shop-item .nm { max-width: 100%; font-size: 9.5px; font-weight: 600; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shop-item .nm { max-width: 100%; font-size: 9.5px; letter-spacing: -0.02em; font-weight: 600; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .shop-item .cost { color: #ecc875; font-weight: 700; font-size: 10.5px; line-height: 1.15; font-variant-numeric: tabular-nums; }
 .shop-item.cheaper .cost { color: #8fdcb5; }
 .shop-item.off { opacity: 0.72; }
@@ -345,6 +345,9 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 /* The ability area is a layout box only: let taps through to whatever is under its empty parts. */
 #actions { pointer-events: none; }
 #actions button { pointer-events: auto; }
+
+/* Silenced (Hush Bell): the ability buttons go dark and violet. */
+.ability.silenced { filter: grayscale(0.75) brightness(0.65); box-shadow: 0 0 0 2px rgba(167,139,250,0.75); }
 
 /* ---------- item icons ---------- */
 svg.icon { display: block; width: 100%; height: 100%; }

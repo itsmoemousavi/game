@@ -230,7 +230,7 @@ export class ItemsUi {
         return;
       }
       const it = item as ItemSlot;
-      if (it.id === 'observerWard' || it.id === 'sentryWard' || ITEMS[it.id].active?.kind === 'blink') {
+      if (it.id === 'observerWard' || it.id === 'sentryWard' || ITEMS[it.id].active?.kind === 'blink' || ITEMS[it.id].active?.kind === 'mire') {
         this.placingSlot = this.placingSlot === i ? null : i;
         this.onWard(this.placingSlot);
         this.lastKey = '';
@@ -752,6 +752,7 @@ const SHOP_TABS: { id: ShopTab; name: string; icon: string }[] = [
 /** Shop tab for an item, from what it gives. */
 function categoryOf(id: ItemId): ShopTab {
   const d = ITEMS[id];
+  if (d.tab) return d.tab;
   if (d.consumable) return 'consumable';
   const s = d.stats;
   // Boots, item buttons, auras and the Crown share a tab.
