@@ -620,7 +620,7 @@ function structure(tier: StructureTier, team: 0 | 1, rax?: 'melee' | 'ranged'): 
     footing(3.6, 14, 51);
     ring(0.02, 0.68, 3.28, 20, 53, 0.42);
     add(g, mesh(cyl(2.92, 2.92, 0.1, 18), stoneDark), 0, 0.68, 0);
-    add(g, mesh(cyl(2.76, 2.76, 0.1, 18), glow(team === 0 ? 0x2f78c0 : 0xc04d32, 1)), 0, 0.71, 0);
+    add(g, mesh(cyl(2.76, 2.76, 0.1, 18), glow(team === 0 ? 0x1d5a8c : 0x8c3a24, 1)), 0, 0.71, 0);
     for (let d = 0; d < 4; d++) add(g, mesh(cyl(0.68 - d * 0.05, 0.75 - d * 0.05, 0.6, 8), stoneAt(d + 60)), 0, 0.7 + d * 0.6 + 0.3, 0);
     add(g, mesh(cyl(0.9, 0.6, 0.35, 10), iron), 0, 3.25, 0);
     add(g, mesh(new THREE.OctahedronGeometry(0.75), crystal), 0, 4.05, 0).scale.set(0.8, 1.4, 0.8);

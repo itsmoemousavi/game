@@ -55,7 +55,7 @@ const fx = new Fx3D(scene, () => 0);
     buffFx(ctx, o, u, a);
     fx.update(1 / 60, i / 60);
   }
-  const views: any = { front: [9, 3.4, 1.5], side: [0.5, 3.4, 9], game: [0, 14, 9.5], back: [-7, 3.5, 6] };
+  const views: any = { front: [9, 3.4, 1.5], side: [0.5, 3.4, 9], game: [0, 14, 9.5], back: [-7, 3.5, 6], three: [7.2, 5.4, 7.4], hammer: [7.6, 5.0, -6.6] };
   const v = views[view];
   cam.position.set(v[0], v[1], v[2]);
   cam.lookAt(0, 2, 0);

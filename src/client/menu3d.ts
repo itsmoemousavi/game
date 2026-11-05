@@ -2,6 +2,12 @@ import * as THREE from 'three';
 import { HEROES, HERO_IDS, HeroId } from '../sim';
 import { JOINTS, model } from './three/models';
 
+/** Heroes whose big gear hides the face get their own portrait angle and a step back. */
+const TURN: Partial<Record<HeroId, number>> = { brakk: 0.12 };
+const BACK: Partial<Record<HeroId, number>> = { brakk: 3.5 };
+/** Heroes whose raised weapon would cover the face in the small round picture. */
+const NO_WEAPON_IN_PORTRAIT: HeroId[] = ['brakk'];
+
 /**
  * The hero on the start screen: the picked hero's 3D model on a lit pedestal, turning
  * slowly and breathing (drag to turn it). Also renders the round hero portraits.
@@ -75,7 +81,7 @@ export class MenuShowcase {
   }
 
   /** Round portraits (head and shoulders) for the hero picker, as image URLs. */
-  portraits(make: (id: HeroId) => THREE.Object3D | null = () => null): Record<HeroId, string> {
+  portraits(): Record<HeroId, string> {
     const out = {} as Record<HeroId, string>;
     const size = 160;
     const prevStage = this.stage.visible;
@@ -83,21 +89,17 @@ export class MenuShowcase {
     this.gl.setSize(size, size, false);
     this.stage.visible = false;
     for (const id of HERO_IDS) {
-      const art = make(id);
-      const m = art ?? model(`hero:${id}`);
-      m.rotation.y = 0.35;
+      const m = model(`hero:${id}`);
+      m.rotation.y = TURN[id] ?? 0.35;
+      if (NO_WEAPON_IN_PORTRAIT.includes(id)) m.getObjectByName('weapon')!.visible = false;
       this.scene.add(m);
       // Frame the head and shoulders (props like raised hammers would throw off a bounding box).
       m.updateMatrixWorld(true);
-      const torso = m.getObjectByName('torso');
-      let headY = torso ? torso.getWorldPosition(new THREE.Vector3()).y + 0.85 : 1.8;
-      if (art) {
-        // Artist models are normalised to their height: the head sits near the top.
-        const b = new THREE.Box3().setFromObject(art, true);
-        headY = b.max.y - (b.max.y - b.min.y) * 0.13;
-      }
-      cam.position.set(0.8, headY + 0.35, 3.2);
-      cam.lookAt(0, headY - 0.12, 0);
+      // Aim at the head joint itself: weapons, shields and horns differ per hero, the face is what counts.
+      const head = m.getObjectByName('head');
+      const headY = head ? head.getWorldPosition(new THREE.Vector3()).y + 0.02 : 1.8;
+      cam.position.set(0.62, headY + 0.3, BACK[id] ?? 3.1);
+      cam.lookAt(0, headY - 0.1, 0);
       this.rim.color.set(HEROES[id].color);
       this.gl.setClearColor(0x000000, 0);
       this.gl.render(this.scene, cam);
@@ -120,12 +122,12 @@ export class MenuShowcase {
     this.stage.visible = false;
     for (const id of HERO_IDS) {
       const m = model(`hero:${id}`);
-      m.rotation.y = 0.45;
+      m.rotation.y = TURN[id] ?? 0.45;
       this.scene.add(m);
       m.updateMatrixWorld(true);
       const torso = m.getObjectByName('torso');
       const chest = torso ? torso.getWorldPosition(new THREE.Vector3()).y + 0.35 : 1.4;
-      cam.position.set(1.1, chest + 0.45, 4.6);
+      cam.position.set(1.1, chest + 0.45, 4.6 + (BACK[id] ? 1 : 0));
       cam.lookAt(0, chest + 0.05, 0);
       this.rim.color.set(HEROES[id].color);
       this.gl.setClearColor(0x000000, 0);

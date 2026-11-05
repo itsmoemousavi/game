@@ -25,6 +25,14 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.11.x · New map art
 
+### 0.11.2
+*2026-11-05*
+- **New shop:** clearer tabs, every item shows its name, and items are sorted into basic and combined. One row at the bottom holds your items, scrolls and courier.
+- **Teleport scroll** is now a normal shop item: tap it, then Buy. With no scrolls left, tapping the TP slot opens the shop with the scroll already picked.
+- **Brakk has a new body and armour**, with the same animations.
+- Hero pictures now show the hero's head properly.
+- Darker fountain water, and no more pale edges under the stone walls.
+
 ### 0.11.1
 *2026-11-05*
 - **Everything matches now:** heroes, creeps, monsters and buildings share the map's painted look, with soft shading, muted colours and grime near the ground.

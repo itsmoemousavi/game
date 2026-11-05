@@ -382,7 +382,7 @@ export function bakeMap(map: GameMap): HTMLCanvasElement {
       g.stroke();
     }
     g.lineCap = 'butt';
-    g.strokeStyle = '#77736b';
+    g.strokeStyle = '#26241f';
     g.lineWidth = (h.outer - h.inner) * px;
     g.beginPath();
     g.arc(h.x * px, h.y * px, mid * px, doorAng + gap, doorAng - gap + Math.PI * 2);
@@ -390,8 +390,8 @@ export function bakeMap(map: GameMap): HTMLCanvasElement {
     g.lineCap = 'round';
   }
 
-  // 8b. Fountain yard walls (only the stretches standing on open ground).
-  g.fillStyle = '#77736b';
+  // 8b. Fountain yard walls (only the stretches standing on open ground): dark footing under the stone.
+  g.fillStyle = '#26241f';
   for (let i = 0; i < n * n; i++) {
     if (!map.fountainWall[i]) continue;
     const cx = i % n;

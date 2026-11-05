@@ -55,8 +55,77 @@ interface BodyOpts {
   torsoH?: number;
   eyes?: number;
   slim?: number;
+  /** Sculpted anatomy (tapered limbs, shaped torso, head with a face, real hands). Same joints either way. */
+  sculpt?: boolean;
 }
+
+/** A turned shape from [radius, height] points, in either direction. */
+function lathe(pts: [number, number][], seg = 12) {
+  // Points must run upward or the surface faces inward and can't be seen from outside.
+  const up = pts[0][1] <= pts[pts.length - 1][1] ? pts : [...pts].reverse();
+  return new THREE.LatheGeometry(up.map(([r, y]) => new THREE.Vector2(Math.max(0.0001, r), y)), seg);
+}
+/** A curved tube that narrows along its length (horns, tusks, fur tufts). */
+function taper(pts: [number, number, number][], r0: number, r1: number, seg = 10, radial = 6) {
+  const curve = new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p)));
+  const g = new THREE.TubeGeometry(curve, seg, 1, radial);
+  const p = g.attributes.position;
+  const c = new THREE.Vector3();
+  for (let i = 0; i <= seg; i++) {
+    curve.getPointAt(i / seg, c);
+    const r = r0 + (r1 - r0) * (i / seg);
+    for (let k = 0; k <= radial; k++) {
+      const v = i * (radial + 1) + k;
+      p.setXYZ(v, c.x + (p.getX(v) - c.x) * r, c.y + (p.getY(v) - c.y) * r, c.z + (p.getZ(v) - c.z) * r);
+    }
+  }
+  return g;
+}
+/** A flat shape with a depth and softened edges (shields, hammer faces). */
+function plate(shape: THREE.Shape, depth: number, bevel = 0.02) {
+  return new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelSize: bevel, bevelThickness: bevel, bevelSegments: 1, curveSegments: 8, steps: 1 }).translate(0, 0, -depth / 2);
+}
+/** A rounded box with a fold or bulge: `shape` moves each corner point (cloaks, tabards). */
+function cloth(w: number, h: number, sx: number, sy: number, shape: (x: number, y: number) => [number, number, number]) {
+  const g = new THREE.BoxGeometry(w, h, 0.035, sx, sy, 1);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const [dx, dy, dz] = shape(p.getX(i) / w + 0.5, p.getY(i) / h + 0.5);
+    p.setXYZ(i, p.getX(i) + dx, p.getY(i) + dy, p.getZ(i) + dz);
+  }
+  g.computeVertexNormals();
+  return g;
+}
+
+/** A head with a real shape: narrower jaw, brow, cheekbones, nose and ears. */
+function sculptedHead(parent: THREE.Object3D, skin: THREE.Material) {
+  const g = new THREE.IcosahedronGeometry(0.21, 2);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i);
+    const y = p.getY(i);
+    const z = p.getZ(i);
+    const below = Math.max(0, -y);
+    const jaw = 1 - below * 1.5;
+    const brow = z > 0.08 && y > 0.02 && y < 0.09 ? 1.06 : 1;
+    p.setXYZ(i, x * jaw * 0.93, y * 1.14, z * jaw * brow);
+  }
+  g.computeVertexNormals();
+  add(parent, mesh(g, skin), 0, 0, 0);
+  add(parent, mesh(lathe([[0.1, 0], [0.085, -0.08], [0.1, -0.17], [0.13, -0.2]], 8), skin), 0, -0.13, -0.01);
+  add(parent, rot(mesh(cone(0.032, 0.09, 5), skin), -0.35, 0, 0), 0, -0.025, 0.205);
+  for (const s of [-1, 1]) add(parent, mesh(sph(0.04, 0), skin), s * 0.19, 0, -0.01).scale.set(0.45, 1, 0.8);
+}
+
+/** A hand: palm, four fingers curled around a grip, and a thumb. */
+function sculptedHand(parent: THREE.Object3D, b: number, skin: THREE.Material) {
+  add(parent, mesh(sph(0.075 * b, 1), skin), 0, 0, 0).scale.set(0.82, 1, 1.05);
+  for (let i = 0; i < 4; i++) add(parent, rot(mesh(cyl(0.019 * b, 0.022 * b, 0.1 * b, 5), skin), 0.75, 0, 0), (i - 1.5) * 0.031 * b, -0.075 * b, 0.05 * b);
+  add(parent, rot(mesh(cyl(0.021 * b, 0.025 * b, 0.08 * b, 5), skin), 0.4, 0, -0.8), 0.06 * b, -0.015 * b, 0.05 * b);
+}
+
 function humanoid(o: BodyOpts): Body {
+  if (o.sculpt) return sculptedHumanoid(o);
   const b = o.bulk ?? 1;
   const hip = o.hip ?? 0.95;
   const th = o.torsoH ?? 0.72;
@@ -97,6 +166,55 @@ function humanoid(o: BodyOpts): Body {
   return { root, torso, head, legL: legs[0], legR: legs[1], armL: arms[0].g, armR: arms[1].g, handL: arms[0].h, handR: arms[1].h };
 }
 
+/** The same skeleton as the plain body (joints in the same places), with real anatomy on it. */
+function sculptedHumanoid(o: BodyOpts): Body {
+  const b = o.bulk ?? 1;
+  const hip = o.hip ?? 0.95;
+  const th = o.torsoH ?? 0.72;
+  const slim = o.slim ?? 1;
+  const w = b * slim;
+  const root = grp();
+  const skin = M(o.skin);
+  const legs = [-1, 1].map((s) => {
+    const g = add(root, grp(), s * 0.16 * b, hip, 0);
+    const L = hip - 0.12;
+    // Thigh, knee and calf, in one turned shape.
+    add(g, mesh(lathe([[0.001, 0.07], [0.12 * w, 0.03], [0.135 * w, -L * 0.14], [0.115 * w, -L * 0.42], [0.09 * w, -L * 0.52], [0.098 * w, -L * 0.6], [0.105 * w, -L * 0.72], [0.075 * w, -L * 0.96], [0.07 * w, -L]], 10), M(o.cloth2)), 0, 0, 0);
+    // Boot: an ankle cuff and a rounded foot.
+    add(g, mesh(lathe([[0.085 * b, -L + 0.14], [0.095 * b, -L + 0.02], [0.1 * b, -L - 0.03]], 8), M(o.boots)), 0, 0, 0);
+    add(g, mesh(sph(1, 1), M(o.boots)), 0, -hip + 0.075, 0.05 * b).scale.set(0.105 * b, 0.08, 0.17 * b);
+    add(g, mesh(cyl(1, 1, 0.03, 9), M(0x1a1612)), 0, -hip + 0.018, 0.05 * b).scale.set(0.095 * b, 1, 0.165 * b);
+    return g;
+  });
+  const torso = add(root, grp(), 0, hip, 0);
+  // Pelvis, waist, ribs, chest and shoulders; flattened front to back.
+  add(torso, mesh(lathe([[0.001, -0.06], [0.24 * w, -0.05], [0.25 * w, 0.03], [0.215 * w, th * 0.3], [0.285 * w, th * 0.62], [0.33 * w, th * 0.82], [0.27 * w, th * 0.97], [0.1, th + 0.03]], 12), M(o.cloth)), 0, 0, 0).scale.set(1, 1, 0.74);
+  add(torso, mesh(lathe([[0.25 * w, 0.0], [0.262 * w, 0.03], [0.262 * w, 0.08], [0.25 * w, 0.11]], 12), M(o.boots)), 0, 0, 0).scale.set(1, 1, 0.78);
+  const head = add(torso, grp(), 0, th + 0.24, 0);
+  sculptedHead(head, skin);
+  const eye = o.eyes !== undefined ? glow(o.eyes, 3) : M(0x1b1b1b);
+  for (const s of [-1, 1]) add(head, mesh(box(0.045, 0.024, 0.02), eye), s * 0.075, 0.02, 0.19);
+  const arms = [-1, 1].map((s) => {
+    const g = add(torso, grp(), s * 0.39 * b * slim, th - 0.1, 0);
+    add(g, mesh(sph(0.115 * b, 1), M(o.cloth)), 0, 0, 0);
+    // Upper arm, elbow and forearm.
+    add(g, mesh(lathe([[0.075 * b, 0.02], [0.092 * b, -0.1], [0.078 * b, -0.27], [0.066 * b, -0.31], [0.08 * b, -0.38], [0.07 * b, -0.5], [0.052 * b, -0.6]], 8), skin), 0, 0, 0);
+    const h = add(g, grp(), 0, -0.62, 0);
+    sculptedHand(h, b, skin);
+    return { g, h };
+  });
+  root.name = 'rig';
+  torso.name = 'torso';
+  head.name = 'head';
+  legs[0].name = 'legL';
+  legs[1].name = 'legR';
+  arms[0].g.name = 'armL';
+  arms[1].g.name = 'armR';
+  arms[0].h.name = 'handL';
+  arms[1].h.name = 'handR';
+  return { root, torso, head, legL: legs[0], legR: legs[1], armL: arms[0].g, armR: arms[1].g, handL: arms[0].h, handR: arms[1].h };
+}
+
 // ------------------------------------------------------------ heroes
 /**
  * Brakk the Bulwark: a heavy armored warrior with a tower shield on the left arm and a war
@@ -104,67 +222,131 @@ function humanoid(o: BodyOpts): Body {
  * (rig, torso, head, legs, arms and the hammer as its own 'weapon' joint).
  */
 function brakk() {
-  const b = humanoid({ skin: 0x9c7558, cloth: 0x4a3a2c, cloth2: 0x3a3029, boots: 0x2e2722, bulk: 1.4, hip: 0.88, torsoH: 0.78 });
-  const steel = M(0x8a929c, { metalness: 0.75, roughness: 0.35 });
-  const iron = M(0x4b5058, { metalness: 0.7, roughness: 0.45 });
-  const gold = M(0xb8902c, { metalness: 0.7, roughness: 0.3 });
-  const leather = M(0x5a3d26);
-  const fur = M(0x6e5a44, { roughness: 0.95 });
-  const bone = M(0xd9ccb0);
-  // Breastplate with a gold rim, fur mantle on the shoulders, belt and a hanging tabard.
-  add(b.torso, mesh(cyl(0.52, 0.4, 0.56, 8), steel), 0, 0.52, 0.02);
-  add(b.torso, mesh(box(0.08, 0.5, 0.06), gold), 0, 0.5, 0.45);
-  add(b.torso, mesh(box(0.52, 0.07, 0.08), gold), 0, 0.3, 0.42);
-  add(b.torso, mesh(cyl(0.58, 0.52, 0.2, 10), fur), 0, 0.86, -0.03).scale.set(1, 1, 0.85);
-  add(b.torso, mesh(cyl(0.42, 0.42, 0.13, 8), leather), 0, 0.06, 0);
-  add(b.torso, mesh(box(0.2, 0.15, 0.07), gold), 0, 0.06, 0.41);
-  add(b.torso, mesh(box(0.44, 0.62, 0.05), M(0x4d1b1b)), 0, -0.3, 0.33);
-  add(b.torso, mesh(box(0.44, 0.06, 0.06), gold), 0, -0.6, 0.34);
-  add(b.torso, rot(mesh(box(0.55, 0.7, 0.05), M(0x3f2a1e)), 0.15, 0, 0), 0, 0.35, -0.42); // back cloak piece
-  // Pauldrons with spikes and gauntlets: on the arms, so they move with them.
+  const b = humanoid({ skin: 0x9c7558, cloth: 0x3f3226, cloth2: 0x352c25, boots: 0x2a241f, bulk: 1.4, hip: 0.88, torsoH: 0.78, sculpt: true });
+  const steel = M(0x7c848d, { metalness: 0.75, roughness: 0.35 });
+  const iron = M(0x3f4349, { metalness: 0.7, roughness: 0.45 });
+  const bronze = M(0x96753a, { metalness: 0.7, roughness: 0.35 });
+  const leather = M(0x4a321f);
+  const furs = [0x5a4936, 0x4c3d2d, 0x665340].map((c) => M(c, { roughness: 0.95 }));
+  const bone = M(0xbdb092);
+  const red = M(0x4d1b1b);
+  // Breastplate: a shaped chest with a raised centre ridge and a bronze collar.
+  add(b.torso, mesh(lathe([[0.385, 0.3], [0.43, 0.42], [0.51, 0.62], [0.53, 0.72], [0.46, 0.84], [0.26, 0.9]], 14), steel), 0, 0, 0.02).scale.set(1, 1, 0.8);
+  add(b.torso, mesh(box(0.05, 0.5, 0.05), steel), 0, 0.6, 0.41).rotation.x = -0.1;
+  add(b.torso, mesh(lathe([[0.37, 0.84], [0.4, 0.86], [0.3, 0.92], [0.27, 0.91]], 14), bronze), 0, 0, 0.02).scale.set(1, 1, 0.82);
+  // Overlapping belly plates.
+  for (let i = 0; i < 3; i++) add(b.torso, mesh(lathe([[0.36 + i * 0.012, 0.09 + i * 0.075], [0.385 + i * 0.012, 0.13 + i * 0.075], [0.37 + i * 0.012, 0.2 + i * 0.075]], 14), i % 2 ? iron : steel), 0, 0, 0.01).scale.set(1, 1, 0.8);
+  // Belt with a bronze buckle.
+  add(b.torso, mesh(lathe([[0.385, 0.01], [0.405, 0.04], [0.405, 0.1], [0.385, 0.13]], 14), leather), 0, 0, 0).scale.set(1, 1, 0.82);
+  add(b.torso, mesh(box(0.17, 0.13, 0.05), bronze), 0, 0.07, 0.34);
+  // Fur mantle: a thick collar of overlapping lumps with short shaggy tufts at its edge.
+  for (let i = 0; i < 18; i++) {
+    const a = (i / 18) * Math.PI * 2;
+    const lump = new THREE.IcosahedronGeometry(0.15 + (i % 3) * 0.018, 1);
+    const lp = lump.attributes.position;
+    for (let v = 0; v < lp.count; v++) {
+      const k = 1 + 0.2 * Math.sin(lp.getX(v) * 41 + i) * Math.cos(lp.getZ(v) * 37 + lp.getY(v) * 29);
+      lp.setXYZ(v, lp.getX(v) * k, lp.getY(v) * k, lp.getZ(v) * k);
+    }
+    add(b.torso, mesh(lump, furs[i % furs.length]), Math.cos(a) * 0.4, 0.9 + (i % 2) * 0.03, Math.sin(a) * 0.31).scale.set(1.15, 0.72, 1.05);
+    const px = Math.cos(a + 0.17) * 0.47;
+    const pz = Math.sin(a + 0.17) * 0.37;
+    add(b.torso, mesh(taper([[px * 0.92, 0.88, pz * 0.92], [px * 1.04, 0.8, pz * 1.04], [px * 1.08, 0.7, pz * 1.08]], 0.06, 0.008, 3, 5), furs[(i + 1) % furs.length]), 0, 0, 0);
+  }
+  // Tabard in front, cloak behind, both with soft folds.
+  add(b.torso, mesh(cloth(0.42, 0.72, 4, 7, (x, y) => [0, 0, Math.sin(x * 9) * 0.012 + (1 - y) * 0.08]), red), 0, -0.3, 0.33);
+  add(b.torso, mesh(box(0.42, 0.045, 0.05), bronze), 0, 0.04, 0.34);
+  // A cloak hangs from under the fur: narrow at the shoulders, wide and torn at the hem, deep folds.
+  add(b.torso, mesh(cloth(0.74, 1.4, 10, 10, (x, y) => {
+    const fall = 1 - y;
+    const u = x - 0.5;
+    const hem = fall > 0.9 ? Math.sin(x * 31) * 0.05 : 0;
+    return [u * (-0.26 + fall * 0.36), hem, -fall * 0.09 + Math.sin(x * 22) * (0.012 + fall * 0.04)];
+  }), M(0x5a2a22)), 0, 0.2, -0.37);
+  // Pauldrons of layered plates with a bronze edge; forearm guards and gauntlets.
   for (const [arm, s] of [[b.armL, -1], [b.armR, 1]] as const) {
-    add(arm, mesh(sph(0.27, 0), iron), 0, 0.04, 0).scale.set(1.3, 0.85, 1.15);
-    add(arm, mesh(box(0.46, 0.06, 0.42), gold), 0, 0.2, 0);
-    for (const k of [-1, 1]) add(arm, rot(mesh(cone(0.055, 0.28, 5), steel), 0, 0, -s * 0.45), s * 0.16, 0.26, k * 0.12);
-    add(arm, mesh(cyl(0.12, 0.14, 0.28, 7), iron), 0, -0.5, 0);
-    add(arm, mesh(cyl(0.135, 0.135, 0.05, 7), gold), 0, -0.36, 0);
+    for (let i = 0; i < 3; i++) {
+      const dome = new THREE.SphereGeometry(0.31 - i * 0.03, 12, 6, 0, Math.PI * 2, 0, Math.PI * 0.52);
+      add(arm, mesh(dome, i === 1 ? steel : iron), s * (0.03 - i * 0.015), 0.1 - i * 0.075, 0).scale.set(1.08, 0.72, 1.02);
+    }
+    add(arm, mesh(new THREE.TorusGeometry(0.28, 0.022, 5, 18), bronze), s * 0.02, 0.08, 0).rotation.x = Math.PI / 2;
+    add(arm, rot(mesh(taper([[0, 0, 0], [s * 0.05, 0.13, 0], [s * 0.13, 0.25, 0]], 0.06, 0.005, 5, 5), steel), 0, 0, 0), s * 0.13, 0.25, 0.05);
+    add(arm, mesh(lathe([[0.125, -0.32], [0.14, -0.4], [0.125, -0.52], [0.145, -0.6], [0.12, -0.63]], 10), iron), 0, 0, 0);
+    add(arm, mesh(new THREE.TorusGeometry(0.134, 0.015, 4, 12), bronze), 0, -0.36, 0).rotation.x = Math.PI / 2;
+    add(arm, mesh(sph(0.1, 1), iron), 0, -0.68, 0.015).scale.set(1, 0.75, 1.1);
   }
-  // Greaves, knee guards and armored boots.
+  // Greaves, knee guards and plated boots.
   for (const leg of [b.legL, b.legR]) {
-    add(leg, mesh(cyl(0.16, 0.14, 0.42, 7), iron), 0, -0.55, 0.02);
-    add(leg, mesh(sph(0.13, 0), steel), 0, -0.3, 0.1);
-    add(leg, mesh(box(0.3, 0.13, 0.42), iron), 0, -0.82, 0.06);
+    add(leg, mesh(lathe([[0.15, -0.28], [0.17, -0.42], [0.155, -0.6], [0.125, -0.74]], 10), iron), 0, 0, 0.01);
+    add(leg, mesh(new THREE.SphereGeometry(0.135, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.6), steel), 0, -0.33, 0.07).rotation.x = 1.1;
+    add(leg, mesh(new THREE.TorusGeometry(0.128, 0.014, 4, 12), bronze), 0, -0.74, 0.01).rotation.x = Math.PI / 2;
+    for (let i = 0; i < 3; i++) add(leg, mesh(sph(1, 1), i % 2 ? steel : iron), 0, -0.77 - i * 0.012, 0.09 + i * 0.08).scale.set(0.15 - i * 0.012, 0.09 - i * 0.008, 0.11);
   }
-  // Horned helm with a face guard and glowing eye slit; braided beard below.
-  add(b.head, mesh(sph(0.26, 1), iron), 0, 0.05, 0).scale.set(1, 0.95, 1.05);
-  add(b.head, mesh(box(0.32, 0.22, 0.08), iron), 0, -0.07, 0.2);
-  add(b.head, mesh(box(0.24, 0.035, 0.02), glow(0xffb347, 2.2)), 0, 0.0, 0.245);
-  add(b.head, mesh(box(0.05, 0.32, 0.06), gold), 0, 0.05, 0.235);
+  // Helm: a dome with a brow band, nose guard and cheek plates; long curved horns; braided beard.
+  add(b.head, mesh(lathe([[0.001, 0.31], [0.1, 0.295], [0.19, 0.23], [0.245, 0.12], [0.255, 0.02], [0.25, -0.07]], 14), iron), 0, 0, 0);
+  add(b.head, mesh(new THREE.TorusGeometry(0.256, 0.024, 5, 20), bronze), 0, 0.05, 0).rotation.x = Math.PI / 2;
+  add(b.head, mesh(box(0.05, 0.27, 0.06), bronze), 0, 0.03, 0.245);
+  add(b.head, mesh(box(0.05, 0.2, 0.03), steel), 0, 0.2, 0.2).rotation.x = -0.55;
   for (const s of [-1, 1]) {
-    add(b.head, rot(mesh(cone(0.075, 0.42, 6), bone), 0, 0, -s * 1.05), s * 0.33, 0.2, 0);
-    add(b.head, rot(mesh(cone(0.045, 0.22, 5), bone), 0, 0, -s * 0.15), s * 0.55, 0.42, 0);
+    add(b.head, rot(mesh(box(0.13, 0.25, 0.05), iron), 0, s * 0.45, s * -0.08), s * 0.15, -0.1, 0.19);
+    add(b.head, mesh(taper([[s * 0.22, 0.13, 0], [s * 0.42, 0.18, 0.02], [s * 0.57, 0.33, 0.04], [s * 0.6, 0.55, 0.03]], 0.078, 0.006, 10, 7), bone), 0, 0, 0);
+    add(b.head, mesh(new THREE.TorusGeometry(0.075, 0.012, 4, 10), bronze), s * 0.28, 0.135, 0).rotation.y = Math.PI / 2 - s * 0.2;
   }
-  add(b.head, rot(mesh(cone(0.11, 0.32, 5), M(0x7a5a3a)), Math.PI, 0, 0), 0, -0.3, 0.17);
-  // Tower shield strapped to the left forearm, facing forward.
-  const sh = add(b.armL, grp(), 0.02, -0.46, 0.2);
+  add(b.head, mesh(box(0.24, 0.032, 0.025), glow(0xffb347, 2.2)), 0, 0.0, 0.232);
+  const beard = M(0x6b4e33);
+  for (let i = 0; i < 9; i++) {
+    const a = ((i - 4) / 4) * 0.8;
+    add(b.head, mesh(taper([[Math.sin(a) * 0.17, -0.14, 0.15 + Math.cos(a) * 0.04], [Math.sin(a) * 0.13, -0.27, 0.19], [Math.sin(a) * 0.05, -0.42 - (i % 2) * 0.05, 0.17]], 0.052, 0.008, 5, 5), beard), 0, 0, 0);
+  }
+  // Tower shield: a rounded, pointed plate with a bronze rim, a riveted boss and a chevron.
+  const sh = add(b.armL, grp(), 0.02, -0.46, 0.31);
   rot(sh, 0.7, 0, 0);
-  add(sh, mesh(box(0.78, 1.1, 0.1), iron), 0, 0, 0);
-  add(sh, mesh(box(0.86, 0.09, 0.13), gold), 0, 0.53, 0);
-  add(sh, mesh(box(0.86, 0.09, 0.13), gold), 0, -0.53, 0);
-  for (const s of [-1, 1]) add(sh, mesh(box(0.09, 1.1, 0.13), gold), s * 0.4, 0, 0);
-  add(sh, mesh(sph(0.15, 0), steel), 0, 0.06, 0.08);
-  add(sh, rot(mesh(cone(0.2, 0.36, 3), gold), Math.PI / 2, 0, 0), 0, -0.22, 0.06);
-  // War hammer in the right hand, held upright at rest: its own joint so it can swing.
+  const shieldShape = (k: number) => {
+    const w = 0.4 * k;
+    const h = 0.56 * k;
+    const s0 = new THREE.Shape();
+    s0.moveTo(-w, h * 0.72);
+    s0.quadraticCurveTo(0, h * 1.06, w, h * 0.72);
+    s0.lineTo(w, -h * 0.42);
+    s0.quadraticCurveTo(w * 0.72, -h * 0.85, 0, -h * 1.02);
+    s0.quadraticCurveTo(-w * 0.72, -h * 0.85, -w, -h * 0.42);
+    s0.closePath();
+    return s0;
+  };
+  add(sh, mesh(plate(shieldShape(1.07), 0.07, 0.015), bronze), 0, 0, -0.012);
+  add(sh, mesh(plate(shieldShape(0.98), 0.09, 0.012), iron), 0, 0, 0.012);
+  add(sh, mesh(new THREE.SphereGeometry(0.13, 12, 6, 0, Math.PI * 2, 0, Math.PI * 0.5), steel), 0, 0.1, 0.06).rotation.x = Math.PI / 2;
+  add(sh, mesh(new THREE.TorusGeometry(0.135, 0.018, 4, 16), bronze), 0, 0.1, 0.065);
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    add(sh, mesh(sph(0.018, 0), bronze), Math.cos(a) * 0.33, 0.04 + Math.sin(a) * 0.45, 0.07);
+  }
+  for (const s of [-1, 1]) add(sh, rot(mesh(box(0.28, 0.05, 0.03), bronze), 0, 0, s * 0.6), s * 0.11, -0.2, 0.065);
+  // War hammer: wrapped haft, an eight-sided head with bronze bands, a back spike and a top spike.
   const w = add(b.armR, grp(), 0, -0.62, 0.04);
   w.name = 'weapon';
-  add(w, mesh(cyl(0.05, 0.055, 1.35), leather), 0, 0.38, 0);
-  add(w, mesh(sph(0.08, 0), gold), 0, -0.3, 0);
-  for (const y of [0.05, 0.75]) add(w, mesh(cyl(0.065, 0.065, 0.06), gold), 0, y, 0);
-  add(w, mesh(box(0.66, 0.38, 0.38), iron), 0, 1.08, 0);
-  add(w, mesh(box(0.7, 0.08, 0.4), gold), 0, 1.08, 0);
-  add(w, mesh(box(0.12, 0.42, 0.42), steel), -0.34, 1.08, 0);
-  add(w, rot(mesh(cone(0.1, 0.28, 5), steel), 0, 0, Math.PI / 2), 0.46, 1.08, 0);
-  add(w, mesh(cone(0.08, 0.24, 5), steel), 0, 1.38, 0);
+  add(w, mesh(lathe([[0.05, -0.3], [0.052, 0], [0.048, 0.5], [0.056, 1.04]], 7), leather), 0, 0, 0);
+  add(w, mesh(sph(0.07, 1), bronze), 0, -0.32, 0);
+  for (let i = 0; i < 6; i++) add(w, rot(mesh(cyl(0.057, 0.057, 0.025, 7), M(0x2b1d12)), 0.14, 0, 0), 0, -0.14 + i * 0.05, 0);
+  for (const y of [0.1, 0.78]) add(w, mesh(cyl(0.064, 0.064, 0.05, 7), bronze), 0, y, 0);
+  const headShape = new THREE.Shape();
+  const hx = 0.19;
+  const hc = 0.07;
+  headShape.moveTo(-hx + hc, -hx);
+  headShape.lineTo(hx - hc, -hx);
+  headShape.lineTo(hx, -hx + hc);
+  headShape.lineTo(hx, hx - hc);
+  headShape.lineTo(hx - hc, hx);
+  headShape.lineTo(-hx + hc, hx);
+  headShape.lineTo(-hx, hx - hc);
+  headShape.lineTo(-hx, -hx + hc);
+  headShape.closePath();
+  const hammerHead = plate(headShape, 0.56, 0.018).rotateY(Math.PI / 2);
+  add(w, mesh(hammerHead, iron), 0, 1.08, 0);
+  for (const x of [-0.19, 0.17]) add(w, rot(mesh(cyl(0.2, 0.2, 0.045, 8), bronze), 0, 0, Math.PI / 2), x, 1.08, 0).rotation.y = 0;
+  add(w, rot(mesh(cyl(0.17, 0.2, 0.08, 8), steel), 0, 0, Math.PI / 2), -0.33, 1.08, 0);
+  add(w, rot(mesh(taper([[0, 0, 0], [0.13, 0.015, 0], [0.26, 0.05, 0]], 0.1, 0.008, 5, 6), steel), 0, 0, 0), 0.28, 1.08, 0);
+  add(w, mesh(taper([[0, 0, 0], [0, 0.13, 0], [0, 0.24, 0]], 0.065, 0.006, 4, 6), steel), 0, 1.27, 0);
   // Neutral stance: shield arm forward, hammer arm relaxed slightly out.
   rot(b.armL, -0.75, 0, -0.18);
   rot(b.armR, -0.15, 0, 0.16);

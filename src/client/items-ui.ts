@@ -52,8 +52,8 @@ export class ItemsUi {
   private shopKey = '';
   private ownKey = '';
   private tab: ShopTab = 'build';
-  /** Selected item in the shop: a shop item, one of your own slots, or a courier slot (to sell). */
-  private sel: { kind: 'shop'; id: ItemId } | { kind: 'own'; slot: number } | { kind: 'courier'; slot: number } | null = null;
+  /** Selected in the shop: a shop item, the teleport scroll, one of your own slots, or a courier slot (to sell). */
+  private sel: { kind: 'shop'; id: ItemId } | { kind: 'tp' } | { kind: 'own'; slot: number } | { kind: 'courier'; slot: number } | null = null;
   private dropBtn: HTMLButtonElement;
   /** Slot whose "Drop" button is showing (after a long press), if any. */
   private dropSlot: number | null = null;
@@ -124,19 +124,15 @@ export class ItemsUi {
       const c = this.ctx();
       if (!c) return;
       const h = c.me.hero!;
-      // Teleports are only bought in the shop; with none left this opens the shop.
+      // With no scrolls left this opens the shop with the scroll picked, one tap from buying.
       if (h.tpCount > 0) this.openPicker();
-      else this.toggleShop(true);
+      else this.select({ kind: 'tp' });
     });
     root.querySelector('#btn-shop')!.innerHTML = itemIcon('shop');
     root.querySelector('#btn-courier')!.innerHTML = `<span class="lbl">${itemIcon('courier')}</span>`;
     this.tpSlot.querySelector('.lbl')!.innerHTML = itemIcon('tp');
     tap(root.querySelector('#btn-shop')!, () => this.toggleShop());
     tap(root.querySelector('#shop-close')!, () => this.toggleShop(false));
-    tap(root.querySelector('#shop-tp')!, () => {
-      const c = this.ctx();
-      if (c) this.send({ type: 'buyTp', unitId: c.me.id });
-    });
     tap(root.querySelector('#tp-close')!, () => this.closePicker());
     tap(this.pickerCanvas, (e) => this.pickDestination(e));
     this.buildShop();
@@ -291,7 +287,7 @@ export class ItemsUi {
     for (const t of SHOP_TABS) {
       const b = document.createElement('button');
       b.dataset.tab = t.id;
-      b.innerHTML = `<span>${t.icon}</span>${t.name}`;
+      b.innerHTML = `<span>${t.icon}</span><em>${t.name}</em>`;
       onTap(b, () => {
         this.tab = t.id;
         this.renderGrid();
@@ -310,15 +306,34 @@ export class ItemsUi {
     this.root.querySelectorAll<HTMLElement>('#shop-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === this.tab));
     list.innerHTML = '';
     list.scrollTop = 0;
-    for (const id of ids) {
-      const d = ITEMS[id];
-      const card = document.createElement('button');
-      card.className = 'shop-item';
-      card.dataset.buy = id;
-      card.innerHTML = `<i>${itemIcon(id)}</i><span class="cost">${d.cost}</span>`;
+    const card = (id: ItemId | 'tp', name: string, cost: number) => {
+      const el = document.createElement('button');
+      el.className = 'shop-item';
+      if (id === 'tp') el.dataset.tp = '1';
+      else el.dataset.buy = id;
+      el.innerHTML = `<i>${itemIcon(id)}</i><span class="nm">${name}</span><span class="cost">${cost}</span>`;
       // Select on a clean tap only: a finger that moved (scrolling) does nothing.
-      onTap(card, () => this.select({ kind: 'shop', id: id as ItemId }), true);
-      list.appendChild(card);
+      onTap(el, () => this.select(id === 'tp' ? { kind: 'tp' } : { kind: 'shop', id }), true);
+      list.appendChild(el);
+    };
+    // The real name where it fits on the tile, otherwise the short one.
+    const label = (id: ItemId) => (ITEMS[id].name.length <= 12 ? ITEMS[id].name : ITEMS[id].short);
+    const heading = (text: string) => {
+      const el = document.createElement('h4');
+      el.textContent = text;
+      list.appendChild(el);
+    };
+    // The teleport scroll is an ordinary item: same tile, same details, same Buy button.
+    if (this.tab === 'build' || this.tab === 'consumable') card('tp', 'Teleport', TELEPORT.cost);
+    if (this.tab === 'build' || this.tab === 'consumable') {
+      for (const id of ids) card(id as ItemId, label(id as ItemId), ITEMS[id].cost);
+    } else {
+      const basics = ids.filter((id) => !ITEMS[id].recipe?.length);
+      const combined = ids.filter((id) => ITEMS[id].recipe?.length);
+      if (basics.length) heading('Basic');
+      for (const id of basics) card(id as ItemId, label(id as ItemId), ITEMS[id].cost);
+      if (combined.length) heading('Combined');
+      for (const id of combined) card(id as ItemId, label(id as ItemId), ITEMS[id].cost);
     }
     this.shopKey = '';
   }
@@ -337,10 +352,24 @@ export class ItemsUi {
     const c = this.ctx();
     const sel = this.sel;
     if (!c || !sel) {
-      box.innerHTML = '<p class="empty">Tap an item to see what it does.<br><br>Tap one of your items to sell or drop it.</p>';
+      box.innerHTML = '<p class="empty">Tap an item to see what it does and buy it.<br><br>Tap one of your own items below to sell or drop it.</p>';
       return;
     }
     const h = c.me.hero!;
+    if (sel.kind === 'tp') {
+      box.innerHTML = `
+        <div class="d-top"><i>${itemIcon('tp')}</i><div><b>Teleport Scroll</b><span class="d-cost">${TELEPORT.cost} gold</span></div></div>
+        <p class="d-sum">Channel, then teleport to any allied building. Keep one with you to get back to a fight.</p>
+        <div class="d-acts"><button id="shop-act"></button></div>
+        <small id="shop-why"></small>`;
+      onTap(box.querySelector('#shop-act')!, () => {
+        const c2 = this.ctx();
+        if (c2) this.send({ type: 'buyTp', unitId: c2.me.id });
+        this.shopKey = '';
+      });
+      this.shopKey = '';
+      return;
+    }
     const slot: ItemSlot | CourierSlot | null = sel.kind === 'own' ? h.items[sel.slot] : sel.kind === 'courier' ? h.courier.bag[sel.slot] : null;
     if (sel.kind !== 'shop' && !slot) {
       this.sel = null;
@@ -369,7 +398,7 @@ export class ItemsUi {
     }
     onTap(box.querySelector('#shop-act')!, () => {
       const c2 = this.ctx();
-      if (!c2 || !this.sel) return;
+      if (!c2 || !this.sel || this.sel.kind === 'tp') return;
       if (this.sel.kind === 'courier') {
         this.send({ type: 'sellCourier', unitId: c2.me.id, slot: this.sel.slot });
         this.sel = null;
@@ -387,7 +416,7 @@ export class ItemsUi {
     if (drop)
       onTap(drop, () => {
         const c2 = this.ctx();
-        if (!c2 || !this.sel || this.sel.kind === 'shop') return;
+        if (!c2 || !this.sel || this.sel.kind === 'shop' || this.sel.kind === 'tp') return;
         if (this.sel.kind === 'courier') this.send({ type: 'dropCourier', unitId: c2.me.id, slot: this.sel.slot });
         else if (c2.me.alive) this.send({ type: 'dropItem', unitId: c2.me.id, slot: this.sel.slot });
         else return;
@@ -404,10 +433,16 @@ export class ItemsUi {
   }
 
   /** Your items and your courier's, inside the shop (tap one to sell it). */
-  private renderOwn(items: (ItemSlot | null)[], bag: (CourierSlot | null)[]) {
+  private renderOwn(items: (ItemSlot | null)[], bag: (CourierSlot | null)[], tpCount: number) {
     const row = this.root.querySelector<HTMLElement>('#shop-own')!;
-    row.innerHTML = '<small>Your items</small><div class="own-grid"></div><small>Courier</small><div class="own-grid courier"></div>';
+    row.innerHTML = '<small>Yours</small><div class="own-grid"></div><div class="own-tp"></div><small class="c">Courier</small><div class="own-grid courier"></div>';
     const [grid, cgrid] = row.querySelectorAll('.own-grid');
+    const tp = document.createElement('button');
+    tp.className = tpCount ? '' : 'empty';
+    tp.classList.toggle('picked', this.sel?.kind === 'tp');
+    tp.innerHTML = `${itemIcon('tp')}<b>${tpCount}</b>`;
+    onTap(tp, () => this.select({ kind: 'tp' }), true);
+    row.querySelector('.own-tp')!.appendChild(tp);
     items.forEach((s, i) => {
       const b = document.createElement('button');
       b.className = s ? '' : 'empty';
@@ -433,6 +468,16 @@ export class ItemsUi {
     if (!btn || !why || !this.sel) return;
     const h = me.hero!;
     const atShop = !me.alive || inShop(w, me);
+    if (this.sel.kind === 'tp') {
+      const b = tpBuyBlocker(w, me);
+      btn.className = 'buy';
+      btn.innerHTML = b === 'courierFull' ? 'COURIER FULL' : `BUY <b>${TELEPORT.cost}</b>`;
+      btn.disabled = b !== null;
+      const have = `You have ${h.tpCount}`;
+      why.textContent =
+        b === 'gold' ? `Need ${Math.ceil(TELEPORT.cost - h.gold)} more gold · ${have}` : b === 'courierFull' ? "Your courier's 3 slots are full" : atShop ? have : `${have} · goes on your courier`;
+      return;
+    }
     if (this.sel.kind === 'courier') {
       const s = h.courier.bag[this.sel.slot];
       if (!s) return;
@@ -549,7 +594,10 @@ export class ItemsUi {
         const open = atShop || !me.alive;
         this.root.querySelector('#shop-gold')!.textContent = String(Math.floor(h.gold));
         this.root.querySelector('#shop-note')!.textContent = open ? (me.alive ? '' : 'You can shop while dead') : 'Away from base: what you buy goes on your courier';
-        this.root.querySelector('#shop-tp')!.classList.toggle('off', tpBuyBlocker(w, me) !== null);
+        this.root.querySelectorAll<HTMLElement>('[data-tp]').forEach((el) => {
+          el.classList.toggle('off', tpBuyBlocker(w, me) !== null);
+          el.classList.toggle('picked', this.sel?.kind === 'tp');
+        });
         this.root.querySelectorAll<HTMLElement>('[data-buy]').forEach((el) => {
           const id = el.dataset.buy as ItemId;
           el.classList.toggle('off', buyBlocker(w, me, id) !== null);
@@ -559,10 +607,10 @@ export class ItemsUi {
           el.querySelector('.cost')!.textContent = String(price);
           el.classList.toggle('cheaper', price < ITEMS[id].cost);
         });
-        const ok = `${h.items.map((x) => x?.id ?? '-').join()}|${bagKey}|${this.sel?.kind ?? ''}${this.sel && this.sel.kind !== 'shop' ? this.sel.slot : ''}`;
+        const ok = `${h.items.map((x) => x?.id ?? '-').join()}|${bagKey}|${h.tpCount}|${this.sel?.kind ?? ''}${this.sel && (this.sel.kind === 'own' || this.sel.kind === 'courier') ? this.sel.slot : ''}`;
         if (ok !== this.ownKey) {
           this.ownKey = ok;
-          this.renderOwn(h.items, h.courier.bag);
+          this.renderOwn(h.items, h.courier.bag, h.tpCount);
         }
         this.updateAction(w, me);
       }
@@ -691,13 +739,14 @@ function localRect(el: HTMLElement) {
 
 
 type ShopTab = 'build' | 'consumable' | 'attack' | 'defense' | 'magic' | 'upgrade';
+const tabIcon = (d: string) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const SHOP_TABS: { id: ShopTab; name: string; icon: string }[] = [
-  { id: 'build', name: 'For you', icon: '★' },
-  { id: 'consumable', name: 'Supplies', icon: '✚' },
-  { id: 'attack', name: 'Attack', icon: '⚔' },
-  { id: 'defense', name: 'Defense', icon: '⛨' },
-  { id: 'magic', name: 'Magic', icon: '✦' },
-  { id: 'upgrade', name: 'Boots & gear', icon: '▲' },
+  { id: 'build', name: 'For you', icon: tabIcon('<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9-5.2-2.8-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z"/>') },
+  { id: 'consumable', name: 'Supplies', icon: tabIcon('<path d="M9.5 3h5M10.5 3v5.5L5.6 17.2A2.5 2.5 0 0 0 7.8 21h8.4a2.5 2.5 0 0 0 2.2-3.8L13.5 8.5V3"/><path d="M8 15h8"/>') },
+  { id: 'attack', name: 'Attack', icon: tabIcon('<path d="M4 4l10.5 10.5M4 4v4M4 4h4"/><path d="M20 4L9.5 14.5M20 4v4M20 4h-4"/><path d="M6.5 13.5l4 4M17.5 13.5l-4 4M5 19l2.5-2.5M19 19l-2.5-2.5"/>') },
+  { id: 'defense', name: 'Defense', icon: tabIcon('<path d="M12 3l7.5 2.6v5.6c0 4.8-3.2 8.2-7.5 9.8-4.3-1.6-7.5-5-7.5-9.8V5.6z"/>') },
+  { id: 'magic', name: 'Magic', icon: tabIcon('<path d="M12 3l1.9 6.1L20 11l-6.1 1.9L12 19l-1.9-6.1L4 11l6.1-1.9z"/><path d="M19 3.5v3M17.5 5h3"/>') },
+  { id: 'upgrade', name: 'Gear', icon: tabIcon('<path d="M7 3.5h6.5v8.2l5 2.3c1.3.6 2 1.7 2 3V19H3.5v-2.2L7 13z"/><path d="M3.5 19v1.5h17V19"/>') },
 ];
 
 /** Shop tab for an item, from what it gives. */
