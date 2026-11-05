@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { HeroId, ITEMS, LANE_IDS, PlayerSlot, TICK_RATE, TELEPORT, Team, Unit, World, teleportTargets, tpBuyBlocker } from '../src/sim';
+import { HEROES, HeroId, ITEMS, fits, isWalkable, trueSightRadius, LANE_IDS, PlayerSlot, TICK_RATE, TELEPORT, Team, Unit, World, teleportTargets, tpBuyBlocker } from '../src/sim';
+import { onHillTop } from '../src/sim/objectives';
 import { spawnDummy } from '../src/client/tutorial';
 
 function arena(a: HeroId[], b: HeroId[]) {
@@ -334,5 +335,202 @@ describe('Mega Creeps', () => {
     const r = w.findStructure(0, 'barracks');
     const hp = (k: string) => r.find((x) => x.structure!.rax === k)!.maxHp;
     expect(hp('melee')).toBeGreaterThan(hp('ranged'));
+  });
+});
+
+describe('mountains and hiding spots', () => {
+  it('melee can only hit someone on a mountain from up there; ranged can if they see them', () => {
+    const { w, hero } = arena(['vexa', 'brakk'], ['orin', 'syl']);
+    const hill = w.map.hills[0];
+    const [v, b] = [hero(0, 'vexa'), hero(0, 'brakk')];
+    const target = hero(1, 'orin');
+    place(target, hill.x, hill.y);
+    place(b, hill.x + 6.5, hill.y);
+    place(v, hill.x + 7, hill.y + 1);
+    expect(w.canAttack(v, target)).toBe(true);
+    expect(w.canAttack(b, target)).toBe(false);
+    place(b, hill.x + 1, hill.y);
+    expect(w.canAttack(b, target)).toBe(true);
+  });
+
+  it('nobody walks up or down a mountain', () => {
+    const { w, hero } = arena(['brakk'], ['orin']);
+    const hill = w.map.hills[0];
+    const b = hero(0, 'brakk');
+    place(hero(1, 'orin'), 20, 20);
+    place(b, hill.x, hill.y);
+    run(w, 1);
+    expect(Math.hypot(b.x - hill.x, b.y - hill.y)).toBeLessThan(1);
+    w.applyCommand({ type: 'moveDir', unitId: b.id, dx: 1, dy: 0 });
+    run(w, 3);
+    expect(Math.hypot(b.x - hill.x, b.y - hill.y)).toBeLessThanOrEqual(6);
+    expect(onHillTop(w, b.x, b.y)).toBe(true);
+    place(b, hill.x + 7, hill.y);
+    w.applyCommand({ type: 'moveDir', unitId: b.id, dx: -1, dy: 0 });
+    run(w, 3);
+    expect(onHillTop(w, b.x, b.y)).toBe(false);
+  });
+
+  it('the woods have hiding spots you can blink into, and no walking path out of', () => {
+    const { w } = arena(['brakk'], ['orin']);
+    const m = w.map;
+    let pockets = 0;
+    for (let i = 0; i < m.walkable.length; i++) if (m.walkable[i] && !m.reachable[i]) pockets++;
+    expect(pockets).toBeGreaterThan(10);
+  });
+
+  it('a lone tree does not stand against the river rocks near the Warden', () => {
+    const { w } = arena(['brakk'], ['orin']);
+    for (const [x, y] of [[216.7, 193.2], [83.3, 106.8]]) {
+      expect(w.map.trees.some((t) => Math.hypot(t.x - x, t.y - y) < 1)).toBe(false);
+    }
+  });
+});
+
+describe('spells go through trees, walls and buildings', () => {
+  const charge = (w: World, b: Unit, dx: number, dy: number) => {
+    b.hero!.abilities[0].level = 1;
+    b.mana = b.maxMana;
+    w.applyCommand({ type: 'cast', unitId: b.id, slot: 0, x: b.x + dx, y: b.y + dy });
+  };
+  /** A straight line of `len` m with a tree or wall partway along it, starting and ending in the open. */
+  const lineThroughBlock = (w: World, len: number) => {
+    const m = w.map;
+    for (let y = 40; y < 260; y += 2) {
+      for (let x = 40; x < 240; x += 2) {
+        if (!fits(w.nav, x, y, 1) || !fits(w.nav, x + len, y, 1) || onHillTop(w, x + len, y)) continue;
+        let blocked = false;
+        for (let k = 2; k < len - 2; k++) if (!isWalkable(m, x + k, y) && !onHillTop(w, x + k, y)) blocked = true;
+        if (blocked) return { x, y };
+      }
+    }
+    throw new Error('no such line');
+  };
+
+  it("Brakk's charge goes its full distance through trees", () => {
+    const { w, hero } = arena(['brakk'], ['orin']);
+    const b = hero(0, 'brakk');
+    place(hero(1, 'orin'), 20, 20);
+    const range = HEROES.brakk.abilities[0].castRange;
+    const s = lineThroughBlock(w, range);
+    place(b, s.x, s.y);
+    charge(w, b, 1, 0);
+    run(w, 2);
+    expect(b.x - s.x).toBeGreaterThan(range - 1);
+    expect(fits(w.nav, b.x, b.y, b.radius)).toBe(true);
+  });
+
+  it('a charge that ends inside something comes out at the nearest open spot', () => {
+    const { w, hero } = arena(['brakk'], ['orin']);
+    const b = hero(0, 'brakk');
+    place(hero(1, 'orin'), 20, 20);
+    const range = HEROES.brakk.abilities[0].castRange;
+    let start: { x: number; y: number } | null = null;
+    for (let y = 40; y < 260 && !start; y += 2) {
+      for (let x = 40; x < 240 && !start; x += 2) {
+        if (fits(w.nav, x, y, 1) && !isWalkable(w.map, x + range, y) && !onHillTop(w, x + range, y)) start = { x, y };
+      }
+    }
+    place(b, start!.x, start!.y);
+    charge(w, b, 1, 0);
+    run(w, 2);
+    expect(fits(w.nav, b.x, b.y, b.radius)).toBe(true);
+    expect(Math.hypot(b.x - start!.x - range, b.y - start!.y)).toBeLessThan(14);
+  });
+
+  it('a charge can land on a mountain, and can leave one', () => {
+    const { w, hero } = arena(['brakk'], ['orin']);
+    const hill = w.map.hills[0];
+    const b = hero(0, 'brakk');
+    place(hero(1, 'orin'), 20, 20);
+    const range = HEROES.brakk.abilities[0].castRange;
+    place(b, hill.x - range, hill.y);
+    charge(w, b, 1, 0);
+    run(w, 2);
+    expect(onHillTop(w, b.x, b.y)).toBe(true);
+    b.hero!.abilities[0].cooldown = 0;
+    charge(w, b, 1, 0);
+    run(w, 2);
+    expect(onHillTop(w, b.x, b.y)).toBe(false);
+  });
+});
+
+describe('true sight', () => {
+  const veil = (u: Unit) => u.buffs.push({ key: 'veil', t: 60, invisible: true } as Unit['buffs'][number]);
+
+  it('towers show invisible enemies inside their attack range, not outside', () => {
+    const { w, hero } = arena(['brakk'], ['syl']);
+    const tower = w.structures.find((s) => s.team === 0 && s.structure!.tier === 'tower1')!;
+    const syl = hero(1, 'syl');
+    place(hero(0, 'brakk'), 20, 250);
+    veil(syl);
+    const r = trueSightRadius(tower);
+    expect(r).toBeGreaterThan(5);
+    let inside: { x: number; y: number } | null = null;
+    for (let a = 0; a < 6.3 && !inside; a += 0.1) {
+      const x = tower.x + Math.cos(a) * (r - 2);
+      const y = tower.y + Math.sin(a) * (r - 2);
+      if (fits(w.nav, x, y, syl.radius)) {
+        place(syl, x, y);
+        w.vision.update(w);
+        if (w.vision.seesPoint(0, x, y)) inside = { x, y };
+      }
+    }
+    expect(inside).not.toBeNull();
+    expect(w.canSee(0, syl)).toBe(true);
+    syl.buffs.length = 0;
+    expect(w.canSee(0, syl)).toBe(true);
+    veil(syl);
+    let outside = false;
+    for (let a = 0; a < 6.3 && !outside; a += 0.1) {
+      const x = tower.x + Math.cos(a) * (r + 3);
+      const y = tower.y + Math.sin(a) * (r + 3);
+      if (fits(w.nav, x, y, syl.radius)) {
+        place(syl, x, y);
+        w.vision.update(w);
+        outside = w.vision.seesPoint(0, x, y);
+      }
+    }
+    expect(outside).toBe(true);
+    expect(w.canSee(0, syl)).toBe(false);
+  });
+
+  it('the Shrine and fountain have it, barracks and observers do not', () => {
+    const { w } = arena(['brakk'], ['syl']);
+    const tier = (t: string) => w.structures.find((s) => s.structure!.tier === t)!;
+    expect(trueSightRadius(tier('shrine'))).toBeGreaterThan(0);
+    expect(trueSightRadius(tier('fountain'))).toBeGreaterThan(0);
+    expect(trueSightRadius(tier('barracks'))).toBe(0);
+  });
+
+  it('a sentry on a mountain shows the enemy observer for 5 seconds, then you need vision of your own', () => {
+    const { w, hero } = arena(['brakk'], ['orin']);
+    const hill = w.map.hills[0];
+    const mine = hero(0, 'brakk');
+    const enemy = hero(1, 'orin');
+    mine.hero!.gold = enemy.hero!.gold = 2000;
+    w.applyCommand({ type: 'buy', unitId: enemy.id, itemId: 'observerWard' });
+    w.applyCommand({ type: 'buy', unitId: mine.id, itemId: 'sentryWard' });
+    const slot = (u: Unit, id: string) => u.hero!.items.findIndex((s) => s?.id === id);
+    place(enemy, hill.x + 1, hill.y);
+    w.applyCommand({ type: 'placeWard', unitId: enemy.id, slot: slot(enemy, 'observerWard'), x: hill.x, y: hill.y + 2 });
+    place(enemy, 280, 40);
+    const observer = w.units.find((u) => u.ward?.kind === 'observer')!;
+    // Planted from the foot of the mountain.
+    place(mine, hill.x + 6.5, hill.y);
+    w.applyCommand({ type: 'placeWard', unitId: mine.id, slot: slot(mine, 'sentryWard'), x: hill.x + 1, y: hill.y });
+    const sentry = w.units.find((u) => u.ward?.kind === 'sentry')!;
+    w.vision.update(w);
+    expect(w.canSee(0, observer)).toBe(true);
+    const t0 = w.time;
+    while (w.time < t0 + 5.5) w.step();
+    place(mine, hill.x + 6.5, hill.y);
+    w.vision.update(w);
+    expect(sentry.alive).toBe(true);
+    expect(w.canSee(0, observer)).toBe(false);
+    // Jumping on top brings vision, and the sentry still unmasks the ward.
+    place(mine, hill.x, hill.y);
+    w.vision.update(w);
+    expect(w.canSee(0, observer)).toBe(true);
   });
 });

@@ -62,7 +62,7 @@ describe('wards', () => {
     const o = hero(0, 'orin');
     const foe = hero(1, 'brakk');
     const ward = w.spawnUnit('ward', 0, { x: 150, y: 120 }, { hp: 200, armor: 0, damage: 0, attackInterval: 0, attackRange: 0, projectileSpeed: 0, moveSpeed: 0, radius: 0.6, acquireRange: 0, bountyGold: 50, bountyXp: 50 });
-    ward.ward = { kind: 'observer', expires: 1e9 };
+    ward.ward = { kind: 'observer', expires: 1e9, placedAt: 0 };
     void o;
     w.dealDamage(foe.id, ward, 9999, 'spell');
     expect(ward.hp).toBe(ward.maxHp);

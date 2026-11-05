@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { botSlots } from './helpers';
-import { CREEPS, LANE_IDS, MAP_SIZE, World, createMap, findPath, isWalkable, lineClear, mirror, pointAlong, polylineLength } from '../src/sim';
+import { CREEPS, LANE_IDS, LANE_WIDTH, MAP_SIZE, Vec2, World, createMap, findPath, isWalkable, lineClear, mirror, pointAlong, polylineLength } from '../src/sim';
 
 const map = createMap();
 const botSlotsHuman = () => botSlots(true);
@@ -155,6 +155,31 @@ describe('map', () => {
     w.vision.update(w);
     expect(w.canSee(0, b)).toBe(true); // bank → river
     expect(w.canSee(1, a)).toBe(false); // river → bank
+  });
+
+  it('mountains stand clear of lanes, trails, camps and the river, with open ground all around', () => {
+    const seg = (p: Vec2, a: Vec2, b: Vec2) => {
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1)));
+      return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
+    };
+    const line = (p: Vec2, l: Vec2[]) => Math.min(...l.slice(1).map((q, i) => seg(p, l[i], q)));
+    expect(map.hills.length).toBe(6);
+    for (const h of map.hills) {
+      for (const l of Object.values(map.lanes)) expect(line(h, l)).toBeGreaterThan(LANE_WIDTH / 2 + 10);
+      for (const l of map.forestPaths) expect(line(h, l)).toBeGreaterThan(4 + 10);
+      for (const [a, b] of map.jungleTrails) expect(seg(h, a, b)).toBeGreaterThan(5 + 10);
+      for (const c of map.camps) expect(Math.hypot(h.x - c.x, h.y - c.y)).toBeGreaterThan(19);
+      expect(line(h, map.riverPath)).toBeGreaterThan(map.riverWidth / 2 + 10);
+      // You can walk to its foot on every side, and plant a ward on top from there.
+      for (let a = 0; a < 6.28; a += 0.4) {
+        const x = h.x + Math.cos(a) * 6.5;
+        const y = h.y + Math.sin(a) * 6.5;
+        const i = Math.floor(y / map.cell) * map.grid + Math.floor(x / map.cell);
+        expect(map.reachable[i]).toBe(1);
+      }
+    }
   });
 
   it('ward hilltops: no walking up, but wards and blinks work there', () => {

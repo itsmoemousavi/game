@@ -28,6 +28,8 @@ export interface GameMap {
   height: Uint8Array;
   /** Raised clearings in the jungle: wards (or heroes) there see over the forest. */
   hills: Vec2[];
+  /** Trails linking the jungle camps (both sides). */
+  jungleTrails: [Vec2, Vec2][];
   /** Narrow paths through the forest (both halves), for drawing. */
   forestPaths: Vec2[][];
   /** Lane polylines, ordered from team 0's base to team 1's base. */
@@ -42,6 +44,8 @@ export interface GameMap {
   bridges: Bridge[];
   /** Every tree: blocks walking and sight in its cell. */
   trees: Tree[];
+  /** Cells you can walk to from a base (the rest are hills and hiding spots in the woods). */
+  reachable: Uint8Array;
   /** River curbs: cells you can't walk over but can see across (1 = curb). */
   cliff: Uint8Array;
   /** Ward hill tops: too high to walk onto; blinks can land there and wards can be placed. */
@@ -210,11 +214,15 @@ const FOREST_PATHS_200: Vec2[][] = [
 ];
 const FOREST_PATHS = FOREST_PATHS_200.map((p) => p.map(sc));
 const FOREST_PATH_WIDTH = 8;
-/** Ward hills (height 3) on the forest paths. */
+/**
+ * Ward mountains (height 3), out in the woods between the forests: well clear of every lane,
+ * trail, camp and the river, so they never stand in anyone's way. Open ground all around each
+ * one lets you walk up to its foot and plant a ward on top. tests/map.test.ts checks this.
+ */
 const HILLS_200: Vec2[] = [
-  { x: 34, y: 86 },
-  { x: 128, y: 162 },
-  { x: 87, y: 127 },
+  { x: 42, y: 78 },
+  { x: 66, y: 160 },
+  { x: 104, y: 128 },
 ];
 const HILLS = HILLS_200.map(sc);
 const HILL_RADIUS = 5;
@@ -534,12 +542,22 @@ export function createMap(): GameMap {
       walkable[i] = 0;
     }
   }
-  // No trees on the curbs.
-  const keptTrees = trees.filter((t) => !cliff[Math.floor(t.y / CELL) * GRID + Math.floor(t.x / CELL)]);
+  // No trees on the curbs, and no lone tree jammed against them where it only blocks the way.
+  const onCurb = (t: Tree) => cliff[Math.floor(t.y / CELL) * GRID + Math.floor(t.x / CELL)] === 1;
+  const curbsNear = (t: Tree) => {
+    let c = 0;
+    const r = Math.ceil(6 / CELL);
+    const ox = Math.floor(t.x / CELL);
+    const oy = Math.floor(t.y / CELL);
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (Math.hypot(dx, dy) * CELL <= 6 && cliff[(oy + dy) * GRID + ox + dx]) c++;
+    return c;
+  };
+  const lone = trees.filter((t) => !onCurb(t) && curbsNear(t) >= 3 && trees.every((o) => o === t || Math.hypot(o.x - t.x, o.y - t.y) > 6));
+  for (const t of lone) walkable[Math.floor(t.y / CELL) * GRID + Math.floor(t.x / CELL)] = 1;
+  const keptTrees = trees.filter((t) => !onCurb(t) && !lone.includes(t));
 
-  // Anything walkable that can't be reached from the bases (a pocket inside a thicket)
-  // is filled in, so a blink can never land somewhere you can't walk out of.
-  sealPockets(walkable, FOUNTAIN0);
+  // Clearings nobody can walk to are left open on purpose: they're hiding spots for a blink.
+  const reachable = floodFrom(walkable, FOUNTAIN0);
 
   return {
     size: MAP_SIZE,
@@ -548,6 +566,7 @@ export function createMap(): GameMap {
     walkable,
     height,
     hills,
+    jungleTrails: [...JUNGLE_PATHS, ...JUNGLE_PATHS.map(([a, b]) => [mirror(a), mirror(b)] as [Vec2, Vec2])],
     forestPaths: [...FOREST_PATHS, ...FOREST_PATHS.map((p) => p.map(mirror))],
     lanes: LANES,
     teamLanes,
@@ -556,6 +575,7 @@ export function createMap(): GameMap {
     riverWidth: RIVER_WIDTH,
     bridges: [],
     trees: keptTrees,
+    reachable,
     cliff,
     hillTop,
     shrines,
@@ -664,6 +684,8 @@ const nearHouse = (x: number, y: number) => Math.hypot(x - HOUSE.x, y - HOUSE.y)
 const BASE_WALL = BASE_PLATEAU + 9;
 /** Outside the side lanes (between them and the map edge) is solid forest. */
 const BORDER_THICKET = 19;
+/** How rare the hiding spots in the thickets are (higher = fewer). */
+const POCKET_NOISE = 0.64;
 
 /**
  * Turn every not-yet-walkable cell into forest: thickets stay solid (a tree in every cell),
@@ -696,7 +718,15 @@ function plantForest(walkable: Uint8Array): Tree[] {
       const nearBase = Math.hypot(x - BASE0.x, y - BASE0.y) < BASE_WALL;
       const d = noise(x / 26, y / 26) * 0.75 + noise(x / 9, y / 9, 1) * 0.25;
       let p: number;
-      if (edge < BORDER_THICKET || nearBase || d > 0.52) p = 1; // thicket
+      if (edge < BORDER_THICKET || nearBase || d > 0.52) {
+        p = 1; // thicket
+        // Hiding spots: small clearings deep in the trees that you can only blink into (and need a
+        // teleport or another blink to leave). Never at the map's edge or around a base.
+        if (!nearBase && edge > BORDER_THICKET + 4 && noise(x / 8, y / 8, 11) > POCKET_NOISE) {
+          walkable[cy * GRID + cx] = 1;
+          continue;
+        }
+      }
       else if (d > 0.3) p = 0.55; // woods
       else p = 0.14; // glade
       if (p < 1) {
@@ -713,7 +743,11 @@ function plantForest(walkable: Uint8Array): Tree[] {
           continue;
         }
       }
-      half.push(tree(cx, cy));
+      const t = tree(cx, cy);
+      // Thickets stay impassable, but not every cell has a tree in it: undergrowth fills the rest,
+      // so the woods never look crammed.
+      const thinned = p === 1 && hash01(cx, cy, 12) > ((cx + cy) % 2 === 0 ? 0.92 : 0.16);
+      if (!thinned) half.push(t);
     }
   }
   // Mirror onto the other half.
@@ -731,25 +765,25 @@ function plantForest(walkable: Uint8Array): Tree[] {
   return trees;
 }
 
-/** Fill walkable cells that can't be reached from `start` (pockets inside thickets). */
-function sealPockets(walkable: Uint8Array, start: Vec2) {
+/** Which walkable cells can be walked to from `start`. */
+function floodFrom(walkable: Uint8Array, start: Vec2): Uint8Array {
   const seen = new Uint8Array(GRID * GRID);
-  const s0 = Math.floor(start.y / CELL) * GRID + Math.floor(start.x / CELL);
-  const stack = [s0];
-  seen[s0] = 1;
+  const stack = [Math.floor(start.y / CELL) * GRID + Math.floor(start.x / CELL)];
+  seen[stack[0]] = 1;
   while (stack.length) {
-    const c = stack.pop()!;
-    const cx = c % GRID;
-    const cy = (c - cx) / GRID;
-    for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const nx = cx + ox;
-      const ny = cy + oy;
-      if (nx < 0 || ny < 0 || nx >= GRID || ny >= GRID) continue;
-      const n = ny * GRID + nx;
-      if (seen[n] || !walkable[n]) continue;
-      seen[n] = 1;
-      stack.push(n);
+    const i = stack.pop()!;
+    const cx = i % GRID;
+    const cy = (i - cx) / GRID;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 0 || y < 0 || x >= GRID || y >= GRID) continue;
+      const k = y * GRID + x;
+      if (!seen[k] && walkable[k]) {
+        seen[k] = 1;
+        stack.push(k);
+      }
     }
   }
-  for (let i = 0; i < walkable.length; i++) if (walkable[i] && !seen[i]) walkable[i] = 0;
+  return seen;
 }

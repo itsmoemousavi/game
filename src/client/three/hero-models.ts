@@ -976,7 +976,7 @@ function rhen() {
  * Four-legged creatures on the same joints as everything else: the front legs are the arms, the
  * back legs the legs. Body along +z.
  */
-function beast(o: { len: number; high: number; girth: number; fur: number[]; team: number; rune: number; alpha?: boolean }): THREE.Group {
+function beast(o: { len: number; high: number; girth: number; fur: number[]; team: number; rune: number; alpha?: boolean; longEars?: boolean }): THREE.Group {
   const f = o.fur.map((c) => M(c, { roughness: 0.95 }));
   const root = grp();
   const torso = add(root, grp(), 0, o.high, 0);
@@ -1010,7 +1010,7 @@ function beast(o: { len: number; high: number; girth: number; fur: number[]; tea
   add(head, mesh(sph(g * 0.09, 0), M(0x14110e)), 0, -g * 0.03, g * (0.92 + (hs - 1) * 0.5));
   add(head, rot(mesh(lathe([[0.001, 0.44 * g * hs], [g * 0.17, g * 0.3 * hs], [g * 0.2, 0]], 7), M(0x241b14)), Math.PI / 2 + 0.2, 0, 0), 0, -g * 0.27, g * 0.3);
   for (const s of [-1, 1]) {
-    add(head, mesh(taper([[s * g * 0.3, g * 0.38, -g * 0.08], [s * g * 0.36, g * 0.62, -g * 0.1], [s * g * 0.4, g * 0.92, -g * 0.14]], g * 0.17, 0.012, 3, 4), f[1]), 0, 0, 0);
+    add(head, mesh(taper((o.longEars ? [[s * g * 0.26, g * 0.38, -g * 0.08], [s * g * 0.38, g * 0.95, -g * 0.18], [s * g * 0.46, g * 1.5, -g * 0.34]] : [[s * g * 0.3, g * 0.38, -g * 0.08], [s * g * 0.36, g * 0.62, -g * 0.1], [s * g * 0.4, g * 0.92, -g * 0.14]]) as [number, number, number][], o.longEars ? g * 0.22 : g * 0.17, 0.012, 3, 4), f[1]), 0, 0, 0);
     add(head, mesh(sph(g * 0.055, 0), glow(0xffc247, 2.4)), s * g * 0.24, g * 0.14, g * 0.46);
     add(head, mesh(taper([[s * g * 0.12, -g * 0.24, g * 0.66], [s * g * 0.12, -g * 0.37, g * 0.66]], g * 0.05, 0.003, 2, 4), M(0xbdb092)), 0, 0, 0);
   }
@@ -1051,7 +1051,102 @@ function redWolf(team: 0 | 1) {
   return beast({ len: 1.75, high: 1.02, girth: 0.37, fur: [0x7a2418, 0x571a12, 0x98321f], team, rune: team === 0 ? 0x62aef0 : 0xf07a5a, alpha: true });
 }
 export const HERO_BUILDERS: Record<HeroId, () => THREE.Group> = { brakk, vexa, orin, syl, grom, kaela, morra, seren, rhen };
-export { wolf, redWolf };
+/**
+ * The courier: a sturdy pack mule in the team's colours. Long head, long ears, a short stiff mane,
+ * hooves, saddlebags, a bedroll and a little lantern. After 6:00 it grows great feathered wings.
+ */
+function mule(fly: boolean, team: 0 | 1) {
+  const coat = M(0x6e5843, { roughness: 0.95 });
+  const dark = M(0x3f3126, { roughness: 0.95 });
+  const pale = M(0x9c8870, { roughness: 0.95 });
+  const hoof = M(0x1e1a16);
+  const tc = M(team === 0 ? 0x234f96 : 0x96272b);
+  const leather = M(0x3f2c1c);
+  const high = 0.8;
+  const root = grp();
+  const torso = add(root, grp(), 0, high, 0);
+  torso.name = 'torso';
+  // Barrel of a body, deep at the chest and round at the rump.
+  add(torso, rot(mesh(lumpy(lathe([[0.001, -0.56], [0.2, -0.48], [0.27, -0.26], [0.26, 0.05], [0.29, 0.3], [0.2, 0.5], [0.001, 0.58]], 10), 0.025, 3), coat), Math.PI / 2, 0, 0), 0, 0, 0);
+  // Neck, carried low and forward, with a stiff dark mane.
+  add(torso, mesh(taper([[0, 0.06, 0.4], [0, 0.26, 0.56], [0, 0.42, 0.7]], 0.17, 0.095, 6, 7), coat), 0, 0, 0);
+  for (let i = 0; i < 6; i++) {
+    const k = i / 5;
+    add(torso, mesh(box(0.035, 0.1, 0.075), dark), 0, 0.24 + k * 0.28, 0.44 + k * 0.28).rotation.x = -0.65;
+  }
+  const head = add(torso, grp(), 0, 0.46, 0.74);
+  head.name = 'head';
+  // Long plain face, pale soft muzzle, dark calm eyes.
+  add(head, mesh(taper([[0, 0.02, -0.04], [0, -0.09, 0.17], [0, -0.17, 0.36]], 0.115, 0.075, 6, 7), coat), 0, 0, 0);
+  add(head, mesh(sph(0.083, 1), pale), 0, -0.19, 0.39).scale.set(1, 0.85, 1.15);
+  for (const s of [-1, 1]) {
+    add(head, mesh(sph(0.019, 0), M(0x0d0b09)), s * 0.1, 0, 0.09);
+    add(head, mesh(sph(0.012, 0), M(0x14100c)), s * 0.04, -0.17, 0.47);
+    // The ears give it away: tall, leaning apart, dark at the tip.
+    add(head, mesh(taper([[s * 0.05, 0.08, -0.06], [s * 0.1, 0.27, -0.1], [s * 0.15, 0.46, -0.16]], 0.05, 0.012, 4, 5), coat), 0, 0, 0).scale.z = 0.7;
+  }
+  // Rope bridle in team colour.
+  add(head, rot(mesh(new THREE.TorusGeometry(0.087, 0.012, 4, 12), tc), 0.5, 0, 0), 0, -0.13, 0.28);
+  // Legs: straight and thin, knobbly knees, solid hooves.
+  const leg = (name: string, x: number, z: number) => {
+    const front = z > 0;
+    const j = add(front ? torso : root, grp(), x, front ? -0.12 : high - 0.12, z);
+    j.name = name;
+    const H = high - 0.12;
+    add(j, mesh(lumpy(sph(0.14, 1), 0.02, x), coat), 0, -0.05, 0).scale.set(0.85, 1.3, 1.1);
+    add(j, mesh(lathe([[0.1, 0], [0.085, -H * 0.42], [0.058, -H * 0.5], [0.05, -H * 0.86], [0.066, -H * 0.9]], 7), coat), 0, 0, 0);
+    add(j, mesh(sph(0.06, 0), dark), 0, -H * 0.5, 0.01);
+    add(j, mesh(cyl(0.062, 0.085, 0.08, 7), hoof), 0, -H + 0.04, 0.01);
+    return j;
+  };
+  leg('armL', -0.17, 0.32);
+  leg('armR', 0.17, 0.32);
+  leg('legL', -0.17, -0.36);
+  leg('legR', 0.17, -0.36);
+  const handL = add(root, grp(), 0, 0, 0);
+  handL.name = 'handL';
+  const handR = add(root, grp(), 0, 0, 0);
+  handR.name = 'handR';
+  // Thin tail with a dark brush.
+  add(torso, mesh(taper([[0, 0.14, -0.54], [0, 0.0, -0.66], [0, -0.26, -0.7]], 0.032, 0.022, 5, 5), coat), 0, 0, 0);
+  add(torso, mesh(taper([[0, -0.22, -0.7], [0, -0.38, -0.71], [0, -0.5, -0.68]], 0.05, 0.012, 3, 5), dark), 0, 0, 0);
+  // Blanket, saddle, bedroll, bulging saddlebags and a lantern.
+  add(torso, mesh(box(0.44, 0.03, 0.46), tc), 0, 0.27, -0.04);
+  for (const s of [-1, 1]) add(torso, rot(mesh(box(0.03, 0.24, 0.46), tc), 0, 0, s * 0.42), s * 0.26, 0.17, -0.04);
+  add(torso, mesh(box(0.24, 0.07, 0.34), leather), 0, 0.3, -0.04);
+  add(torso, rot(mesh(cyl(0.085, 0.085, 0.46, 8), M(0x7a6a4f)), 0, 0, Math.PI / 2), 0, 0.33, -0.26);
+  for (const s of [-1, 1]) {
+    add(torso, mesh(lumpy(sph(0.14, 1), 0.03, s), leather), s * 0.3, -0.03, -0.08).scale.set(0.58, 1.1, 1.15);
+    add(torso, mesh(box(0.018, 0.08, 0.2), tc), s * 0.385, 0.03, -0.08);
+  }
+  add(torso, mesh(cyl(0.04, 0.05, 0.09, 6), M(0x2a2622)), 0.32, -0.02, 0.2);
+  add(torso, mesh(sph(0.034, 0), glow(0xffc247, 2.6)), 0.32, -0.02, 0.2);
+  if (fly) {
+    const tones = [0xcdc7b8, 0xb9b2a1, 0xa89f8d].map((c) => M(c, { roughness: 0.9 }));
+    for (const s of [-1, 1]) {
+      const wing = add(torso, grp(), s * 0.15, 0.25, 0.14);
+      wing.rotation.z = s * 0.42;
+      // The arm of the wing, then long flight feathers fanning out from it, under shorter coverts.
+      add(wing, mesh(taper([[0, 0, 0], [s * 0.42, 0.05, 0.03], [s * 0.86, 0.02, -0.04]], 0.032, 0.012, 5, 5), tones[2]), 0, 0, 0);
+      const row = (n: number, len: number, wide: number, y: number, tone: number) => {
+        for (let i = 0; i < n; i++) {
+          const k = i / (n - 1);
+          const l = len * (0.62 + k * 0.5);
+          const fan = s * (0.05 + k * k * 0.85);
+          const f = add(wing, mesh(sph(1, 1), tones[(i + tone) % 3]), s * (0.06 + k * 0.8) + Math.sin(fan) * l * 0.5, y, -0.02 - Math.cos(fan) * l * 0.5);
+          f.scale.set(wide, 0.012, l * 0.5);
+          f.rotation.y = -fan;
+        }
+      };
+      row(10, 0.72, 0.06, 0, 0);
+      row(8, 0.36, 0.052, 0.02, 1);
+    }
+  }
+  root.name = 'rig';
+  return root;
+}
+
+export { wolf, redWolf, mule };
 
 /** Everything else: creeps, jungle monsters, buildings, wards, power-ups. */
 export { humanoid, M, glow, add, mesh, box, cyl, sph, cone, grp, rot, lathe, taper, plate, cloth, skirt, lumpy, hood };

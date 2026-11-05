@@ -211,6 +211,45 @@ export class Fx3D {
     });
   }
 
+  /** Big stones thrown out of an explosion: they arc, bounce once and lie where they land for a while. */
+  boulders(x: number, y: number, r: number, n: number) {
+    const gy = this.ground(x, y);
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const start = Math.random() * r;
+      const size = 0.28 + Math.random() * Math.random() * 1.5;
+      const m = new THREE.Mesh(this.chunkGeo, this.boulderMats[i % this.boulderMats.length]);
+      m.castShadow = true;
+      m.scale.set(size * (0.8 + Math.random() * 0.5), size * (0.6 + Math.random() * 0.5), size);
+      m.position.set(x + Math.cos(a) * start, gy + 1 + Math.random() * 3, y + Math.sin(a) * start);
+      const out = 5 + Math.random() * 17;
+      const v = new THREE.Vector3(Math.cos(a) * out, 9 + Math.random() * 17, Math.sin(a) * out);
+      const spin = new THREE.Vector3(Math.random() * 7, Math.random() * 7, Math.random() * 7);
+      let bounces = 0;
+      this.add(m, 5 + Math.random() * 2, (k, dt) => {
+        if (bounces < 3) {
+          v.y -= 30 * dt;
+          m.position.addScaledVector(v, dt);
+          m.rotation.x += spin.x * dt;
+          m.rotation.y += spin.y * dt;
+          m.rotation.z += spin.z * dt;
+          const floor = this.ground(m.position.x, m.position.z) + size * 0.3;
+          if (m.position.y < floor) {
+            m.position.y = floor;
+            bounces++;
+            v.y = Math.abs(v.y) * 0.32;
+            v.x *= 0.45;
+            v.z *= 0.45;
+            spin.multiplyScalar(0.4);
+          }
+        }
+        // Slowly sink away at the very end.
+        if (k > 0.85) m.position.y -= dt * 1.2;
+      });
+    }
+  }
+  private boulderMats = [0x5c584f, 0x4c4942, 0x6a665c, 0x3b3832].map((color) => new THREE.MeshLambertMaterial({ color, flatShading: true }));
+
   /** A jagged streak of light between two map points (lightning, thrown magic). */
   bolt(x0: number, y0: number, x1: number, y1: number, color: THREE.ColorRepresentation, h = 1.5) {
     const a = new THREE.Vector3(x0, this.ground(x0, y0) + h, y0);

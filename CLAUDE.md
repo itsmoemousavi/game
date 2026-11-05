@@ -83,6 +83,12 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
   Fountain shoots heroes anywhere in its healing area.
 - Controls: joystick moves; tapping the ground does **not** walk (only while holding the minimap, or with a mouse); tap an enemy to attack it.
 - Attack (owner's spec, 2026-11-05). Auto attack ON: nearest target in range by itself, also while walking, sticks to it while it stays in range (walking past creeps doesn't switch); an enemy picked with the Attack arrow comes first until it dies or leaves range; never denies, doesn't wake jungle camps. Auto attack OFF: one attack per tap (nearest) or per release of a hold (aimed target); tapping faster than attack speed does nothing extra; holding never attacks until release. Denies are one attack per tap/release in both modes.
+- Spells vs obstacles (owner, 2026-11-05): trees, walls, buildings and mountains block only walking, never spells. Charges/dashes go through and may end anywhere: on a mountain, off one, in or out of a pocket, into the Warden's house. Ending inside something moves you to the nearest open spot.
+- Mountains (owner, 2026-11-05): six, in the woods between forests, never on a lane or trail (`tests/map.test.ts` checks it), open ground all around so anyone can walk to the foot and plant a ward on top. Not walkable at all: up or down only by blink, teleport or charge. Melee can only hit someone up there from up there.
+- Forest: no crowded spots; pockets with no walking way out are on purpose (escape with blink, charge, or a TP brought by courier). Bots are lifted out of pockets and off mountains until they can use them.
+- True sight (owner, 2026-11-05): towers (attack range), Shrine and fountain always have it; sentry totems too. It needs vision: a sentry gives vision only for its first 5 s, then only unmasks where the team already sees. Vision is the observer totem's job. Everything with true sight wears a green outlined eye.
+- Match ending: everything freezes (heroes do not walk), the camera glides to the fallen Shrine, it explodes, result banner, then end screen.
+- Menu: Play with Bots, Practice, Play with Friend (locked until multiplayer). Courier art approved: pack mule, winged after 6:00.
 - Teleport: hero is frozen while channelling, only the X on the TP slot (or a stun) stops it, no walking cancels it; the destination is fixed when it starts, so a tower falling mid-channel doesn't matter. Channel bar over the health bar shows anything charging. Wayfarer Boots: always 1 TP, never used up, 30 s cooldown, allied heroes and creeps as targets too, can't buy scrolls; drop them and you keep 1.
 - Mega Creeps when all 6 enemy barracks are down. Camera: default is the farthest, can only zoom in.
 - Every hero starts the match with 1 TP scroll.
@@ -107,7 +113,6 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
   both ways; the Warden returns 8–11 min after dying (random, unannounced); wards die to exactly 2 attacks.
 - Courier (owner's design, 2026-11-03): 3 slots per hero, buys away from base go on it, delivers in slot order as many as fit,
   walks lanes only until 6:00 then flies, turns back on death, invulnerable for now (killable + bounty = later).
-  Its look is a placeholder mule (walking) / winged mule (flying): ask the owner before final art.
 - Dying costs gold; buyback exists. Android build: not now. App stores: later.
 
 ## Open items / next steps
@@ -119,10 +124,10 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
    Also not done: bots using walkways / blinking onto cliff hills, deliberate denies.
 3. **Hero balance** on the 300 m map: all 45–55% with the 8 new items (120 matches, 2026-11-05). Bot shopping lists move these numbers a lot:
    adding an item early to a list swung Kaela and Syl by 15-20%. Red ~55% was mostly a biased test shuffle; tick order now alternates. Owner: don't chase it.
-4. 3D polish: real art/animations, spell effects in 3D. Courier art is a placeholder (ask owner).
+4. 3D polish: real art/animations, spell effects in 3D.
 5. Living world: shipped in 0.11.0. Phone frame rate and battery with the new art still need the owner's check.
 6. More heroes: Morra, Seren and Rhen shipped in 0.13.0. A 4th only if playing them shows a missing role (owner agreed to wait).
-   Balance after 0.13.0 is rough (about 70 matches per hero): Brakk 59%, Grom 58%, Rhen 40.5%, the rest 45-56%. Re-check with more matches.
+   Balance after 0.15.0 is rough (about 45 matches per hero, so ±7-15%): Brakk 65%, Vexa 62%, Grom 58%, Syl 54%, Kaela 50%, Seren 47%, Rhen 42%, Morra 37%, Orin 30%. Re-check with more matches before tuning.
 7. Later: multiplayer (first on owner's MacBook, local only), killable courier + bounty, Capacitor app builds, store release.
 
 ## Gotchas

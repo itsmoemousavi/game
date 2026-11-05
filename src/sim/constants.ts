@@ -78,6 +78,10 @@ export const WARD_DURATION = 360;
 export const WARD_CAST_RANGE = 7;
 /** Sentry wards reveal invisible enemies (wards, invisible heroes) in this radius. */
 export const TRUE_SIGHT_RADIUS = 10;
+/** A fresh sentry also gives a little normal vision, only this long; after that it shows nothing by itself. */
+export const SENTRY_VISION_SECONDS = 5;
+/** The Shrine has no attack, so its true sight gets its own range. */
+export const SHRINE_TRUE_SIGHT = 16;
 
 /** Attacks from lower ground onto higher ground miss this often. */
 export const UPHILL_MISS_CHANCE = 0.25;

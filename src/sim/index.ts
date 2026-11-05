@@ -19,7 +19,7 @@ export { effectiveCooldown } from './abilities';
 export { RUNE_INFO } from './objectives';
 export type { Rune, RuneKind } from './objectives';
 export { buybackBlocker } from './objectives';
-export { isInvisible } from './vision';
+export { isInvisible, trueSightRadius } from './vision';
 export type { BotDifficulty } from './ai/bots';
 export { Rng } from './rng';
 export { DRAFT_ORDER, DRAFT_TIME, Draft, WARMUP_SECONDS } from './draft';

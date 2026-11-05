@@ -61,7 +61,7 @@ export class Tutorial {
         done: (_w, _me, t) => t.spellHit,
       },
       {
-        text: 'Your hero hits whatever is in range by itself. Tap the Attack button to hit the nearest target. Hold Attack and drag to pick a different target; while steering with the joystick, holding Attack hits on the move.',
+        text: 'Your hero hits whatever is in range by itself. Tap the Attack button to hit the nearest target. Hold Attack and drag to pick a different target, and let go to attack it.',
         marker: (w) => w.unit(this.dummyId) ?? null,
         done: (w) => !w.unit(this.dummyId)?.alive,
       },

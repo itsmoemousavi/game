@@ -537,6 +537,7 @@ export class WorldArt {
     quality: 'low' | 'medium' | 'high',
     fogTex: THREE.Texture,
     waterLevel: number,
+    private mountain: { height: number; top: number; foot: number },
   ) {
     this.level = ART_LEVEL[quality];
     this.shared.uFogMap.value = fogTex;
@@ -546,6 +547,7 @@ export class WorldArt {
     this.buildTrees();
     this.buildWater(waterLevel);
     this.buildCurbs();
+    this.buildMountains();
     this.buildRocks();
     this.buildUndergrowth();
     this.buildFireflies();
@@ -811,7 +813,7 @@ export class WorldArt {
 
   // ---------------------------------------------------------------- stone
 
-  /** River curbs and the rims of the ward hills: rough stone banks you can't walk through. */
+  /** River curbs: rough stone banks you can't walk through. */
   private buildCurbs() {
     const { map, terrainAt } = this;
     const n = map.grid;
@@ -828,9 +830,6 @@ export class WorldArt {
       }
     };
     map.cliff.forEach((c, i) => c && add(i));
-    map.hillTop.forEach((c, i) => {
-      if (c && [i - 1, i + 1, i - n, i + n].some((k) => !map.hillTop[k])) add(i);
-    });
     if (!stones.length) return;
     const mat = this.enhance(new THREE.MeshLambertMaterial({ vertexColors: true }), { fogReach: 2 });
     const e = new THREE.Euler();
@@ -851,6 +850,50 @@ export class WorldArt {
           m.compose(p, q, sc);
           const l = 0.74 + r.v * 0.36;
           c.setRGB(l * 1.02, l, l * 0.95);
+        },
+        { shadow: true },
+      );
+    });
+  }
+
+  /**
+   * Ward mountains: craggy stacks of big boulders up the steep sides, smaller stones around the
+   * flat top, so they read as a real mountain you could only get onto with a blink.
+   */
+  private buildMountains() {
+    const { map, terrainAt, mountain } = this;
+    const stones: { x: number; y: number; h: number; s: number; v: number; up: number }[] = [];
+    map.hills.forEach((hill, hi) => {
+      const put = (r: number, count: number, size: number, tier: number, up: number) => {
+        for (let i = 0; i < count; i++) {
+          const a = (i / count) * Math.PI * 2 + rnd(hi, tier, i) * 0.5;
+          const rr = r + (rnd(hi, tier, i + 40) - 0.5) * 0.7;
+          const x = hill.x + Math.cos(a) * rr;
+          const y = hill.y + Math.sin(a) * rr;
+          stones.push({ x, y, h: terrainAt(x, y), s: size * (0.72 + rnd(hi, tier, i + 80) * 0.6), v: rnd(hi, tier, i + 120), up });
+        }
+      };
+      // Bottom to top: wide footing, the steep cliffs, a jagged crown around the flat top.
+      put(mountain.foot - 0.1, 18, 1.5, 1, 1.05);
+      put(mountain.foot - 1.2, 15, 1.9, 2, 1.55);
+      put(mountain.top + 1.1, 12, 1.65, 3, 1.5);
+      put(mountain.top + 0.15, 11, 0.8, 4, 1.25);
+    });
+    if (!stones.length) return;
+    const mat = this.enhance(new THREE.MeshLambertMaterial({ vertexColors: true }), { fogReach: 4 });
+    const e = new THREE.Euler();
+    const q = new THREE.Quaternion();
+    [0, 1, 2].forEach((variant) => {
+      this.instanced(
+        stones.filter((s) => Math.floor(s.v * 3) === variant),
+        rockGeo(variant + 21, 1, 0.42),
+        mat,
+        (r, m, c) => {
+          e.set((r.v - 0.5) * 0.6, r.v * 40, (r.s % 1) * 0.5);
+          q.setFromEuler(e);
+          m.compose(new THREE.Vector3(r.x, r.h - 0.2, r.y), q, new THREE.Vector3(r.s * 1.05, r.s * r.up, r.s));
+          const l = 0.78 + r.v * 0.3;
+          c.setRGB(l * 1.02, l, l * 0.94);
         },
         { shadow: true },
       );
@@ -952,6 +995,7 @@ export class WorldArt {
     for (const p of map.forestPaths) markRoad(p, 2.2);
     const grassCell = (cell: number) => map.walkable[cell] === 1 && map.height[cell] === 1 && !road[cell];
 
+    const treeCells = new Set(map.trees.map((t) => Math.floor(t.y / map.cell) * n + Math.floor(t.x / map.cell)));
     // Bushes: thicken the edge of the woods so trees don't stand on bare ground. Only in cells
     // nobody can walk on, so they can't hide anybody.
     const bushes: { x: number; y: number; s: number; v: number }[] = [];
@@ -960,7 +1004,9 @@ export class WorldArt {
         const i = cy * n + cx;
         if (map.walkable[i] || map.height[i] !== 1 || map.cliff[i] || map.fountainWall[i]) continue;
         const edge = map.walkable[i - 1] || map.walkable[i + 1] || map.walkable[i - n] || map.walkable[i + n];
-        if (!edge || rnd(cx, cy, 31) > 0.55) continue;
+        // Woods without a tree in a cell are undergrowth, so it's clear you can't walk through.
+        const open = !treeCells.has(i);
+        if (!(edge && rnd(cx, cy, 31) <= 0.55) && !(open && rnd(cx, cy, 36) <= 0.5)) continue;
         bushes.push({ x: (cx + 0.2 + rnd(cx, cy, 32) * 0.6) * map.cell, y: (cy + 0.2 + rnd(cx, cy, 33) * 0.6) * map.cell, s: 0.8 + rnd(cx, cy, 34) * 0.7, v: rnd(cx, cy, 35) });
       }
     }

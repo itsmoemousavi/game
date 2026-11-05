@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { GLYPH_DURATION, GameMap, HEROES, HERO_IDS, Team, Unit, World, courierFlying, isInvisible, isNight } from '../sim';
+import { GLYPH_DURATION, GameMap, HEROES, HERO_IDS, Team, Unit, World, courierFlying, isInvisible, isNight, trueSightRadius } from '../sim';
 import type { Aim } from './input';
-import { Renderer, TEAM_COLORS } from './renderer';
+import { Renderer, TEAM_COLORS, drawTrueSightEye } from './renderer';
 import { JOINTS, Joint, TEAM_HEX, model } from './three/models';
 import { Fx3D } from './three/fx';
 import { Anim, AnimCtx, Corpse, animateHero, buffFx, heroAttack, heroBlink, heroCast, heroCorpse, newAnim, pose, setGround } from './three/hero-anims';
@@ -17,6 +17,10 @@ const ELEVATION = [-1.0, 0, 1.1, 3.4];
 /** Bridge deck height and the water surface (shallow: about ankle deep over the river bed). */
 const BRIDGE_DECK = 0.25;
 const WATER_LEVEL = -0.72;
+/** The end of a match: camera arrives, Shrine blows up, result comes up, end screen (seconds). */
+const END_TIMES = { arrive: 1.8, boom: 2.1, banner: 3.6, done: 7.2 };
+/** Ward mountains: meters high, radius of the flat top and of the foot. */
+const MOUNTAIN = { height: 6.8, top: 3.6, foot: 6.6 };
 /** Camera: looking down at this angle from the horizon, with this field of view. */
 const PITCH = (56 * Math.PI) / 180;
 const FOV = 38;
@@ -68,6 +72,21 @@ export class Renderer3D extends Renderer {
   private fxY = 0;
   private overlay: CanvasRenderingContext2D;
   private art!: WorldArt;
+  private ending: {
+    t: number;
+    x: number;
+    y: number;
+    fromX: number;
+    fromY: number;
+    zoom: number;
+    shrineId: number;
+    radius: number;
+    team: number;
+    boomed: boolean;
+    bannered: boolean;
+    finished: boolean;
+    on: { onBoom: () => void; onBanner: () => void; onDone: () => void };
+  } | null = null;
   private objs = new Map<string, Obj>();
   /** Per-unit animation clocks (walk cycle, attack swing, cast). */
   private anims = new Map<number, Anim>();
@@ -166,6 +185,22 @@ export class Renderer3D extends Renderer {
         }
       }
     }
+    // Ward mountains: a flat top, then a steep drop down to the clearing around them.
+    {
+      const r = n + 1;
+      for (let vy = 0; vy <= n; vy++) {
+        for (let vx = 0; vx <= n; vx++) {
+          const px = vx * map.cell;
+          const py = vy * map.cell;
+          for (const h of map.hills) {
+            const d = Math.hypot(px - h.x, py - h.y);
+            if (d > MOUNTAIN.foot) continue;
+            const k = d <= MOUNTAIN.top ? 1 : 1 - (d - MOUNTAIN.top) / (MOUNTAIN.foot - MOUNTAIN.top);
+            this.elev[vy * r + vx] = Math.max(this.elev[vy * r + vx], MOUNTAIN.height * k * (0.7 + 0.3 * k));
+          }
+        }
+      }
+    }
     this.bridges = map.bridges.map((b) => ({ ...b, c: Math.cos(b.angle), s: Math.sin(b.angle) }));
     const geo = new THREE.PlaneGeometry(map.size, map.size, n, n);
     geo.rotateX(-Math.PI / 2);
@@ -201,7 +236,7 @@ export class Renderer3D extends Renderer {
     fx.renderOrder = 2;
     this.scene.add(fx);
 
-    this.art = new WorldArt(this.scene, map, (x, y) => this.terrainAt(x, y), dpr, quality, this.fogTex, WATER_LEVEL);
+    this.art = new WorldArt(this.scene, map, (x, y) => this.terrainAt(x, y), dpr, quality, this.fogTex, WATER_LEVEL, MOUNTAIN);
     this.art.detailGround(groundMat);
     this.art.softFog(fog.material as THREE.MeshBasicMaterial, n);
     this.buildBridges(map);
@@ -438,6 +473,7 @@ export class Renderer3D extends Renderer {
     this.sun.target.position.set(this.camX, 0, this.camY - 6);
     this.clock += this.dt;
     this.art.update(this.dt, this.night);
+    this.updateEnding();
     this.world = w;
     this.viewTeam = viewTeam;
     this.syncCtx();
@@ -452,9 +488,79 @@ export class Renderer3D extends Renderer {
     this.drawOverlay(w, alpha, focus, viewTeam);
   }
 
+  /** The end of a match, played out on the fallen Shrine. See main.ts. */
+  playEnding(w: World, on: { onBoom: () => void; onBanner: () => void; onDone: () => void }) {
+    const loser = w.winner === 0 ? 1 : 0;
+    const shrine = w.structures.find((s) => s.team === loser && s.structure!.tier === 'shrine');
+    const p = shrine ?? { x: w.map.shrines[loser].x, y: w.map.shrines[loser].y };
+    this.ending = { t: 0, x: p.x, y: p.y, fromX: this.camX, fromY: this.camY, zoom: this.zoom, shrineId: shrine?.id ?? -1, radius: shrine?.radius ?? 5, team: loser, boomed: false, bannered: false, finished: false, on };
+  }
+
+  private updateEnding() {
+    const e = this.ending;
+    if (!e || e.finished) return;
+    e.t += this.dt;
+    const k = Math.min(1, e.t / END_TIMES.arrive);
+    const s = k * k * (3 - 2 * k);
+    this.lookAt(e.fromX + (e.x - e.fromX) * s, e.fromY + (e.y - e.fromY) * s);
+    this.zoom = e.zoom * (1 + 0.75 * s);
+    if (!e.boomed && e.t >= END_TIMES.boom) {
+      e.boomed = true;
+      this.shrineExplosion(e.x, e.y, e.radius, e.team);
+      e.on.onBoom();
+    }
+    if (!e.bannered && e.t >= END_TIMES.banner) {
+      e.bannered = true;
+      e.on.onBanner();
+    }
+    if (e.t >= END_TIMES.done) {
+      e.finished = true;
+      e.on.onDone();
+    }
+  }
+
+  /** The Shrine blows apart: a blast of light, its crystal in shards, stones flying far and landing all around. */
+  private shrineExplosion(x: number, y: number, r: number, team: number) {
+    const fx = this.fx3;
+    const crystal = team === 0 ? 0x62aef0 : 0xf07a5a;
+    fx.flash(x, y, 4, 26, 0xfff0c8, 0.7);
+    fx.flash(x, y, 6, 15, crystal, 1.1);
+    fx.shockwave(x, y, r * 4.5, 0xffb070, 1.0, 0.45);
+    fx.shockwave(x, y, r * 2.8, crystal, 0.8, 0.5);
+    fx.shockwave(x, y, r * 6.5, 0x9a8466, 1.6, 0.3);
+    // A pillar of fire and smoke climbing out of the crater.
+    const base = this.elevationAt(x, y);
+    for (let i = 0; i < 70; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const d = Math.random() * r * 0.8;
+      const hot = i < 40;
+      fx.particle(new THREE.Vector3(x + Math.cos(a) * d, base + 0.5 + Math.random() * 2, y + Math.sin(a) * d), hot ? (i % 3 ? 0xff8a3a : 0xffd27a) : 0x3a332b, hot ? 1 + Math.random() * 1.6 : 2 + Math.random() * 2.4, hot ? 0.8 + Math.random() * 0.9 : 1.8 + Math.random() * 2, { vel: new THREE.Vector3(Math.cos(a) * 2, hot ? 10 + Math.random() * 16 : 5 + Math.random() * 7, Math.sin(a) * 2), gravity: hot ? 2 : -0.5, additive: hot, opacity: hot ? 0.9 : 0.6 });
+    }
+    fx.boulders(x, y, r, 62);
+    fx.debris(x, y, 40, r, 13);
+    fx.sparks(x, y, 3, 60, 0xffc27a, 16);
+    fx.sparks(x, y, 5, 36, crystal, 11);
+    for (let i = 0; i < 26; i++) {
+      const a = (i / 26) * Math.PI * 2;
+      const d = r * (0.5 + Math.random() * 1.6);
+      fx.dust(x + Math.cos(a) * d, y + Math.sin(a) * d, 3, 3.4, 0x6f604c, 2.2, 2.2);
+    }
+    // Shards of the crystal, climbing and falling back.
+    const up = this.elevationAt(x, y) + 5;
+    for (let i = 0; i < 34; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 6 + Math.random() * 14;
+      fx.particle(new THREE.Vector3(x, up, y), crystal, 0.45 + Math.random() * 0.7, 1.1 + Math.random() * 0.9, { vel: new THREE.Vector3(Math.cos(a) * sp, 8 + Math.random() * 16, Math.sin(a) * sp), gravity: 22 });
+    }
+    fx.shake = Math.max(fx.shake, 1.9);
+    this.sound?.('earthsplitter', x, y, 1);
+    this.sound?.('stoneCrumble', x, y, 1);
+    this.sound?.('meteorImpact', x, y, 1);
+  }
+
   private updateFog(w: World, team: Team) {
     // Vision only changes a few times a second: rebuild the fog texture only then.
-    const key = `${w.vision.version}|${team}|${isNight(w.time)}`;
+    const key = `${w.vision.version}|${team}|${isNight(w.time)}|${!!this.ending}`;
     if (key === this.fogKey) return;
     this.fogKey = key;
     const g = w.vision.grids[team];
@@ -470,7 +576,8 @@ export class Renderer3D extends Renderer {
         d[o] = 1;
         d[o + 1] = 2;
         d[o + 2] = 4;
-        d[o + 3] = g[cy * n + cx] ? 0 : a;
+        // At the end of a match the fog lifts, so everybody can watch the Shrine go.
+        d[o + 3] = g[cy * n + cx] || this.ending ? 0 : a;
       }
     }
     this.fogTex.needsUpdate = true;
@@ -840,8 +947,10 @@ export class Renderer3D extends Renderer {
       if (u.kind === 'structure') {
         const tier = u.structure!.tier;
         const side = u.team === 1 ? 1 : 0;
-        if (u.alive) this.place(`structure:${tier}:${side}${u.structure!.rax ? ':' + u.structure!.rax : ''}`, id, u.x, u.y, 0, side ? Math.PI : 0);
-        else this.place(`rubble:${u.radius}`, id, u.x, u.y);
+        // The losing Shrine still stands until the camera has arrived and it blows up.
+        const standing = this.ending?.shrineId === u.id ? !this.ending.boomed : u.alive;
+        if (standing) this.place(`structure:${tier}:${side}${u.structure!.rax ? ':' + u.structure!.rax : ''}`, id, u.x, u.y, 0, side ? Math.PI : 0);
+        else this.place(tier === 'shrine' ? `rubble:shrine:${side}` : `rubble:${u.radius}`, id, u.x, u.y);
         // Tower shield (glyph): a golden dome over every shielded building, seen by everyone.
         const gl = u.structure!.glyph;
         if (u.alive && gl > 0) {
@@ -882,7 +991,16 @@ export class Renderer3D extends Renderer {
       if (hu.team !== team && !w.vision.seesPoint(team, x, y)) continue;
       const moving = Math.hypot(c.x - c.px, c.y - c.py) > 1e-3;
       const lift = flying ? 3.2 + Math.sin(t * 3 + hu.id) * 0.25 : moving ? Math.abs(Math.sin(t * 9 + hu.id)) * 0.08 : 0;
-      this.place(`courier:${flying ? 'fly' : 'walk'}:${hu.team === 1 ? 1 : 0}`, 'cour' + hu.id, x, y, lift, face(c.facing), 1.5);
+      const co = this.placeObj(`courier:${flying ? 'fly' : 'walk'}:${hu.team === 1 ? 1 : 0}`, 'cour' + hu.id, x, y, lift, face(c.facing), 1.5);
+      // A trot on the ground; in the air it tucks its legs and leans into the turns.
+      const step = moving && !flying ? Math.sin(this.clock * 11 + hu.id) * 0.7 : 0;
+      const tuck = flying ? 0.75 : 0;
+      pose(co.joints.armL, step - tuck, 0, 0);
+      pose(co.joints.armR, -step - tuck, 0, 0);
+      pose(co.joints.legL, -step + tuck, 0, 0);
+      pose(co.joints.legR, step + tuck, 0, 0);
+      pose(co.joints.head, Math.sin(this.clock * 2.2 + hu.id) * 0.06, 0, 0);
+      pose(co.joints.torso, flying ? Math.sin(this.clock * 3 + hu.id) * 0.05 : 0, 0, flying ? Math.sin(this.clock * 1.7 + hu.id) * 0.07 : 0);
     }
     for (const r of w.runes) {
       if (!w.vision.seesPoint(team, r.x, r.y)) continue;
@@ -932,6 +1050,12 @@ export class Renderer3D extends Renderer {
     ctx.textAlign = 'center';
     for (const u of w.units) {
       if (!u.alive) continue;
+      // True sight: a green eye floating over everything that has it.
+      if (trueSightRadius(u) > 0 && w.canSee(team, u)) {
+        const tier = u.structure?.tier;
+        const e = this.toScreen(u.x, u.y, u.ward ? 2.5 : tier === 'shrine' ? 12 : tier === 'fountain' ? 8 : 11.5);
+        drawTrueSightEye(ctx, e.x, e.y, u.ward ? 15 : 18);
+      }
       if (u.kind === 'structure') {
         if (u.hp >= u.maxHp) continue;
         const p = this.toScreen(u.x, u.y, u.structure!.tier === 'barracks' ? 6 : 8.5);

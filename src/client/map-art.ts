@@ -99,6 +99,16 @@ export function bakeMap(map: GameMap): HTMLCanvasElement {
       g.globalAlpha = 0.5;
       g.drawImage(stamp, (t.x - 2.2 * t.s) * px - sw, (t.y - 1.5 * t.s) * px - sw * 0.8, sw * 2, sw * 1.6);
     }
+    // The undergrowth between trees is the same dark floor, so thickets read as one mass.
+    g.globalAlpha = 0.6;
+    const r0 = map.cell * 1.5 * px;
+    for (let cy = 0; cy < map.grid; cy++) {
+      for (let cx = 0; cx < map.grid; cx++) {
+        const i = cy * map.grid + cx;
+        if (map.walkable[i] || map.height[i] !== 1 || map.cliff[i]) continue;
+        g.drawImage(stamp, (cx + 0.5) * map.cell * px - r0, (cy + 0.5) * map.cell * px - r0, r0 * 2, r0 * 2);
+      }
+    }
     g.globalAlpha = 1;
   }
 
@@ -329,11 +339,12 @@ export function bakeMap(map: GameMap): HTMLCanvasElement {
   }
   // Ward hills: rocky grass.
   for (const h of map.hills) {
-    const grad = g.createRadialGradient(h.x * px, h.y * px, 0, h.x * px, h.y * px, 5.5 * px);
-    grad.addColorStop(0, 'rgba(120,112,84,0.55)');
-    grad.addColorStop(1, 'rgba(120,112,84,0)');
+    const grad = g.createRadialGradient(h.x * px, h.y * px, 0, h.x * px, h.y * px, 7.5 * px);
+    grad.addColorStop(0, 'rgba(70,66,54,0.95)');
+    grad.addColorStop(0.55, 'rgba(58,54,44,0.9)');
+    grad.addColorStop(1, 'rgba(50,46,38,0)');
     g.fillStyle = grad;
-    g.fillRect((h.x - 6) * px, (h.y - 6) * px, 12 * px, 12 * px);
+    g.fillRect((h.x - 8) * px, (h.y - 8) * px, 16 * px, 16 * px);
   }
   // Cliff lips: dark edge where any raised ground meets lower ground.
   for (let cy = 0; cy < n; cy++) {

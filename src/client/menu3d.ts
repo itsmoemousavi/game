@@ -81,14 +81,14 @@ export class MenuShowcase {
   }
 
   /** Round portraits (head and shoulders) for the hero picker, as image URLs. */
-  portraits(): Record<HeroId, string> {
-    const out = {} as Record<HeroId, string>;
+  portraits(ids: readonly HeroId[] = HERO_IDS): Partial<Record<HeroId, string>> {
+    const out: Partial<Record<HeroId, string>> = {};
     const size = 160;
     const prevStage = this.stage.visible;
     const cam = new THREE.PerspectiveCamera(26, 1, 0.1, 50);
     this.gl.setSize(size, size, false);
     this.stage.visible = false;
-    for (const id of HERO_IDS) {
+    for (const id of ids) {
       const m = model(`hero:${id}`);
       m.rotation.y = TURN[id] ?? 0.35;
       if (NO_WEAPON_IN_PORTRAIT.includes(id)) m.getObjectByName('weapon')!.visible = false;
@@ -112,15 +112,15 @@ export class MenuShowcase {
   }
 
   /** Tall card pictures (chest up, 3:4) for the draft screen, as image URLs. */
-  cards(): Record<HeroId, string> {
-    const out = {} as Record<HeroId, string>;
+  cards(ids: readonly HeroId[] = HERO_IDS): Partial<Record<HeroId, string>> {
+    const out: Partial<Record<HeroId, string>> = {};
     const w = 210;
     const h = 280;
     const prevStage = this.stage.visible;
     const cam = new THREE.PerspectiveCamera(28, w / h, 0.1, 50);
     this.gl.setSize(w, h, false);
     this.stage.visible = false;
-    for (const id of HERO_IDS) {
+    for (const id of ids) {
       const m = model(`hero:${id}`);
       m.rotation.y = TURN[id] ?? 0.45;
       this.scene.add(m);
@@ -138,6 +138,96 @@ export class MenuShowcase {
     this.stage.visible = prevStage;
     this.resize();
     return out;
+  }
+
+  /**
+   * The start screen's picture: the heroes gathered on a stone rise at dusk, lit from behind by a
+   * burning Shrine. Drawn once as an image, so the menu costs no battery.
+   */
+  backdrop(w: number, h: number): string {
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x24150d);
+    scene.fog = new THREE.Fog(0x2c1a0e, 24, 74);
+    scene.add(new THREE.HemisphereLight(0xa9b4d0, 0x4a3320, 1.7));
+    const key = new THREE.DirectionalLight(0xffd9a8, 3.3);
+    key.position.set(-5, 9, 12);
+    key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    Object.assign(key.shadow.camera, { left: -14, right: 14, top: 12, bottom: -12, near: 1, far: 40 });
+    scene.add(key);
+    const rim = new THREE.DirectionalLight(0xff6a2a, 3.8);
+    rim.position.set(5, 5, -10);
+    scene.add(rim);
+    const ground = new THREE.Mesh(new THREE.CircleGeometry(60, 48).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x3a3227 }));
+    ground.receiveShadow = true;
+    scene.add(ground);
+    // Rough stones scattered about, and the Shrine's crystal blazing far behind them.
+    const rock = new THREE.IcosahedronGeometry(1, 1);
+    const pos = rock.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const k = 1 + 0.22 * Math.sin(pos.getX(i) * 9) * Math.cos(pos.getZ(i) * 7 + pos.getY(i) * 5);
+      pos.setXYZ(i, pos.getX(i) * k, pos.getY(i) * k * 0.7, pos.getZ(i) * k);
+    }
+    rock.computeVertexNormals();
+    const stoneMat = new THREE.MeshLambertMaterial({ color: 0x4b453a });
+    for (let i = 0; i < 46; i++) {
+      const a = i * 2.399;
+      const r = 5.5 + (i % 11) * 2.1;
+      const m = new THREE.Mesh(rock, stoneMat);
+      m.position.set(4 + Math.cos(a) * r, 0.1, -4 + Math.sin(a) * r);
+      m.scale.setScalar(0.4 + ((i * 7) % 5) * 0.32);
+      m.rotation.y = a;
+      m.castShadow = true;
+      m.receiveShadow = true;
+      scene.add(m);
+    }
+    const shrine = model('structure:shrine:1');
+    shrine.position.set(9, 0, -32);
+    shrine.scale.setScalar(1.25);
+    scene.add(shrine);
+    // The sky burning behind it.
+    const glowCv = document.createElement('canvas');
+    glowCv.width = glowCv.height = 256;
+    const gc = glowCv.getContext('2d')!;
+    const grad = gc.createRadialGradient(128, 128, 0, 128, 128, 128);
+    grad.addColorStop(0, 'rgba(255,150,80,0.6)');
+    grad.addColorStop(0.35, 'rgba(210,80,35,0.3)');
+    grad.addColorStop(1, 'rgba(120,30,10,0)');
+    gc.fillStyle = grad;
+    gc.fillRect(0, 0, 256, 256);
+    const sky = new THREE.Mesh(new THREE.PlaneGeometry(90, 60), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(glowCv), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    sky.position.set(9, 7, -40);
+    scene.add(sky);
+    // Heroes, a little to the right so the buttons have the left side of the screen.
+    const cast: [string, number, number, number][] = [
+      ['hero:brakk', 3.4, 0.2, 0.3],
+      ['hero:seren', 1, -1.5, 0.65],
+      ['hero:orin', 6, -1.7, -0.1],
+      ['hero:rhen', 8.4, -0.2, -0.45],
+      ['hero:vexa', -1.2, -3.6, 0.8],
+      ['hero:kaela', 3.4, -3.8, 0.1],
+      ['hero:grom', 10.8, -3.4, -0.5],
+      ['hero:syl', 7, -4.6, -0.1],
+      ['hero:morra', -0.6, 1.2, 0.85],
+      ['redwolf:1', 6, 1.8, -0.75],
+      ['wolf:1', 0.8, 2.6, 0.7],
+    ];
+    for (const [key2, x, z, ry] of cast) {
+      const m = model(key2);
+      m.position.set(x, 0, z);
+      m.rotation.y = ry;
+      m.scale.setScalar(key2.startsWith('hero:brakk') ? 1.15 : 1);
+      m.traverse((o) => ((o as THREE.Mesh).isMesh ? ((o as THREE.Mesh).castShadow = true) : null));
+      scene.add(m);
+    }
+    const cam = new THREE.PerspectiveCamera(30, w / h, 0.1, 120);
+    cam.position.set(0.2, 2.5, 14.5);
+    cam.lookAt(0.2, 3.2, 0);
+    this.gl.setPixelRatio(1);
+    this.gl.setSize(w, h, false);
+    this.gl.setClearColor(0x000000, 1);
+    this.gl.render(scene, cam);
+    return this.canvas.toDataURL('image/jpeg', 0.86);
   }
 
   resize() {

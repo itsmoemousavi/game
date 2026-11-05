@@ -1,4 +1,4 @@
-import { GameEvent, groundItemExpiry, GameMap, HEROES, ITEMS, canPickUp, PING_DURATION, PingKind, RUNE_INFO, Side, Team, Unit, WARD_CAST_RANGE, WARDEN_SLAM, World, isInvisible, isNight } from '../sim';
+import { trueSightRadius, GameEvent, groundItemExpiry, GameMap, HEROES, ITEMS, canPickUp, PING_DURATION, PingKind, RUNE_INFO, Side, Team, Unit, WARD_CAST_RANGE, WARDEN_SLAM, World, isInvisible, isNight } from '../sim';
 import { ATTACK_AIM, type Aim } from './input';
 import { itemImage } from './icons';
 import { bakeMap } from './map-art';
@@ -20,6 +20,34 @@ export const PING_STYLE: Record<PingKind, { color: string; icon: string; label: 
   retreat: { color: '#facc15', icon: '⟲', label: 'Retreat!' },
   missing: { color: '#c084fc', icon: '?', label: 'Enemy missing!' },
 };
+
+/** The sign for true sight: a green outlined eye. (x, y) is its centre, `size` its width. */
+export function drawTrueSightEye(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
+  const w = size / 2;
+  const h = size * 0.3;
+  const lens = () => {
+    ctx.beginPath();
+    ctx.moveTo(x - w, y);
+    ctx.quadraticCurveTo(x, y - h * 1.7, x + w, y);
+    ctx.quadraticCurveTo(x, y + h * 1.7, x - w, y);
+    ctx.closePath();
+  };
+  ctx.save();
+  ctx.lineJoin = 'round';
+  lens();
+  ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+  ctx.lineWidth = size * 0.26;
+  ctx.stroke();
+  lens();
+  ctx.strokeStyle = '#5dff8f';
+  ctx.lineWidth = size * 0.11;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(x, y, size * 0.13, 0, Math.PI * 2);
+  ctx.fillStyle = '#5dff8f';
+  ctx.fill();
+  ctx.restore();
+}
 
 export class Renderer {
   ctx: CanvasRenderingContext2D;
@@ -227,6 +255,9 @@ export class Renderer {
     this.drawGroundItems(w, viewTeam, focus);
     this.drawWardenSlam(w, sees);
     for (const u of w.units) if (u.ward && u.alive && sees(u)) this.drawWard(u, viewTeam);
+    for (const u of w.units) {
+      if (trueSightRadius(u) > 0 && sees(u)) drawTrueSightEye(this.ctx, u.x, u.y - u.radius - 1.6, 2.6);
+    }
     if (this.wardMode !== null && focus?.alive) {
       const p = lerp(focus);
       ctx.strokeStyle = 'rgba(250,204,21,0.8)';

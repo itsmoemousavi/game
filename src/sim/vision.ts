@@ -1,4 +1,4 @@
-import { DAY_SECONDS, NIGHT_SECONDS, TRUE_SIGHT_RADIUS, Team } from './constants';
+import { DAY_SECONDS, NIGHT_SECONDS, SENTRY_VISION_SECONDS, SHRINE_TRUE_SIGHT, TRUE_SIGHT_RADIUS, Team } from './constants';
 import type { House } from './map';
 import type { Unit, World } from './world';
 
@@ -24,9 +24,22 @@ import type { Unit, World } from './world';
 /** Wards are always invisible; heroes are while an invisibility buff is active. */
 export const isInvisible = (u: Unit) => !!u.ward || u.buffs.some((b) => b.invisible);
 
+/**
+ * How far this unit shows invisible things to its team (0 = it can't): towers within their attack
+ * range, the Shrine and the fountain around them, and sentry wards. True sight only unmasks what
+ * the team can already see, so it never gives vision by itself.
+ */
+export function trueSightRadius(u: Unit): number {
+  if (!u.alive) return 0;
+  if (u.ward) return u.ward.kind === 'sentry' ? TRUE_SIGHT_RADIUS : 0;
+  const tier = u.structure?.tier;
+  if (!tier || tier === 'barracks') return 0;
+  return tier === 'shrine' ? SHRINE_TRUE_SIGHT : u.attackRange + u.radius;
+}
+
 export class Vision {
   readonly grids: [Uint8Array, Uint8Array];
-  /** Where each team can see invisible things (sentry wards, fountain). */
+  /** Where each team can see invisible things (sentry wards, towers, Shrine, fountain). */
   readonly trueSight: [Uint8Array, Uint8Array];
   /** Per radius (in half-cells): offsets in range + the cells each sight line crosses. */
   private patterns = new Map<number, { dx: Int16Array; dy: Int16Array; lineStart: Int32Array; lineX: Int16Array; lineY: Int16Array }>();
@@ -74,10 +87,11 @@ export class Vision {
           inside = true;
           continue;
         }
-        const r = night ? u.visionNight : u.visionDay;
+        const blindSentry = u.ward?.kind === 'sentry' && w.time - u.ward.placedAt > SENTRY_VISION_SECONDS;
+        const r = blindSentry ? 0 : night ? u.visionNight : u.visionDay;
         if (r > 0) this.reveal(g, u.x, u.y, r);
-        if (u.ward?.kind === 'sentry') this.disc(ts, u.x, u.y, TRUE_SIGHT_RADIUS);
-        if (u.structure?.tier === 'fountain') this.disc(ts, u.x, u.y, 16);
+        const sight = trueSightRadius(u);
+        if (sight > 0) this.disc(ts, u.x, u.y, sight);
       }
       if (hs) for (const c of this.houseCells) g[c] = inside ? 1 : 0;
     }

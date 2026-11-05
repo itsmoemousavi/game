@@ -146,7 +146,7 @@ export function placeWard(w: World, u: Unit, slot: number, x: number, y: number)
   if (dist(u.x, u.y, x, y) > WARD_CAST_RANGE) return 'approach';
   const kind = s.id === 'observerWard' ? 'observer' : 'sentry';
   const ward = w.spawnUnit('ward', u.team, { x, y }, WARDS[kind]);
-  ward.ward = { kind, expires: w.time + WARD_DURATION };
+  ward.ward = { kind, expires: w.time + WARD_DURATION, placedAt: w.time };
   s.count--;
   if (s.count <= 0) h.items[slot] = null;
   w.events.push({ type: 'ward', unitId: ward.id });

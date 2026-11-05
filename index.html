@@ -12,24 +12,40 @@
     <link rel="apple-touch-icon" href="./ovra-touch-icon.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="./ovra-touch-icon.png" />
     <link rel="manifest" href="./manifest.webmanifest" />
+    <style>
+      /* Here and not in the stylesheet, so it shows from the very first moment. */
+      html, body { background: #0d0f0e; }
+      #loading { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; color: #e7e2d3; font-family: Georgia, 'Times New Roman', serif; background: radial-gradient(ellipse at 50% 42%, #2a2118 0%, #12110e 55%, #090a09 100%); transition: opacity 0.35s; }
+      #loading.done { opacity: 0; pointer-events: none; }
+      #loading .l-logo { font-size: 64px; font-weight: 700; letter-spacing: 0.28em; padding-left: 0.28em; color: #e9d7a8; text-shadow: 0 0 34px rgba(255,150,70,0.5), 0 2px 0 #3a2a14; }
+      #loading .l-bar { width: min(320px, 56vw); height: 5px; border-radius: 3px; background: rgba(255,255,255,0.09); overflow: hidden; box-shadow: 0 0 0 1px rgba(214,177,99,0.3); }
+      #l-fill { width: 4%; height: 100%; background: linear-gradient(90deg, #a8742b, #f2c26b); transition: width 0.25s; }
+      #l-text { font-size: 13px; letter-spacing: 0.08em; color: rgba(231,226,211,0.62); font-style: italic; }
+    </style>
   </head>
   <body>
+    <div id="loading">
+      <div class="l-logo">OVRA</div>
+      <div class="l-bar"><div id="l-fill"></div></div>
+      <div id="l-text">Waking the Shrines</div>
+    </div>
     <div id="root">
     <section id="select">
-      <header class="menu-top">
-        <div class="logo">OV<span>RA</span></div>
-        <div class="menu-tag">3v3 · Break the towers · Destroy the enemy Shrine</div>
-      </header>
-      <div class="menu-main">
-        <div class="menu-side">
+      <div id="menu-art"></div>
+      <div id="menu-embers"></div>
+      <div class="menu-panel">
+        <div class="logo">OVRA</div>
+        <div class="menu-tag">Three against three. Break the towers. Destroy the Shrine.</div>
+        <div class="menu-buttons">
+          <button id="btn-play" class="primary">Play with Bots</button>
+          <button id="btn-friend" class="locked">Play with Friend<small>Coming soon</small></button>
+          <button id="btn-practice">Practice</button>
+        </div>
+        <div class="menu-opts">
           <div class="opt"><span>Lane</span><div id="lane-pick" class="seg"></div></div>
           <div class="opt"><span>Bots</span><div id="diff-pick" class="seg"></div></div>
-          <button id="btn-play"><b>PLAY</b><small>vs Bots</small></button>
-          <div class="menu-minor">
-            <button id="btn-practice" class="alt">Practice</button>
-            <button id="btn-tutorial" class="alt">Tutorial</button>
-          </div>
         </div>
+        <button id="btn-tutorial" class="textlink">New here? Play the tutorial</button>
       </div>
       <canvas id="menu3d"></canvas>
     </section>
@@ -37,6 +53,8 @@
     <section id="draft" class="hidden"></section>
 
     <div id="app" class="hidden">
+      <div id="victory" class="hidden"><b></b><small></small></div>
+      <div id="end-flash"></div>
       <canvas id="game3d"></canvas>
       <canvas id="game"></canvas>
 

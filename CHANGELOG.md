@@ -9,6 +9,7 @@ The version you're playing is shown in **Settings → View** in the game.
 
 | Version | Milestone | Date |
 |---|---|---|
+| [0.15.x](#015x--a-real-start-and-finish) | A real start and finish | 2026-11-05 |
 | [0.14.x](#014x--new-controls-and-rules) | New controls and rules | 2026-11-05 |
 | [0.13.x](#013x--three-new-heroes) | Three new heroes | 2026-11-05 |
 | [0.12.x](#012x--new-items) | 8 new items | 2026-11-05 |
@@ -25,6 +26,41 @@ The version you're playing is shown in **Settings → View** in the game.
 | [0.1.x](#01x--first-playable-prototype) | First playable prototype (2D) | 2026-11-01 |
 
 ---
+
+## 0.15.x · A real start and finish
+
+### 0.15.0
+*2026-11-05*
+
+**Start and finish**
+- New loading screen, with a bar that moves while the game gets ready.
+- New start menu: Play with Bots, Practice, and Play with Friend (coming soon).
+- The match now ends properly: everything freezes, the camera glides to the fallen Shrine, it blows apart in fire and flying stones, the result comes up, and then the end screen with the leaderboard and MVP.
+
+**Spells ignore trees, walls and buildings**
+- Charges and dashes such as Brakk's now go straight through trees, walls, buildings and mountains. Only walking is blocked.
+- If a charge ends inside something, you come out at the nearest open spot.
+- A charge can land you on a mountain, take you off one, get you in or out of a hiding spot, or carry you into the Warden's house.
+
+**Mountains and forest**
+- Ward spots are now tall rock mountains, moved off the lanes and trails into the woods between forests. Open ground all around lets you walk to the foot and plant a ward on top.
+- Nobody can walk up or down a mountain. Get up or down with a blink, a teleport or a charge.
+- Melee heroes can only hit someone on a mountain from up there; ranged heroes can if they have vision.
+- About half as many trees, so nothing feels crowded. The woods now hide small pockets you can only get in or out of with a blink, a charge or a teleport.
+- Removed the single tree near the rocks by the Warden's house, on both sides.
+
+**True sight**
+- Towers, the Shrine and the fountain always show invisible enemies inside their range. Step out and you are hidden again.
+- Sentry totems now give normal vision for only their first 5 seconds. After that they show invisible things only where your team already has vision. Vision is the Watcher totem's job.
+- Everything with true sight wears a green eye on top.
+
+**Look**
+- The courier is now a proper pack mule that grows feathered wings when it starts flying.
+- All item and spell icons share calmer colours and a thin gold edge.
+
+**Behind the scenes**
+- Bots that end up on a mountain or in a hiding spot are lifted out, because they can't use the escape routes yet.
+- The hard-bot test now checks kills only, because hard bots still don't win more matches than easy ones.
 
 ## 0.14.x · New controls and rules
 

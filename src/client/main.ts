@@ -10,7 +10,7 @@ import { Tutorial, spawnDummy } from './tutorial';
 import { playEvents } from './sound-events';
 import { ScreenFx } from './screen-fx';
 import { EndScreen } from './end-screen';
-import { GameEvent, HEROES as HERO_DEFS, PingKind, RUNE_INFO, RuneKind, TEAM_NAMES } from '../sim';
+import { GameEvent, HERO_IDS, HEROES as HERO_DEFS, PingKind, RUNE_INFO, RuneKind, TEAM_NAMES } from '../sim';
 import { PING_STYLE } from './renderer';
 import { Renderer } from './renderer';
 import { QUALITY, Quality, Renderer3D } from './renderer3d';
@@ -45,15 +45,55 @@ try {
 
 // ------------------------------------------------------------- menu & draft
 
-// The 3D hero models are rendered once into round headshots (HUD and draft screen).
-try {
-  const showcase = new MenuShowcase($<HTMLCanvasElement>('#menu3d'));
-  Object.assign(heroPortraits, showcase.portraits());
-  Object.assign(heroCards, showcase.cards());
-  showcase.dispose();
-} catch (err) {
-  console.warn('Hero headshots unavailable', err);
+// ------------------------------------------------------------- loading screen
+
+const loadingEl = $<HTMLElement>('#loading');
+function showLoading(text: string, pct: number) {
+  loadingEl.classList.remove('done');
+  $<HTMLElement>('#l-text').textContent = text;
+  $<HTMLElement>('#l-fill').style.width = `${pct}%`;
 }
+/** Give the browser a moment to draw the loading screen before the next heavy step. */
+const nextPaint = () => new Promise<void>((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+
+// The 3D hero models are rendered once into headshots and draft cards, a hero at a time so the
+// loading bar keeps moving. Then the start screen's picture.
+async function boot() {
+  try {
+    const showcase = new MenuShowcase($<HTMLCanvasElement>('#menu3d'));
+    for (const [i, id] of HERO_IDS.entries()) {
+      showLoading(`Summoning ${HERO_DEFS[id].name}`, 8 + (i / HERO_IDS.length) * 72);
+      await nextPaint();
+      Object.assign(heroPortraits, showcase.portraits([id]));
+      Object.assign(heroCards, showcase.cards([id]));
+    }
+    showLoading('Lighting the Shrines', 86);
+    await nextPaint();
+    const art = showcase.backdrop(1400, 646);
+    $<HTMLElement>('#menu-art').style.backgroundImage = `url(${art})`;
+    showcase.dispose();
+  } catch (err) {
+    console.warn('Hero pictures unavailable', err);
+  }
+  showLoading('Ready', 100);
+  await nextPaint();
+  loadingEl.classList.add('done');
+}
+void boot();
+
+// A few embers rising past the start screen (only CSS, nothing to redraw).
+{
+  const embers = $<HTMLElement>('#menu-embers');
+  for (let i = 0; i < 16; i++) {
+    const e = document.createElement('i');
+    e.style.left = `${28 + Math.random() * 70}%`;
+    e.style.setProperty('--dx', `${(Math.random() - 0.5) * 120}px`);
+    e.style.animationDuration = `${7 + Math.random() * 9}s`;
+    e.style.animationDelay = `${-Math.random() * 14}s`;
+    embers.appendChild(e);
+  }
+}
+
 const draftUi = new DraftUi($<HTMLElement>('#draft'));
 
 /** Play → the draft (bans, then picks) → the match. Practice and the tutorial only pick your hero. */
@@ -103,6 +143,11 @@ for (const d of ['easy', 'normal', 'hard'] as BotDifficulty[]) {
 
 $<HTMLButtonElement>('#btn-play').addEventListener('click', () => startDraft('bots'));
 $<HTMLButtonElement>('#btn-practice').addEventListener('click', () => startDraft('practice'));
+$<HTMLButtonElement>('#btn-friend').addEventListener('click', () => {
+  const b = $<HTMLElement>('#btn-friend small');
+  b.textContent = 'Not ready yet';
+  setTimeout(() => (b.textContent = 'Coming soon'), 1500);
+});
 $<HTMLButtonElement>('#btn-tutorial').addEventListener('click', () => startDraft('tutorial'));
 
 // ------------------------------------------------------------- match setup
@@ -137,7 +182,47 @@ const endScreen = new EndScreen(
     world = null;
   },
 );
-hud.onGameOver = (w) => endScreen.show(w, myTeam, myHeroId);
+hud.onGameOver = (w) => playEnding(w);
+
+/**
+ * The end of a match: everything stops, the camera glides to the fallen Shrine, it blows apart,
+ * the result comes up, and then the end screen.
+ */
+let ending = false;
+function playEnding(w: World) {
+  ending = true;
+  app.classList.add('ending');
+  settingsPanel.classList.add('hidden');
+  itemsUi.toggleShop(false);
+  const show = () => {
+    $<HTMLElement>('#victory').classList.add('hidden');
+    endScreen.show(w, myTeam, myHeroId);
+  };
+  const won = w.winner === myTeam;
+  const banner = () => {
+    const v = $<HTMLElement>('#victory');
+    v.classList.remove('hidden');
+    v.classList.toggle('lost', !won);
+    v.querySelector('b')!.textContent = won ? 'VICTORY' : 'DEFEAT';
+    v.querySelector('small')!.textContent = `${TEAM_NAMES[w.winner as Team]} destroyed the enemy Shrine`;
+  };
+  if (!(renderer instanceof Renderer3D)) {
+    banner();
+    setTimeout(show, 2200);
+    return;
+  }
+  const flash = $<HTMLElement>('#end-flash');
+  renderer.playEnding(w, {
+    onBoom: () => {
+      flash.classList.remove('go');
+      void flash.offsetWidth;
+      flash.classList.add('go');
+      buzz([120, 50, 200], 0);
+    },
+    onBanner: banner,
+    onDone: show,
+  });
+}
 
 const sfx = new Sfx();
 const itemsUi = new ItemsUi(
@@ -480,7 +565,12 @@ practicePanel.querySelectorAll<HTMLElement>('[data-cheat]').forEach((b) =>
   }),
 );
 
-function startMatch(m: Mode, d: Draft) {
+async function startMatch(m: Mode, d: Draft) {
+  showLoading('Preparing the battlefield', 55);
+  await nextPaint();
+  ending = false;
+  app.classList.remove('ending');
+  $<HTMLElement>('#victory').classList.add('hidden');
   screenFx.clear();
   endScreen.reset();
   lastMatch = { m, d };
@@ -515,6 +605,9 @@ function startMatch(m: Mode, d: Draft) {
   applySettings();
   itemsUi.reset();
   void enterImmersive();
+  showLoading('Ready', 100);
+  await nextPaint();
+  loadingEl.classList.add('done');
 }
 
 setupLandscape($<HTMLElement>('#root'), () => {
@@ -535,7 +628,7 @@ let lastDraw = 0;
 function frame(now: number) {
   acc += Math.min(0.25, (now - last) / 1000);
   last = now;
-  if (paused) acc = 0;
+  if (paused || ending) acc = 0;
   // Battery: never draw faster than the quality's frame rate (phones can refresh at 120 Hz),
   // and don't redraw a paused game.
   const fps = settings.graphics === '3d' ? QUALITY[settings.quality].fps : 60;
@@ -571,7 +664,7 @@ function frame(now: number) {
       renderer.marker = tutorial.marker?.(world, me) ?? null;
     } else renderer.marker = null;
     // Back from the dead (or done peeking): camera returns to the hero.
-    if (me.alive && renderer.freeCamera && !input.peeking) renderer.follow();
+    if (me.alive && renderer.freeCamera && !input.peeking && !ending) renderer.follow();
     try {
       renderer.render(world, acc / DT, me, myTeam, input.aim);
     } catch (err) {
@@ -584,7 +677,7 @@ function frame(now: number) {
       renderer.camY = prev.camY;
       input.renderer = renderer;
     }
-    screenFx.frame(me);
+    if (!ending) screenFx.frame(me);
     endScreen.record(world);
     hud.update(world, me, myTeam);
     if (!statsPanel.classList.contains('hidden')) hud.updateStats(world, me);

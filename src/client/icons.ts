@@ -4,8 +4,18 @@ import type { ItemId, StatusId } from '../sim';
  * Hand-made 24×24 SVG icons for items (original artwork, no external assets).
  * Each returns markup that fills its container.
  */
+/** Every colour on every icon gets a little quieter, so they sit with the painted game. */
+function muted(hex: string): string {
+  const n = parseInt(hex.length === 4 ? hex.slice(1).replace(/./g, '$&$&') : hex.slice(1), 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  const l = 0.3 * r + 0.59 * g + 0.11 * b;
+  const c = (v: number) => Math.round((v + (l - v) * 0.24) * 0.93);
+  return `#${((1 << 24) | (c(r) << 16) | (c(g) << 8) | c(b)).toString(16).slice(1)}`;
+}
 const svg = (body: string, bg: string) =>
-  `<svg viewBox="0 0 24 24" class="icon" xmlns="http://www.w3.org/2000/svg"><rect width="24" height="24" rx="4" fill="${bg}"/>${body}</svg>`;
+  `<svg viewBox="0 0 24 24" class="icon" xmlns="http://www.w3.org/2000/svg"><rect width="24" height="24" rx="4" fill="${muted(bg)}"/>${body.replace(/#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b/g, muted)}<path d="M4 0h16a4 4 0 0 1 4 4v7H0V4a4 4 0 0 1 4-4z" fill="#fff" opacity=".055"/><path d="M0 16h24v4a4 4 0 0 1-4 4H4a4 4 0 0 1-4-4z" fill="#000" opacity=".2"/><rect x=".5" y=".5" width="23" height="23" rx="3.6" fill="none" stroke="#d6b163" stroke-opacity=".34"/></svg>`;
 
 const ICONS: Record<ItemId | 'tp' | 'shop' | 'courier', string> = {
   courier: svg(

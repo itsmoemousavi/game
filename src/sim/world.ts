@@ -39,7 +39,7 @@ import { ITEMS, ItemId, ItemStats, TELEPORT } from './data/items';
 import { GroundItem, ItemSlot, charmSlot, updateItemAuras, buyItem, buyTeleport, dropItem, emptyInventory, expireGroundItems, itemBonuses, pickUpItem, sellCourierItem, sellItem, startTeleport, swapItems, updateChannel, useItem } from './inventory';
 import { CourierState, courierGround, dropCourierItem, newCourier, sendCourier, updateCouriers } from './courier';
 import { Vision, isInvisible } from './vision';
-import { Rune, activateGlyph, buyback, placeWard, spawnBoss, updateObjectives } from './objectives';
+import { Rune, activateGlyph, buyback, onHillTop, placeWard, spawnBoss, updateObjectives } from './objectives';
 import { GameMap, LaneId, StructureTier, createMap, fits, heightAt, inHouse, isWalkable, lineClear, teamLanePath } from './map';
 import { Vec2, dist, distV } from './math';
 
@@ -318,6 +318,7 @@ export interface NeutralState {
 export interface WardState {
   kind: 'observer' | 'sentry';
   expires: number;
+  placedAt: number;
 }
 
 export interface CreepState {
@@ -599,6 +600,8 @@ export class World {
   canAttack(a: Unit, b: Unit | undefined): b is Unit {
     if (!b || !b.alive || b.team === a.team) return false;
     if (b.structure && !b.structure.vulnerable) return false;
+    // On top of a mountain: melee can only reach you from up there too.
+    if (a.projectileSpeed === 0 && a.attackRange > 0 && onHillTop(this, b.x, b.y) !== onHillTop(this, a.x, a.y)) return false;
     return true;
   }
 
@@ -1145,6 +1148,8 @@ export class World {
             botThink(this, u);
           }
         }
+        // A bot that blinked into a hiding spot in the woods doesn't know how to get out: lift it out.
+        if (u.hero.controller === 'bot') this.rescueBot(u);
         this.updateHero(u);
       } else if (u.creep) this.updateCreep(u);
       else if (u.summon) this.updateSummon(u);
@@ -1221,7 +1226,9 @@ export class World {
    */
   private unstick(u: Unit) {
     const m = this.nav;
-    if (u.hero?.order.type === 'idle' || fits(m, u.x, u.y, u.radius)) return;
+    if (onHillTop(this, u.x, u.y) || fits(m, u.x, u.y, u.radius)) return;
+    // Standing still and only squeezed against something is fine; inside something is not.
+    if (u.hero?.order.type === 'idle' && isWalkable(m, u.x, u.y)) return;
     // First the smallest nudge that frees it (keeps it moving along its way instead of
     // snapping back to a cell centre, which can loop next to a building).
     for (const r of [0.15, 0.3, 0.5, 0.8]) {
@@ -1238,7 +1245,7 @@ export class World {
     }
     const cx = Math.floor(u.x / m.cell);
     const cy = Math.floor(u.y / m.cell);
-    for (let r = 1; r <= 6; r++) {
+    for (let r = 1; r <= 24; r++) {
       let best: { x: number; y: number; d: number } | null = null;
       for (let dy = -r; dy <= r; dy++) {
         for (let dx = -r; dx <= r; dx++) {
@@ -1255,6 +1262,27 @@ export class World {
         u.y = best.y;
         u.path = null;
         return;
+      }
+    }
+  }
+
+  private rescueBot(u: Unit) {
+    const n = this.map.grid;
+    const c = this.map.cell;
+    const cx = Math.floor(u.x / c);
+    const cy = Math.floor(u.y / c);
+    if (this.map.reachable[cy * n + cx]) return;
+    for (let r = 1; r < 14; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const k = (cy + dy) * n + cx + dx;
+          if (k < 0 || k >= n * n || !this.map.reachable[k]) continue;
+          u.x = u.px = (cx + dx + 0.5) * c;
+          u.y = u.py = (cy + dy + 0.5) * c;
+          u.path = null;
+          return;
+        }
       }
     }
   }
@@ -1589,10 +1617,13 @@ export class World {
   private updateDash(u: Unit) {
     const d = u.dash!;
     const step = Math.min(d.remaining, d.speed * DT);
-    const bx = u.x;
-    const by = u.y;
-    this.stepMove(u, d.dx, d.dy, step, true);
-    const moved = Math.hypot(u.x - bx, u.y - by);
+    // Trees, walls, buildings and mountains only stop walking: a charge goes straight through
+    // them. If it ends inside one, the hero comes out at the nearest open spot (a mountain top
+    // counts as a place to stand).
+    const size = this.map.size;
+    u.facing = Math.atan2(d.dy, d.dx);
+    u.x = Math.max(1, Math.min(size - 1, u.x + d.dx * step));
+    u.y = Math.max(1, Math.min(size - 1, u.y + d.dy * step));
     d.remaining -= step;
     for (const e of this.units) {
       if (d.phase) break;
@@ -1604,10 +1635,14 @@ export class World {
         this.stun(e, d.stun);
         u.dash = null;
         u.hero!.order = { type: 'attack', targetId: e.id };
+        this.unstick(u);
         return;
       }
     }
-    if (d.remaining <= 0 || moved < step * 0.3) u.dash = null;
+    if (d.remaining <= 0) {
+      u.dash = null;
+      this.unstick(u);
+    }
   }
 
   private updateSkillshots() {
@@ -2087,9 +2122,13 @@ export class World {
     const nav = throughBuildings ? this.map : this.nav;
     // If we're already squeezed against a wall/footprint, only require the centre to be
     // walkable so the unit can always work itself free.
-    const ok = fits(nav, u.x, u.y, u.radius)
-      ? (x: number, y: number) => fits(nav, x, y, u.radius)
-      : (x: number, y: number) => isWalkable(this.map, x, y);
+    // On a mountain top you can only move around up there; nobody walks up or down.
+    const high = onHillTop(this, u.x, u.y);
+    const ok = high
+      ? (x: number, y: number) => onHillTop(this, x, y)
+      : fits(nav, u.x, u.y, u.radius)
+        ? (x: number, y: number) => fits(nav, x, y, u.radius)
+        : (x: number, y: number) => isWalkable(this.map, x, y);
     const nx = u.x + dx * d;
     const ny = u.y + dy * d;
     if (ok(nx, ny)) {
