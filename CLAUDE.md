@@ -14,6 +14,7 @@ Destroy towers → barracks → shrine towers → the enemy **Shrine**. Empty sl
 Offline vs bots for now; multiplayer and app-store release later (Capacitor planned).
 
 - **Always landscape** (on a phone held upright the whole UI is rotated, `src/client/screen.ts`).
+  The owner plays with rotation lock ON (iPhone 16 Pro: game area about 793 × 393), so the page is really portrait. CSS must use `cqw`/`cqh`, `@container` and `--sl/--sr/--st/--sb`, never `vw`/`vh`/`@media` size queries/`env()` directly. Test layout at viewport 393 × 793, not only landscape: Chrome's responsive view doesn't show this case. iOS shows the status bar in portrait, so with rotation lock on only the real app can hide it.
 - The owner tests on an **iPhone** through the GitHub Pages build: https://itsmoemousavi.github.io/ovra-game/
   Settings → Graphics shows `build <sha>`: ask them to check it (Safari caches old builds).
 - **3D is the default view** (Three.js); 2D stays as a "low graphics" setting and as the fallback

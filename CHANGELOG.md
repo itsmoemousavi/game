@@ -29,6 +29,11 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.15.x · A real start and finish
 
+### 0.15.8
+*2026-11-06*
+
+- Fixed the bottom panel, bars and item slots looking squeezed when the phone's rotation lock is on. Everything now sizes itself to the sideways game, so the screen matches a true landscape view.
+
 ### 0.15.7
 *2026-11-06*
 

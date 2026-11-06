@@ -6,7 +6,6 @@
     <meta name="theme-color" content="#0d150f" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Ovra</title>
     <meta name="apple-mobile-web-app-title" content="Ovra" />
     <link rel="icon" type="image/png" sizes="32x32" href="./ovra-favicon-32.png" />
@@ -19,7 +18,7 @@
       #loading { position: absolute; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; color: #e7e2d3; font-family: Georgia, 'Times New Roman', serif; background: radial-gradient(ellipse at 50% 42%, #2a2118 0%, #12110e 55%, #090a09 100%); transition: opacity 0.35s; }
       #loading.done { opacity: 0; pointer-events: none; }
       #loading .l-logo { font-size: 64px; font-weight: 700; letter-spacing: 0.28em; padding-left: 0.28em; color: #e9d7a8; text-shadow: 0 0 34px rgba(255,150,70,0.5), 0 2px 0 #3a2a14; }
-      #loading .l-bar { width: min(320px, 56vw); height: 5px; border-radius: 3px; background: rgba(255,255,255,0.09); overflow: hidden; box-shadow: 0 0 0 1px rgba(214,177,99,0.3); }
+      #loading .l-bar { width: min(320px, 56cqw); height: 5px; border-radius: 3px; background: rgba(255,255,255,0.09); overflow: hidden; box-shadow: 0 0 0 1px rgba(214,177,99,0.3); }
       #l-fill { width: 4%; height: 100%; background: linear-gradient(90deg, #a8742b, #f2c26b); transition: width 0.25s; }
       #l-text { font-size: 13px; letter-spacing: 0.08em; color: rgba(231,226,211,0.62); font-style: italic; }
     </style>
@@ -32,7 +31,7 @@
         var r = document.getElementById('root'), w = innerWidth, h = innerHeight, up = h > w;
         r.style.width = (up ? h : w) + 'px';
         r.style.height = (up ? w : h) + 'px';
-        if (up) r.style.transform = 'rotate(90deg) translateY(-100%)';
+        if (up) { r.style.transform = 'rotate(90deg) translateY(-100%)'; r.classList.add('rotated'); }
       })();
     </script>
     <div id="loading">
