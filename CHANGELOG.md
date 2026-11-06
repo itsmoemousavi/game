@@ -30,6 +30,10 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.16.x · Play with Friend
 
+### 0.16.3
+
+- **Fixed: players on Crimson were treated as Azure.** They saw the map through Azure's eyes, team messages were the wrong way round, and Victory and Defeat were swapped. Now you see what your own team sees, wherever you sit.
+
 ### 0.16.2
 
 - **You now have a player name.** Every player gets a permanent ID like `ovra-k3x9q2`, kept on their phone. That's also their name until they choose one.

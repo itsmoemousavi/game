@@ -37,7 +37,8 @@ let world: World | null = null;
 let renderer: Renderer | null = null;
 let input: Input | null = null;
 let myHeroId = 0;
-const myTeam: Team = 0;
+/** The side this phone plays and sees. Azure offline; in a multiplayer match, wherever their seat is. */
+let myTeam: Team = 0;
 let devPick: HeroId | null = null;
 // Local dev server only (never in the published game): lets test scripts look at the match.
 if (import.meta.env.DEV) Object.assign(window, { dbg: { world: () => world, me: () => world?.unit(myHeroId), pick: (h: HeroId) => (devPick = h), renderer: () => renderer, net: () => net, draft: () => draftUi } });
@@ -175,6 +176,7 @@ function leaveToMenu(why: string) {
   netPeer?.close();
   netPeer = null;
   if (s) draftUi.cancel();
+  myTeam = 0;
   friendUi.hideCountdown();
   settingsPanel.classList.add('hidden');
   app.classList.add('hidden');
@@ -829,6 +831,7 @@ async function startMatch(m: Mode, d: Draft, info?: MatchInfo, catchUp = false) 
   const slots = info ? info.slots : m === 'bots' ? buildSlots(d) : [{ team: myTeam, heroId: d.picks[myTeam][0], controller: 'human' as const, lane: pickedLane }];
   // Vs bots: a 30 s warm-up (the clock counts up from -0:30) to shop and walk to lane before creeps come.
   world = new World({ seed: info ? info.seed : (Date.now() & 0xffff) + 1, slots, warmup: m === 'bots' || info ? WARMUP_SECONDS : 0 });
+  if (info && net) myTeam = net.mySeat < 3 ? 0 : 1;
   // Who plays each hero, in the order of the world's heroes (which is seat order).
   const me = shownName(profile);
   setHeroNames(world.heroes, info && net ? seatNames(info.seats, net.state.players) : slots.map((s, i) => (s.controller === 'human' ? me : botName(i))));
