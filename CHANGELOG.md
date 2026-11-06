@@ -29,6 +29,21 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.15.x · A real start and finish
 
+### 0.15.9
+*2026-11-06*
+
+**Hero balance, tested over about 1,100 bot matches:**
+- **Morra:** more health and attack damage. Her wolves are back to their earlier strength and keep the 35 s duration. Red Wolf form deals 10 more damage.
+- **Seren:** more health, damage and move speed, stronger Aegis and Rebuke. Aegis still lasts 3 seconds.
+- **Brakk:** slightly less damage, health per level and blocking.
+- **Grom:** slightly less damage.
+- **Vexa:** slightly less damage.
+- **Orin:** no change in the end.
+- **Kaela:** a little more damage.
+- **Rhen:** a little more damage, and a stronger Bolt Storm.
+
+Behind the scenes: bot Morra now calls her wolves more often.
+
 ### 0.15.8
 *2026-11-06*
 

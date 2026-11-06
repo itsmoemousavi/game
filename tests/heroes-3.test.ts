@@ -111,7 +111,7 @@ describe('Morra', () => {
     expect(m.hero!.wolfForm).toBe(true);
     expect(m.attackRange).toBeLessThan(2);
     expect(m.projectileSpeed).toBe(0);
-    expect(m.damage).toBe(damage + 35);
+    expect(m.damage).toBe(damage + 45);
     expect(w.speedOf(m)).toBeGreaterThan(speed);
     run(w, 13.5);
     expect(m.hero!.wolfForm).toBe(true);

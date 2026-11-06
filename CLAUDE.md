@@ -130,7 +130,7 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
 4. 3D polish: real art/animations, spell effects in 3D.
 5. Living world: shipped in 0.11.0. Phone frame rate and battery with the new art still need the owner's check.
 6. More heroes: Morra, Seren and Rhen shipped in 0.13.0. A 4th only if playing them shows a missing role (owner agreed to wait).
-   Balance after 0.15.1 is rough (about 45 matches per hero, so ±7-15%; the last two runs differ a lot): Kaela 66%, Seren 55%, Vexa 55%, Syl 54%, Grom 51%, Orin 49%, Brakk 46%, Rhen 36%, Morra 33%. Owner: balance LATER. Re-check with more matches before tuning.
+   Balance after 0.15.9 (240 matches, about 160 games per hero, luck still ±4-8%): Vexa 58.6%, Grom 51.6%, Brakk 51.2%, Seren 49.7%, Syl 49.4%, Rhen 48.3%, Kaela 46.9%, Orin 46.4%, Morra 46.2%. Vexa is the one left above 55%. Single runs swing a lot, even 13% on the same numbers: pool runs before tuning.
 7. Later: multiplayer (first on owner's MacBook, local only), killable courier + bounty, Capacitor app builds, store release.
 
 ## Gotchas

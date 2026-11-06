@@ -446,7 +446,7 @@ function useAbilities(w: World, me: Unit, target: Unit): boolean {
     return false;
   }
   // Morra calls her pack to push and farm too, not only for hero fights.
-  if (me.hero!.defId === 'morra' && ready(me, 0) && me.mana > me.maxMana * 0.85 && !w.units.some((o) => o.alive && o.summon?.ownerId === me.id && o.summon.kind === 'wolf')) {
+  if (me.hero!.defId === 'morra' && ready(me, 0) && me.mana > me.maxMana * 0.5 && !w.units.some((o) => o.alive && o.summon?.ownerId === me.id && o.summon.kind === 'wolf')) {
     w.applyCommand({ type: 'cast', unitId: me.id, slot: 0 });
     return true;
   }
