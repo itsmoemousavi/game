@@ -34,7 +34,7 @@ import {
   otherTeam,
 } from './constants';
 import { HEROES, HeroId, maxAbilityLevel } from './data/heroes';
-import { BARRACKS, CREEPS, CombatStats, HERO_VISION, MEGA_CREEP_MULT, NEUTRALS, STRUCTURES, SUPER_CREEP_MULT } from './data/units';
+import { BARRACKS, CREEPS, CombatStats, HERO_VISION, MEGA_CREEP_MULT, MELEE_BARRACKS_REGEN, NEUTRALS, STRUCTURES, SUPER_CREEP_MULT } from './data/units';
 import { ITEMS, ItemId, ItemStats, TELEPORT } from './data/items';
 import { GroundItem, ItemSlot, charmSlot, updateItemAuras, buyItem, buyTeleport, dropItem, emptyInventory, expireGroundItems, itemBonuses, pickUpItem, sellCourierItem, sellItem, startTeleport, swapItems, updateChannel, useItem } from './inventory';
 import { CourierState, courierGround, dropCourierItem, newCourier, sendCourier, updateCouriers } from './courier';
@@ -1457,7 +1457,25 @@ export class World {
     while (c.wp < c.path.length && dist(u.x, u.y, c.path[c.wp].x, c.path[c.wp].y) < 2.5) c.wp++;
     if (c.wp >= c.path.length) return;
     const wp = c.path[c.wp];
-    this.steerTo(u, wp.x, wp.y);
+    // Every lane ends at the Shrine, which can't be hit while a Shrine tower stands, and a building
+    // can be too far from that road to notice. So for that last stretch, go to the nearest one that can be hit.
+    const shrine = c.wp === c.path.length - 1 ? this.findStructure(otherTeam(u.team as Team), 'shrine')[0] : undefined;
+    const goal = shrine && dist(wp.x, wp.y, shrine.x, shrine.y) < 1 ? this.nearestAttackableBuilding(u) : wp;
+    if (goal) this.steerTo(u, goal.x, goal.y);
+  }
+
+  private nearestAttackableBuilding(u: Unit): Unit | undefined {
+    let best: Unit | undefined;
+    let bestDist = Infinity;
+    for (const s of this.units) {
+      if (!s.structure || !this.canAttack(u, s)) continue;
+      const d = dist(u.x, u.y, s.x, s.y);
+      if (d < bestDist) {
+        best = s;
+        bestDist = d;
+      }
+    }
+    return best;
   }
 
   /** Morra calls a creature: a body of its own, fighting and following on its own. */
@@ -1513,6 +1531,7 @@ export class World {
 
   private updateStructure(u: Unit) {
     const s = u.structure!;
+    if (s.rax === 'melee') u.hp = Math.min(u.maxHp, u.hp + MELEE_BARRACKS_REGEN * DT);
     if (u.attackInterval <= 0) return;
     if (s.aggroTimer > 0) s.aggroTimer -= DT;
     let t = this.unit(u.targetId);
@@ -2119,7 +2138,8 @@ export class World {
    * Structure protection rules (Dota-style):
    *  - Tier 1 towers: always attackable.
    *  - Tier 2 tower of a lane: after that lane's tier 1 falls.
-   *  - Tier 3 tower + barracks of a lane: after that lane's tier 2 falls.
+   *  - Tier 3 tower of a lane: after that lane's tier 2 falls.
+   *  - The barracks of a lane: after that lane's tier 3 falls.
    *  - The two shrine towers: after any barracks of that team falls.
    *  - Shrine: after both shrine towers fall.
    *  - Fountain: never.
@@ -2136,8 +2156,10 @@ export class World {
           st.vulnerable = this.findStructure(s.team, 'tower1', st.lane).every((t) => !t.alive);
           break;
         case 'tower3':
-        case 'barracks':
           st.vulnerable = this.findStructure(s.team, 'tower2', st.lane).every((t) => !t.alive);
+          break;
+        case 'barracks':
+          st.vulnerable = this.findStructure(s.team, 'tower3', st.lane).every((t) => !t.alive);
           break;
         case 'shrineTower':
           st.vulnerable = this.findStructure(s.team, 'barracks').some((r) => !r.alive);

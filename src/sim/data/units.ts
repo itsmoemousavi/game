@@ -86,8 +86,9 @@ export const STRUCTURES: Record<StructureTier, CombatStats & { teamGold: number 
   fountain: {
     ...tower(99999, 300),
     attackInterval: 0.25,
-    attackRange: 19, // covers its whole healing area
-    acquireRange: 19,
+    // Reaches its whole healing area and the doorway, but nothing outside the yard's wall (19.5 m out).
+    attackRange: 15,
+    acquireRange: 15,
     radius: 3,
     projectileSpeed: 40,
     vision: [20, 20],
@@ -96,6 +97,9 @@ export const STRUCTURES: Record<StructureTier, CombatStats & { teamGold: number 
 };
 
 /** The two barracks of a lane: melee is the tougher one. */
+/** Health a standing melee barracks gets back each second. */
+export const MELEE_BARRACKS_REGEN = 5;
+
 export const BARRACKS: Record<'melee' | 'ranged', { hp: number; armor: number; teamGold: number }> = {
   melee: { hp: 1800, armor: 13, teamGold: 160 },
   ranged: { hp: 1200, armor: 8, teamGold: 120 },

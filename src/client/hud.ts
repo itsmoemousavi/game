@@ -481,6 +481,7 @@ export class Hud {
     if (this.el.kda.innerHTML !== kda) this.el.kda.innerHTML = kda;
 
     this.el.respawn.style.display = !me.alive && w.winner === null ? 'block' : 'none';
+    this.el.portrait.classList.toggle('dead', !me.alive);
     const night = isNight(w.time);
     this.el.daynight.textContent = night ? '☾' : '☀';
     this.el.daynight.classList.toggle('night', night);

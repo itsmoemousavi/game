@@ -81,9 +81,9 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
 - Balance goal: no hero is a must-pick (every hero ≈45–55% win rate in random bot lineups);
   team play decides games. Last full check (200 m map): all 45–57%. Needs a re-check on the new map.
 - Map 1.5× bigger (300 m). Per lane: tier-1 near the river, tier-2, tier-3 at the gate with **two barracks**
-  (melee: tougher; ranged). A fallen barracks powers up only that creep type of the attackers.
+  (melee: tougher, regenerates 5 health a second; ranged), which can only be attacked once that lane's tier-3 falls. A fallen barracks powers up only that creep type of the attackers.
   Shrine towers 11 m from the Shrine. Glyph = invulnerable buildings + 2× tower attack speed.
-  Fountain shoots heroes anywhere in its healing area.
+  Fountain shoots heroes anywhere in its healing area and doorway, never past its wall.
 - Controls: joystick moves; tapping the ground does **not** walk (only while holding the minimap, or with a mouse); tap an enemy to attack it.
 - Attack (owner's spec, 2026-11-05). Auto attack ON: nearest target in range by itself, also while walking, sticks to it while it stays in range (walking past creeps doesn't switch); an enemy picked with the Attack arrow comes first until it dies or leaves range; never denies, doesn't wake jungle camps. Auto attack OFF: one attack per tap (nearest) or per release of a hold (aimed target); tapping faster than attack speed does nothing extra; holding never attacks until release. Denies are one attack per tap/release in both modes.
 - Spells vs obstacles (owner, 2026-11-05): trees, walls, buildings and mountains block only walking, never spells. Charges/dashes go through and may end anywhere: on a mountain, off one, in or out of a pocket, into the Warden's house. Ending inside something moves you to the nearest open spot.
@@ -152,7 +152,13 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
 11. **Hero stats panel (owner, 2026-11-06; PLANNED, not started, wait for their go).** The panel opened by the i on the portrait (`updateStats` in `hud.ts`) should show only the necessary data, not everything, with a better design. Show a preview before shipping.
 
 12. **Sounds: picked and shipped in 0.17.2 (owner, 2026-11-06).** Their choices are in `scripts/sounds/picks.json`, sources in `docs/SOUND-SOURCES.md`. Silent by their choice: hero deaths, body and tree falls, projectiles landing. One end song for both teams, starting when the camera leaves for the Shrine. `SOUND_NAMES` in `audio.ts` must match `public/sfx` (tested). `Sfx.playHit` measures each sound's hit, so swapping a melee sound keeps it on the hit frame. I can't hear audio.
-13. **Announcer (owner, 2026-11-06; waiting on their files).** They make the voice lines in ElevenLabs and send a zip, named as in `docs/ANNOUNCER-LINES.md`. Then wire them in with a queue so lines never overlap and a repeat timer per building.
+13. **Announcer (owner, 2026-11-06; trimming the list).** They thought the list had too much in it and are editing it at https://claude.ai/artifact/8cW26H89uMdFPWjiNkT4ZV (read collections `lines`: `removed`, `text`, with a row only for touched lines; and `added`: their own new lines). Once done, update `docs/ANNOUNCER-LINES.md` to match. They make the voice lines in ElevenLabs and send a zip, named as in that file. Then wire them in with a queue so lines never overlap and a repeat timer per building.
+
+14. **Owner's test list (2026-11-06; WRITTEN DOWN, not started, wait for their go).**
+    - **Sounds to change:** Brakk Shield Charge, Vexa Arrow Storm, Orin attack, Grom Bark Skin, Grom Root Snare, Kaela Maelstrom, Morra Feral Bond, all Seren spells, all Rhen spells, Warden's death, Death Song. **To add:** buyback plays a short song instead of its current sound; a click sound on menu buttons. Use a listening page like before.
+    - **Shipped in 0.17.3:** barracks, melee regen, fountain reach, creeps and the second Shrine tower, removed texts, channel bar margin, dead portrait, ping and shield beside the minimap.
+    - **New top bar:** Score | P1 | P2 | P3 | Timer and Day/Night | P3 | P2 | P1 | Score. Dead: grayscale portrait with respawn time under it. Disconnected or left (multiplayer): grayscale with a red disconnect icon. Bought back: a coin instead of the respawn time for 5 s. Test at 393 x 793.
+    - **Ping and shield buttons:** to the right of the minimap instead of below it, still stacked in a column.
 
 ## Gotchas
 

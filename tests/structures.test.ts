@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Team, Unit, World } from '../src/sim';
+import { FOUNTAIN_HEAL_RADIUS, TICK_RATE, Team, Unit, World, dHypot, teamLanePath } from '../src/sim';
 import { newWorld } from './helpers';
 
 const get = (w: World, team: Team, tier: string, lane: string | null = null) =>
@@ -10,6 +10,64 @@ function destroy(w: World, u: Unit) {
   w.dealDamage(enemyHero.id, u, 1e9);
   expect(u.alive).toBe(false);
 }
+
+describe('rules from playing it', () => {
+  it('a melee barracks regenerates 5 health a second and a ranged one does not', () => {
+    const w = newWorld();
+    const [melee, ranged] = ['melee', 'ranged'].map((k) => get(w, 1, 'barracks', 'top').find((r) => r.structure!.rax === k)!);
+    melee.hp = ranged.hp = 1000;
+    for (let i = 0; i < 2 * TICK_RATE; i++) w.step();
+    expect(melee.hp).toBeCloseTo(1010, 3);
+    expect(ranged.hp).toBe(1000);
+  });
+
+  it("the fountain covers its healing area and its doorway, and never shoots past its wall", () => {
+    const w = newWorld();
+    const f = get(w, 0, 'fountain')[0];
+    const yard = w.map.fountainYards[0];
+    const foe = w.heroes.find((h) => h.team === 1)!;
+    const at = (d: number, angle = 0) => {
+      foe.x = f.x + Math.cos(angle) * d;
+      foe.y = f.y + Math.sin(angle) * d;
+      return w.inReach(f, foe);
+    };
+    expect(at(FOUNTAIN_HEAL_RADIUS)).toBe(true);
+    expect(at(yard.outer)).toBe(false);
+    expect(at(yard.outer + 1)).toBe(false);
+  });
+
+  it('after one Shrine tower falls, creeps walk over to the other one and take it down', () => {
+    const w = newWorld();
+    for (const s of w.structures) {
+      if (s.team !== 1 || !['tower1', 'tower2', 'tower3', 'barracks'].includes(s.structure!.tier)) continue;
+      s.alive = false;
+      s.hp = 0;
+    }
+    w.rebuildNav();
+    w.refreshVulnerability();
+    const path = teamLanePath(w.map, 0, 'bot');
+    const end = path[path.length - 1];
+    const [far, close] = get(w, 1, 'shrineTower').sort((a, b) => dHypot(b.x - path[path.length - 2].x, b.y - path[path.length - 2].y) - dHypot(a.x - path[path.length - 2].x, a.y - path[path.length - 2].y));
+    destroy(w, close);
+    w.heroes.forEach((h) => { h.x = 20; h.y = 20; });
+    const start = path[path.length - 2];
+    const creepOf = () => w.units.find((u) => u.alive && u.creep && u.team === 0 && u.creep.lane === 'bot');
+    while (!creepOf()) w.step();
+    const creep = creepOf()!;
+    const others = () => w.units.filter((u) => u !== creep && u.creep).forEach((u) => w.expire(u));
+    creep.x = start.x;
+    creep.y = start.y;
+    creep.creep!.wp = path.length - 1;
+    creep.hp = creep.maxHp = 1e6;
+    let attacked = false;
+    for (let i = 0; i < 40 * TICK_RATE && !attacked; i++) {
+      others();
+      w.step();
+      attacked = creep.targetId === far.id;
+    }
+    expect(attacked, `creep ended at ${creep.x.toFixed(0)},${creep.y.toFixed(0)}, Shrine at ${end.x},${end.y}`).toBe(true);
+  });
+});
 
 describe('structure protection rules', () => {
   it('starts with only tier-1 towers attackable', () => {
@@ -26,7 +84,7 @@ describe('structure protection rules', () => {
     expect(t2.hp).toBe(t2.maxHp);
   });
 
-  it('opens a lane tower by tower: tier-2 after tier-1, then tier-3 and barracks after tier-2', () => {
+  it('opens a lane tower by tower: tier-2 after tier-1, tier-3 after tier-2, then the barracks after tier-3', () => {
     const w = newWorld();
     destroy(w, get(w, 1, 'tower1', 'top')[0]);
     expect(get(w, 1, 'tower2', 'top')[0].structure!.vulnerable).toBe(true);
@@ -35,7 +93,10 @@ describe('structure protection rules', () => {
     expect(get(w, 1, 'tower2', 'mid')[0].structure!.vulnerable).toBe(false);
     destroy(w, get(w, 1, 'tower2', 'top')[0]);
     expect(get(w, 1, 'tower3', 'top')[0].structure!.vulnerable).toBe(true);
-    expect(get(w, 1, 'barracks', 'top')[0].structure!.vulnerable).toBe(true);
+    expect(get(w, 1, 'barracks', 'top')[0].structure!.vulnerable).toBe(false);
+    destroy(w, get(w, 1, 'tower3', 'top')[0]);
+    for (const r of get(w, 1, 'barracks', 'top')) expect(r.structure!.vulnerable).toBe(true);
+    expect(get(w, 1, 'barracks', 'mid')[0].structure!.vulnerable).toBe(false);
     expect(get(w, 1, 'shrineTower')[0].structure!.vulnerable).toBe(false);
   });
 
@@ -43,6 +104,7 @@ describe('structure protection rules', () => {
     const w = newWorld();
     destroy(w, get(w, 1, 'tower1', 'bot')[0]);
     destroy(w, get(w, 1, 'tower2', 'bot')[0]);
+    destroy(w, get(w, 1, 'tower3', 'bot')[0]);
     destroy(w, get(w, 1, 'barracks', 'bot')[0]);
     const [a, b] = get(w, 1, 'shrineTower');
     expect(a.structure!.vulnerable && b.structure!.vulnerable).toBe(true);
@@ -66,6 +128,7 @@ describe('structure protection rules', () => {
     expect(melee.armor).toBeGreaterThan(ranged.armor);
     destroy(w, get(w, 1, 'tower1', 'mid')[0]);
     destroy(w, get(w, 1, 'tower2', 'mid')[0]);
+    destroy(w, get(w, 1, 'tower3', 'mid')[0]);
     destroy(w, melee);
     const before = new Set(w.units.map((u) => u.id));
     while (w.units.every((u) => before.has(u.id) || !u.creep)) w.step();

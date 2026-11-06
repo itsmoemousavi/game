@@ -31,6 +31,17 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.17.x · New sounds
 
+### 0.17.3
+
+- **Barracks stay safe until the tower beside them falls.** They used to open up one tower earlier.
+- **Melee barracks heal themselves,** 5 health per second.
+- **The base stops at its walls.** It no longer shoots anyone standing outside them.
+- **Creeps finish the job.** After one Shrine tower falls they walk over to the other one, instead of wandering behind the Shrine.
+- **Fewer messages at the start.** The "creeps arrive" and "battle begins" texts are gone, since the horn says it.
+- **The teleport bar** sits a little higher above the health bar.
+- **Your portrait turns grey with a faint red** while your hero is dead.
+- **Shield and ping buttons** now stand beside the minimap.
+
 ### 0.17.2
 
 - **The final sounds are in,** chosen by ear, one by one. Nearly every sound in the game has changed.

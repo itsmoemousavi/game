@@ -433,6 +433,19 @@ onTap('#btn-glyph', () => world?.enqueue({ type: 'glyph', unitId: myHeroId }));
 // Pings: open the menu, pick a ping, then tap the map or minimap to place it.
 const pingMenu = $<HTMLElement>('#ping-menu');
 const pingBtn = $<HTMLElement>('#btn-ping');
+/** The shield and ping buttons stand in a column to the right of the minimap, the ping menu beside them. */
+function placeMinimapButtons() {
+  const mm = renderer!.minimapRect();
+  const left = mm.x + mm.size + 6;
+  const place = (sel: string, x: number, y: number) => {
+    const el = $<HTMLElement>(sel);
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+  };
+  place('#btn-glyph', left, mm.y);
+  place('#btn-ping', left, mm.y + 48);
+  place('#ping-menu', left + 48, mm.y);
+}
 onTap('#btn-ping', () => {
   if (input?.pingKind) {
     input.pingKind = null;
@@ -889,7 +902,6 @@ async function startMatch(m: Mode, d: Draft, info?: MatchInfo, catchUp = false) 
       if (!net || world !== w) return;
     }
   }
-  if (m === 'bots' || (info && !catchUp)) hud.toast(`Creeps arrive in ${WARMUP_SECONDS} s: buy items and head to your lane`, '#ffd23f');
   practicePanel.classList.toggle('hidden', m !== 'practice');
   tutorial?.hide();
   tutorial = m === 'tutorial' ? new Tutorial($<HTMLElement>('#tutorial'), () => (tutorial = null)) : null;
@@ -901,10 +913,7 @@ async function startMatch(m: Mode, d: Draft, info?: MatchInfo, catchUp = false) 
     itemsUi.placingSlot = null;
   };
   sfx.unlock();
-  const mm = renderer.minimapRect();
-  $<HTMLElement>('#btn-glyph').style.top = `${mm.y + mm.size + 10}px`;
-  $<HTMLElement>('#btn-ping').style.top = `${mm.y + mm.size + 58}px`;
-  $<HTMLElement>('#ping-menu').style.top = `${mm.y + mm.size + 10}px`;
+  placeMinimapButtons();
   hud.setHero(world.unit(myHeroId)!);
   world.enqueue({ type: 'setAutoAttack', unitId: myHeroId, enabled: settings.autoAttack });
   settingsPanel.classList.add('hidden');
@@ -926,10 +935,7 @@ async function startMatch(m: Mode, d: Draft, info?: MatchInfo, catchUp = false) 
 setupLandscape($<HTMLElement>('#root'), () => {
   renderer?.resize();
   if (renderer) {
-    const mm = renderer.minimapRect();
-    $<HTMLElement>('#btn-glyph').style.top = `${mm.y + mm.size + 10}px`;
-  $<HTMLElement>('#btn-ping').style.top = `${mm.y + mm.size + 58}px`;
-  $<HTMLElement>('#ping-menu').style.top = `${mm.y + mm.size + 10}px`;
+    placeMinimapButtons();
   }
 });
 
@@ -981,7 +987,6 @@ function frame(now: number) {
       net?.afterStep(world);
       // The war horn, three seconds before the battle begins.
       if (before < -3 && world.time >= -3) sfx.play('matchHorn');
-      if (before < 0 && world.time >= 0) hud.toast('The battle begins: creeps are on their way!', '#ffd23f');
       renderer.pushEvents(world, world.events, myHeroId);
       tutorial?.update(world, world.unit(myHeroId)!);
       playEvents(sfx, world, world.events, myHeroId, myTeam, { x: renderer.camX, y: renderer.camY });

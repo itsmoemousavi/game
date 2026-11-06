@@ -105,6 +105,9 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #portrait { flex: none; width: calc(var(--slot) * 2 + 4px); height: calc(var(--slot) * 2 + 4px); border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #111; border: 2px solid rgba(255,255,255,0.55); box-sizing: border-box; }
 #portrait .face { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; display: grid; place-items: center; font-size: 18px; }
 #portrait .face img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.15); }
+/* Your hero is dead: grey, under a faint red. */
+#portrait.dead .face img { filter: grayscale(1); }
+#portrait.dead .face::after { content: ''; position: absolute; inset: 0; background: rgba(220, 30, 30, 0.28); }
 #portrait #level { position: absolute; left: 50%; bottom: -2px; transform: translateX(-50%); min-width: 18px; height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 8px; background: #111; border: 1px solid #ffd23f; color: #ffd23f; font-size: 11px; font-weight: 900; line-height: 14px; text-align: center; }
 #herobar .bars { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .bar { position: relative; height: 13px; background: #222; border-radius: 3px; overflow: hidden; }
@@ -187,7 +190,7 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #itembar .tp.channel::after { content: '✕'; position: absolute; inset: 0; z-index: 3; display: grid; place-items: center; background: rgba(20,8,8,0.62); color: #ff9a9a; font-size: 20px; font-weight: 900; border-radius: 5px; }
 /* The bar over the health bar while something charges up. */
 .bars { position: relative; }
-#channel-bar { position: absolute; left: 0; bottom: calc(100% + 11px); min-width: 100%; width: max-content; box-sizing: border-box; border-radius: 8px; overflow: hidden; background: rgba(10,12,16,0.85); border: 1px solid rgba(214,177,99,0.7); box-shadow: 0 2px 8px rgba(0,0,0,0.5); z-index: 4; }
+#channel-bar { position: absolute; left: 0; bottom: calc(100% + 20px); min-width: 100%; width: max-content; box-sizing: border-box; border-radius: 8px; overflow: hidden; background: rgba(10,12,16,0.85); border: 1px solid rgba(214,177,99,0.7); box-shadow: 0 2px 8px rgba(0,0,0,0.5); z-index: 4; }
 #channel-bar.hidden { display: none; }
 #channel-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(180deg, #9fd0ff, #3f8ae0); }
 #channel-text { position: relative; display: block; padding: 4px 12px; text-align: center; white-space: nowrap; line-height: 14px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.03em; color: #fff; text-shadow: 0 1px 2px #000; font-variant-numeric: tabular-nums; }
@@ -270,7 +273,7 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #respawn { pointer-events: none; }
 #btn-buyback { pointer-events: auto; margin-left: 8px; padding: 4px 10px; border-radius: 8px; border: 0; background: #ffd23f; color: #111; font-weight: 800; font-size: 13px; }
 #btn-buyback.off { opacity: 0.45; }
-#btn-glyph { position: absolute; left: 10px; top: 190px; width: 40px; height: 40px; border-radius: 50%; border: 2px solid #8cc4ff; background: rgba(20,40,70,0.85); font-size: 18px; display: grid; place-items: center; touch-action: none; }
+#btn-glyph { position: absolute; width: 40px; height: 40px; border-radius: 50%; border: 2px solid #8cc4ff; background: rgba(20,40,70,0.85); font-size: 18px; display: grid; place-items: center; touch-action: none; }
 #btn-glyph .cd { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 50%; background: rgba(0,0,0,0.65); font-size: 11px; font-weight: 800; }
 #btn-glyph .cd:empty { display: none; }
 
@@ -410,12 +413,10 @@ svg.icon { display: block; width: 100%; height: 100%; }
 
 
 /* ---------- pings ---------- */
-#btn-ping { position: absolute; left: 10px; top: 240px; width: 40px; height: 40px; border-radius: 50%; border: 2px solid #f59e0b; background: rgba(60,40,10,0.85); font-size: 18px; display: grid; place-items: center; touch-action: none; }
+#btn-ping { position: absolute; width: 40px; height: 40px; border-radius: 50%; border: 2px solid #f59e0b; background: rgba(60,40,10,0.85); font-size: 18px; display: grid; place-items: center; touch-action: none; }
 #btn-ping.armed { background: #f59e0b; }
-#ping-menu { position: absolute; left: 58px; top: 200px; display: flex; flex-direction: column; gap: 4px; z-index: 6; }
+#ping-menu { position: absolute; display: flex; flex-direction: column; gap: 4px; z-index: 6; }
 #ping-menu button { padding: 6px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.3); background: rgba(10,16,12,0.92); font-weight: 700; font-size: 13px; text-align: left; }
-#app.lefty #btn-ping, #app.lefty #btn-glyph { left: auto; right: 10px; }
-#app.lefty #ping-menu { left: auto; right: 58px; }
 
 /* ---------- practice / tutorial ---------- */
 #tutorial { position: absolute; left: 50%; top: 44px; transform: translateX(-50%); width: min(380px, 46%); background: rgba(10,16,12,0.92); border: 2px solid #ffd23f; border-radius: 12px; padding: 8px 12px; z-index: 6; }
