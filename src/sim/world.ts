@@ -457,7 +457,7 @@ export type GameEvent =
   | { type: 'itemExpire'; unitId: number; itemId: ItemId }
   /** The Warden's ground slam: 'windup' when it raises its arms, 'hit' when it lands. */
   | { type: 'wardenSlam'; unitId: number; phase: 'windup' | 'hit'; x: number; y: number; radius: number }
-  | { type: 'wardenMove'; unitId: number; phase: 'start' | 'stopped' | 'arrive'; x: number; y: number; fromX: number; fromY: number; watched: [boolean, boolean] }
+  | { type: 'wardenMove'; unitId: number; phase: 'start' | 'stopped' | 'arrive'; x: number; y: number; fromX: number; fromY: number }
   | { type: 'goldLost'; unitId: number; amount: number }
   | { type: 'ping'; ping: Ping }
   | { type: 'blink'; unitId: number; fromX: number; fromY: number }

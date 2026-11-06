@@ -433,7 +433,8 @@ export class Hud {
     const show = me.alive && left > 0;
     bar.classList.toggle('hidden', !show);
     if (!show) return;
-    this.el['channel-fill'].style.width = `${Math.min(100, (1 - left / total) * 100)}%`;
+    // Starts full and runs out, along with the seconds left.
+    this.el['channel-fill'].style.width = `${Math.min(100, (left / total) * 100)}%`;
     this.el['channel-text'].textContent = `${c ? 'Teleporting' : wind!.name}  ${left.toFixed(1)}`;
   }
 

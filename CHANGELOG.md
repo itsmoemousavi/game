@@ -29,6 +29,13 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.15.x · A real start and finish
 
+### 0.15.3
+*2026-11-05*
+
+- The channel bar now fits its text on one line, and runs from full to empty as the seconds count down.
+- The health, items and hero panel moved back to the right a little.
+- Removed the Warden messages. Its teleport effect shows what is happening.
+
 ### 0.15.2
 *2026-11-05*
 

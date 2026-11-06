@@ -158,25 +158,22 @@ function updateWardenMove(w: World) {
   const u = w.units.find((e) => e.alive && e.neutral?.boss);
   if (!u) return;
   const n = u.neutral!;
-  const watched = (): [boolean, boolean] => [0, 1].map((t) => w.units.some((e) => e.alive && e.team === t && e.kind === 'hero' && dist(e.x, e.y, u.x, u.y) < 25)) as [boolean, boolean];
-  const event = (phase: 'start' | 'stopped' | 'arrive', fromX: number, fromY: number, seen: [boolean, boolean]) =>
-    w.events.push({ type: 'wardenMove', unitId: u.id, phase, x: u.x, y: u.y, fromX, fromY, watched: seen });
+  const event = (phase: 'start' | 'stopped' | 'arrive', fromX: number, fromY: number) => w.events.push({ type: 'wardenMove', unitId: u.id, phase, x: u.x, y: u.y, fromX, fromY });
   if (dusk && n.moveAt == null) {
     n.moveAt = w.time + WARDEN_MOVE_SECONDS;
     n.slamLand = null;
     u.targetId = null;
-    event('start', u.x, u.y, watched());
+    event('start', u.x, u.y);
   }
   if (n.moveAt == null) return;
   if (u.stunTimer > 0) {
     n.moveAt = null;
-    event('stopped', u.x, u.y, watched());
+    event('stopped', u.x, u.y);
   } else if (w.time >= n.moveAt) {
     const fromX = u.x;
     const fromY = u.y;
-    const seen = watched();
     moveWardenTo(w, u, w.wardenHouse === 0 ? 1 : 0);
-    event('arrive', fromX, fromY, seen);
+    event('arrive', fromX, fromY);
   }
 }
 
