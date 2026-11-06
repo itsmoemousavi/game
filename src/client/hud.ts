@@ -252,7 +252,7 @@ export class Hud {
 
   private statsKey = '';
 
-  /** Hero stats panel (tap the portrait). */
+  /** Hero stats panel (tap the i on the portrait). */
   updateStats(w: World, me: Unit) {
     const h = me.hero!;
     const def = HEROES[h.defId];

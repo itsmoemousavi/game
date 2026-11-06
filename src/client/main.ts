@@ -689,7 +689,7 @@ select.addEventListener(
   },
   { capture: true },
 );
-onTap('#portrait', () => statsPanel.classList.toggle('hidden'));
+onTap('#btn-stats', () => statsPanel.classList.toggle('hidden'));
 onTap('#topbar', () => scorePanel.classList.toggle('hidden'));
 onTap('#btn-pause', () => (net ? net.setPaused(true) : setPaused(true)));
 onTap('#btn-resume', () => (net ? net.setPaused(false) : setPaused(false)));

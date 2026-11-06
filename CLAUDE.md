@@ -138,6 +138,17 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
    Balance after 0.15.9 (240 matches, about 160 games per hero, luck still ±4-8%): Vexa 58.6%, Grom 51.6%, Brakk 51.2%, Seren 49.7%, Syl 49.4%, Rhen 48.3%, Kaela 46.9%, Orin 46.4%, Morra 46.2%. Vexa is the one left above 55%. Single runs swing a lot, even 13% on the same numbers: pool runs before tuning.
 7. **Multiplayer.** Local shipped in 0.16.0: `src/net/` (session.ts lockstep + lobby, peer.ts WebRTC via the free public PeerJS service, works from GitHub Pages), `src/client/friend-ui.ts`. Owner's rules: Play with Friend holds Local (host lobby, code, bots fill seats) and Online (locked: invite up to 2 friends, Find Match, 6 humans, no bots). A leaver's hero goes inactive at base in both. Any player pauses (3 per match); dropped players rejoin by replaying the match. Host leaving or locking the phone stops the match (no host migration). Not done: TURN relay for strict networks, own introduction service, real iPhone test.
 8. Later: killable courier + bounty, Capacitor app builds, store release.
+9. **New tutorial (owner, 2026-11-06; PLANNED, not started, wait for their go).** The current one (`src/client/tutorial.ts`) is 8 short steps from an older version: move, learn, cast, attack, buy, look around, last hits, goal. Replace it so someone who knows nothing about the game ends up understanding it. Must cover:
+   - Goal: towers → barracks → shrine towers → enemy Shrine; 3v3 teams; what creeps do; Mega Creeps.
+   - Moving and controls: joystick, Attack button and aiming, auto attack on and off, denies, spell aiming, learning abilities, looking with the minimap, pings, pause.
+   - Map: lanes, river, runes, forest and pockets, mountains, Warden's houses, fountain yard, day and night, fog.
+   - Buildings: each tower tier, both barracks and what losing one does, shrine towers, Shrine, fountain, tower sight rules, glyph, backdoor.
+   - Economy: gold, last hits, shop, courier, TP and Wayfarer Boots, dying costs gold, buyback.
+   - Wards and sight: Watcher and Seer totems, true sight, invisible units, trees and high ground.
+   - Warden: where it lives, how to fight it, its dusk move, the charm anyone can grab.
+   - Also check every step against current rules before writing it, and test it at 393 × 793.
+10. **Mega Creep look (owner, 2026-11-06; PLANNED, not started, wait for their go).** When creeps turn Mega they should be a little bigger and their current look should read as stronger. Show a preview before shipping (art rule). Check what 3D already does first (`creep(..., mega)` in `three/models.ts`, scale in `renderer3d.ts`), and the 2D view too. Owner saw a still of the current models and said they're fine (keep the size); add armor to them, done well.
+11. **Hero stats panel (owner, 2026-11-06; PLANNED, not started, wait for their go).** The panel opened by the i on the portrait (`updateStats` in `hud.ts`) should show only the necessary data, not everything, with a better design. Show a preview before shipping.
 
 ## Gotchas
 

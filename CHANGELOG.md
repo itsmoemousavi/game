@@ -30,6 +30,10 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.16.x · Play with Friend
 
+### 0.16.4
+
+- Hero stats now open only from the **i** on your hero's picture, which moved to its bottom right. Tapping the picture itself no longer does anything.
+
 ### 0.16.3
 
 - **Fixed: players on Crimson were treated as Azure.** They saw the map through Azure's eyes, team messages were the wrong way round, and Victory and Defeat were swapped. Now you see what your own team sees, wherever you sit.

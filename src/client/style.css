@@ -288,8 +288,10 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 
 /* ---------- settings / stats ---------- */
 #btn-settings { position: absolute; right: max(10px, var(--sr)); top: max(6px, var(--st)); width: 34px; height: 34px; border-radius: 50%; border: 0; background: rgba(0,0,0,0.5); font-size: 18px; color: #e8eee9; }
-#portrait { position: relative; pointer-events: auto; cursor: pointer; }
-#portrait i { position: absolute; right: -4px; top: -4px; width: 15px; height: 15px; z-index: 1; border-radius: 50%; background: #2b5f9e; color: #fff; font-size: 11px; font-style: italic; font-weight: 800; font-family: Georgia, serif; display: grid; place-items: center; border: 1px solid #fff; }
+#portrait { position: relative; pointer-events: auto; }
+/* A small mark with a finger-sized area around it. */
+#portrait i::after { content: ''; position: absolute; inset: -12px; }
+#portrait i { position: absolute; right: -4px; bottom: -4px; cursor: pointer; width: 15px; height: 15px; z-index: 1; border-radius: 50%; background: #2b5f9e; color: #fff; font-size: 11px; font-style: italic; font-weight: 800; font-family: Georgia, serif; display: grid; place-items: center; border: 1px solid #fff; }
 .panel { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(14,22,17,0.96); border: 2px solid #3a5242; border-radius: 12px; padding: 10px 14px; z-index: 7; max-height: 88%; overflow-y: auto; }
 #settings { width: min(600px, 92%); max-height: 90%; display: flex; flex-direction: column; box-sizing: border-box; }
 #settings.hidden { display: none; }
