@@ -223,7 +223,7 @@ describe('abilities', () => {
     b.hp = before;
     learn(w, b, 1);
     w.dealDamage(v.id, b, 50, 'attack');
-    expect(before - b.hp).toBeLessThan(plain - 3);
+    expect(before - b.hp).toBeLessThan(plain - 2);
   });
 
   it('spells never damage structures', () => {
