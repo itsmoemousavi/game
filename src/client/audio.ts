@@ -11,7 +11,7 @@
 export const SOUND_NAMES = [
   'swing', 'hit', 'shoot', 'tower', 'creep', 'cast', 'slam', 'fireBlast', 'heal', 'coin', 'levelUp', 'heroDeath', 'collapse', 'teleport',
   'deny', 'rune', 'buyback', 'glyph', 'ward', 'roar', 'revive', 'purchase', 'itemDrop', 'itemPickUp', 'click', 'clockTick', 'clockTock', 'clockGo',
-  'ping', 'victory', 'defeat', 'bodyFall', 'bowShot', 'arrowHit', 'piercingShot', 'critPing', 'arrowRain', 'fireBolt', 'fireHit', 'fireballCast',
+  'ping', 'matchHorn', 'deathSong', 'winSong', 'loseSong', 'shrineBoom', 'salve', 'bodyFall', 'bowShot', 'arrowHit', 'piercingShot', 'critPing', 'arrowRain', 'fireBolt', 'fireHit', 'fireballCast',
   'mendFlame', 'meteorFall', 'meteorImpact', 'daggerSlash', 'shadowStep', 'vanish', 'execute', 'woodPunch', 'rootSnare', 'rootsErupt', 'barkSkin',
   'overgrowth', 'treeFall', 'waterBolt', 'splash', 'tidalWave', 'brineVeil', 'maelstrom', 'zap', 'bellToll', 'frostNova', 'stoneCrumble',
   'wardenPunch', 'impStab', 'hammerAttack', 'shieldCharge', 'shieldBash', 'quakeCharge', 'earthsplitter', 'ironClang', 'armorFall', 'tpChannel',

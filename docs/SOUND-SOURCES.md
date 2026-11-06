@@ -20,3 +20,7 @@ To rebuild: unzip each pack as `<folder>/x/` under one directory (folder names a
 pip install numpy scipy soundfile   # plus ffmpeg
 SFX_SOURCES=/path/to/packs python3 scripts/sounds/design.py public/sfx
 ```
+
+## Picking by ear
+
+`scripts/sounds/choose.py` builds the listening sheet's options from CC0 recordings on OpenGameArt and Freesound (each file's licence checked on its own page). It records every option's source, so the final list here gets updated once the picks are in.

@@ -115,6 +115,8 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
         const u = w.unit(e.unitId);
         if (!u) break;
         if (u.kind === 'hero') sfx.play('heroDeath', u.id === meId ? 1 : near(u));
+        // A little piece of music when it's your own hero.
+        if (u.id === meId) sfx.play('deathSong', 0.8);
         else if (u.kind === 'structure') sfx.play('collapse', Math.max(0.35, near(u)));
         break;
       }
@@ -169,8 +171,10 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
         break;
       case 'itemActive':
         sfx.play(
-          e.kind === 'manaBurst' || e.kind === 'teamHeal' || e.kind === 'salve'
-            ? 'heal'
+          e.kind === 'salve'
+            ? 'salve'
+            : e.kind === 'manaBurst' || e.kind === 'teamHeal'
+              ? 'heal'
             : e.kind === 'frostNova' || e.kind === 'mire'
               ? 'frostNova'
               : e.kind === 'silence'
@@ -215,9 +219,6 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
         break;
       case 'itemPickUp':
         if (e.unitId === meId) sfx.play('itemPickUp');
-        break;
-      case 'gameOver':
-        sfx.play(e.winner === team ? 'victory' : 'defeat');
         break;
     }
   }

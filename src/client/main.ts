@@ -181,6 +181,7 @@ function leaveToMenu(why: string) {
   if (s) draftUi.cancel();
   myTeam = 0;
   friendUi.hideCountdown();
+  stopEndSong();
   settingsPanel.classList.add('hidden');
   app.classList.add('hidden');
   app.classList.remove('net');
@@ -341,8 +342,12 @@ const hud = new Hud(app);
 let lastMatch: { m: Mode; d: Draft } | null = null;
 const endScreen = new EndScreen(
   app,
-  () => lastMatch && startMatch(lastMatch.m, lastMatch.d),
   () => {
+    stopEndSong();
+    if (lastMatch) void startMatch(lastMatch.m, lastMatch.d);
+  },
+  () => {
+    stopEndSong();
     if (net) {
       net.leave();
       return;
@@ -359,6 +364,12 @@ hud.onGameOver = (w) => playEnding(w);
  * the result comes up, and then the end screen.
  */
 let ending = false;
+/** The short song behind the end of the match, so leaving the end screen can stop it. */
+let endSong: ReturnType<Sfx['play']> = null;
+function stopEndSong() {
+  sfx.stop(endSong);
+  endSong = null;
+}
 function playEnding(w: World) {
   ending = true;
   app.classList.add('ending');
@@ -369,6 +380,10 @@ function playEnding(w: World) {
     endScreen.show(w, myTeam, myHeroId);
   };
   const won = w.winner === myTeam;
+  const shrineFalls = () => {
+    sfx.play('shrineBoom');
+    endSong = sfx.play(won ? 'winSong' : 'loseSong', 0.8);
+  };
   const banner = () => {
     const v = $<HTMLElement>('#victory');
     v.classList.remove('hidden');
@@ -377,6 +392,7 @@ function playEnding(w: World) {
     v.querySelector('small')!.textContent = `${TEAM_NAMES[w.winner as Team]} destroyed the enemy Shrine`;
   };
   if (!(renderer instanceof Renderer3D)) {
+    shrineFalls();
     banner();
     setTimeout(show, 2200);
     return;
@@ -384,6 +400,7 @@ function playEnding(w: World) {
   const flash = $<HTMLElement>('#end-flash');
   renderer.playEnding(w, {
     onBoom: () => {
+      shrineFalls();
       flash.classList.remove('go');
       void flash.offsetWidth;
       flash.classList.add('go');
@@ -964,6 +981,8 @@ function frame(now: number) {
       const before = world.time;
       world.step();
       net?.afterStep(world);
+      // The war horn, three seconds before the battle begins.
+      if (before < -3 && world.time >= -3) sfx.play('matchHorn');
       if (before < 0 && world.time >= 0) hud.toast('The battle begins: creeps are on their way!', '#ffd23f');
       renderer.pushEvents(world, world.events, myHeroId);
       tutorial?.update(world, world.unit(myHeroId)!);

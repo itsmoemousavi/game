@@ -31,6 +31,13 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.17.x · New sounds
 
+### 0.17.1
+
+- **A war horn** now sounds three seconds before the battle begins.
+- **A little piece of music** plays when your hero dies.
+- **A short song and the Shrine's explosion** now play at the end of the match.
+- These are first choices: the final sounds are still being picked by ear.
+
 ### 0.17.0
 
 - **Every sound in the game is new.** Natural recordings, layered and shaped: deep rumbling explosions and ground smashes, real rock and wood hits, soft chimes for healing, a choir and harp for teleporting, modelled water for Kaela. Nothing sounds electric any more.
