@@ -469,7 +469,7 @@ export type GameEvent =
   | { type: 'announce'; unitId: number; victimId: number; firstBlood: boolean; multi: number; streak: number; shutdown: number }
   | { type: 'immunity'; unitId: number }
   /** An item button was used (Arcane Boots, Frost Horn, Stoneskin Amulet). */
-  | { type: 'itemActive'; unitId: number; kind: 'manaBurst' | 'frostNova' | 'stoneskin' | 'silence' | 'teamHeal' | 'vanish' | 'mire'; targetId?: number }
+  | { type: 'itemActive'; unitId: number; kind: 'manaBurst' | 'frostNova' | 'stoneskin' | 'silence' | 'teamHeal' | 'vanish' | 'mire' | 'salve'; targetId?: number }
   | { type: 'chainLightning'; sourceId: number; targetIds: number[] }
   | { type: 'shieldBreak'; unitId: number }
   | { type: 'megaCreeps'; team: Team }

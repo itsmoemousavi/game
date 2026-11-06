@@ -1,5 +1,5 @@
 import { GameEvent, HEROES, Team, Unit, World } from '../sim';
-import { Sfx, SoundName } from './audio';
+import { ATTACK_LEAD, Sfx, SoundName } from './audio';
 
 /** When each Brakk last started a Shield Charge (to give its hits a shield-bash sound). */
 const chargeAt = new Map<number, number>();
@@ -36,6 +36,19 @@ const ATTACK_SOUNDS: Record<string, SoundName> = {
   rhen: 'bowShot',
 };
 
+/** How long after an attack starts each swing visibly lands (from the animations). Ranged attacks fire at once. */
+const HERO_IMPACT: Record<string, number> = { brakk: 0.19, seren: 0.22, syl: 0.09, grom: 0.22 };
+function impactAt(u: Unit): number {
+  if (u.hero) return u.hero.wolfForm ? 0.18 : HERO_IMPACT[u.hero.defId] ?? 0;
+  if (u.summon) return 0.18;
+  if (u.neutral) return u.neutral.boss || u.radius > 0.9 ? 0.3 : 0.12;
+  if (u.creep) return u.projectileSpeed > 0 ? 0.12 : 0.14;
+  return 0;
+}
+
+/** Teleports being charged: their sound fades as soon as the hero stops channelling (arrived or cancelled). */
+const channelling = new Map<number, ReturnType<Sfx['play']>>();
+
 /** A hero's delayed blast landing (Earthsplitter, Cataclysm, Root Snare / Overgrowth). */
 const BLAST_SOUNDS: Record<string, SoundName> = {
   brakk: 'earthsplitter',
@@ -55,6 +68,11 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
     const d = Math.hypot(x - cam.x, y - cam.y);
     return d < 22 ? 1 : Math.max(0, 1 - (d - 22) / 25);
   };
+  for (const [id, voice] of channelling) {
+    if (w.unit(id)?.hero?.channel) continue;
+    sfx.stop(voice);
+    channelling.delete(id);
+  }
   for (const e of events) {
     switch (e.type) {
       case 'attack': {
@@ -62,15 +80,18 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
         const t = w.unit(e.targetId);
         if (!s) break;
         const involvesMe = s.id === meId || t?.id === meId;
+        // Melee sounds carry a little swing before the impact, so the impact lands on the hit frame.
+        const hitAt = impactAt(s);
+        const swing = s.projectileSpeed === 0 ? Math.max(0, hitAt - ATTACK_LEAD) : hitAt;
         if (s.kind === 'structure') sfx.play('tower', near(s) * (involvesMe ? 1 : 0.5));
         else if (s.hero) {
-          sfx.play(s.hero.wolfForm ? 'impStab' : (ATTACK_SOUNDS[s.hero.defId] ?? 'swing'), near(s));
+          sfx.play(s.hero.wolfForm ? 'impStab' : (ATTACK_SOUNDS[s.hero.defId] ?? 'swing'), near(s), swing);
           if (s.hero.defId === 'vexa' && s.hero.lastCrit) sfx.play('critPing', near(s));
         }
-        else if (s.kind === 'neutral' && s.neutral?.boss) sfx.play('wardenPunch', near(s));
-        else if (s.kind === 'neutral') sfx.play(s.radius > 0.9 ? 'woodPunch' : 'impStab', near(s) * (involvesMe ? 0.9 : 0.5));
-        else sfx.play('creep', near(s) * (involvesMe ? 1 : 0.4));
-        if (t && t.id === meId && s.projectileSpeed === 0) sfx.play('hit', 0.6);
+        else if (s.kind === 'neutral' && s.neutral?.boss) sfx.play('wardenPunch', near(s), swing);
+        else if (s.kind === 'neutral') sfx.play(s.radius > 0.9 ? 'woodPunch' : 'impStab', near(s) * (involvesMe ? 0.9 : 0.5), swing);
+        else sfx.play(s.projectileSpeed > 0 ? 'shoot' : 'creep', near(s) * (involvesMe ? 1 : 0.4), swing);
+        if (t && t.id === meId && s.projectileSpeed === 0) sfx.play('hit', 0.6, hitAt);
         break;
       }
       case 'cast': {
@@ -111,7 +132,7 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
         const u = w.unit(e.unitId);
         const t = w.unit(e.targetId);
         const destHeard = t && (u?.team === team || w.vision.seesPoint(team, t.x, t.y)) ? near(undefined, t.x, t.y) : 0;
-        sfx.play('tpChannel', Math.max(near(u), destHeard));
+        channelling.set(e.unitId, sfx.play('tpChannel', Math.max(near(u), destHeard)));
         break;
       }
       case 'damage': {
@@ -144,18 +165,18 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
         sfx.play('revive', near(w.unit(e.unitId)));
         break;
       case 'blink':
-        sfx.play('teleport', near(w.unit(e.unitId)) * 0.7);
+        sfx.play('shadowStep', near(w.unit(e.unitId)) * 0.8);
         break;
       case 'itemActive':
         sfx.play(
-          e.kind === 'manaBurst' || e.kind === 'teamHeal'
-            ? 'brineVeil'
+          e.kind === 'manaBurst' || e.kind === 'teamHeal' || e.kind === 'salve'
+            ? 'heal'
             : e.kind === 'frostNova' || e.kind === 'mire'
               ? 'frostNova'
               : e.kind === 'silence'
                 ? 'bellToll'
                 : e.kind === 'vanish'
-                  ? 'teleport'
+                  ? 'vanish'
                   : 'ironClang',
           near(w.unit(e.unitId)),
         );

@@ -145,7 +145,6 @@ export function animateMonster(c: AnimCtx, kind: MonsterKind, o: THREE.Object3D,
           const [x, y] = near(c, u, 2.4);
           c.fx.dust(x, y, 4, 1.1, 0x7a6448, 0.6, 0.7);
           c.fx.shockwave(x, y, 2, 0xc8b89a, 0.3, 0.6);
-          c.sound('woodPunch', x, y, 0.35);
         }
       }
       break;

@@ -41,7 +41,7 @@ let myHeroId = 0;
 let myTeam: Team = 0;
 let devPick: HeroId | null = null;
 // Local dev server only (never in the published game): lets test scripts look at the match.
-if (import.meta.env.DEV) Object.assign(window, { dbg: { world: () => world, me: () => world?.unit(myHeroId), pick: (h: HeroId) => (devPick = h), renderer: () => renderer, net: () => net, draft: () => draftUi } });
+if (import.meta.env.DEV) Object.assign(window, { dbg: { world: () => world, me: () => world?.unit(myHeroId), pick: (h: HeroId) => (devPick = h), renderer: () => renderer, net: () => net, draft: () => draftUi, sfx: () => sfx } });
 const profile = loadProfile(phoneStorage);
 let pickedLane: LaneId = 'mid';
 let pickedDifficulty: BotDifficulty = 'normal';
@@ -83,6 +83,9 @@ async function boot() {
   } catch (err) {
     console.warn('Hero pictures unavailable', err);
   }
+  // Every sound ready before the menu, so none is ever late. A very slow connection doesn't hold up the game.
+  showLoading('Tuning the horns', 94);
+  await Promise.race([sfxLoaded, new Promise((r) => setTimeout(r, 6000))]);
   showLoading('Ready', 100);
   await nextPaint();
   loadingEl.classList.add('done');
@@ -392,6 +395,7 @@ function playEnding(w: World) {
 }
 
 const sfx = new Sfx();
+const sfxLoaded = sfx.load();
 const itemsUi = new ItemsUi(
   app,
   (cmd) => world?.enqueue(cmd),
@@ -767,7 +771,7 @@ function announce(w: World, events: GameEvent[]) {
       continue;
     }
     if (e.type === 'announce') {
-      if (hud.announce(w, e, myTeam)) sfx.play(w.unit(e.unitId)?.team === myTeam ? 'victory' : 'defeat', 0.5);
+      if (hud.announce(w, e, myTeam)) sfx.play(w.unit(e.unitId)?.team === myTeam ? 'levelUp' : 'glyph', 0.6);
       continue;
     }
     if (e.type === 'bossKilled') {

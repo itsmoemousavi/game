@@ -70,7 +70,7 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
   attacks, every spell, buffs, deaths), `three/spell-fx.ts` (projectile trails, area spells),
   `three/fx.ts` (dust, sparks, slashes, roots, meteor, whirlpool, camera shake), `three/world-art.ts` (map look: ground detail, flowing river, swaying trees and grass, rocks, walls, fireflies; all decoration, never reacts to units), `three/hero-models.ts` +
   `three/models.ts` (our own models sculpted in code; every model goes through one paint finish when baked into few meshes with animatable joints, so new models match automatically), `menu3d.ts` (start screen 3D hero + portraits), `hud.ts`, `input.ts`, `items-ui.ts`
-  (shop), `audio.ts` (synthesized sounds), `tutorial.ts`.
+  (shop), `audio.ts` (loads and plays `public/sfx`), `tutorial.ts`.
 - `tests/` vitest. Positions in tests are on the 300 m map. Long full-match tests must `await` a
   `setTimeout(0)` about every 600 ticks, or vitest's worker heartbeat times out on CI (all tests can pass and the run still fails).
 
@@ -121,6 +121,7 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
   walks lanes only until 6:00 then flies, turns back on death, invulnerable for now (killable + bounty = later).
 - Player identity (owner, 2026-11-06): permanent random id `ovra-` + 6 letters and numbers (`src/client/profile.ts`), kept on the phone until there's a database to guarantee uniqueness. Display name is edited in Settings → Profile from the start menu only (edit icon → window with Cancel/Save); during a match it's shown with the edit icon disabled. It falls back to the id when empty. Names everywhere (`player-names.ts`): lobby, draft, kill feed, announcements, overhead; scoreboards show `Name (Hero)`. Bots are named by seat (Bot Ash…, my choice). Names are client-only, never in the sim.
 - Host taps Start: 3 s ticking clock on every phone, lobby frozen, then the draft.
+- Sounds (owner, 2026-11-06): all the same loudness (a sword must not hurt, quiet sounds must be heard). Walking makes no sound for anyone. Nothing electric, everything natural; teleport sounds heavenly. Their reference for the feel is another well known game of the genre, but we never use its files. Melee impacts land on the animation's hit frame: `impactAt` in `sound-events.ts` must match the animations.
 - Dying costs gold; buyback exists. Android build: not now. App stores: later.
 
 ## Open items / next steps
@@ -150,7 +151,7 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
 10. **Mega Creep look (owner, 2026-11-06; PLANNED, not started, wait for their go).** When creeps turn Mega they should be a little bigger and their current look should read as stronger. Show a preview before shipping (art rule). Check what 3D already does first (`creep(..., mega)` in `three/models.ts`, scale in `renderer3d.ts`), and the 2D view too. Owner saw a still of the current models and said they're fine (keep the size); add armor to them, done well.
 11. **Hero stats panel (owner, 2026-11-06; PLANNED, not started, wait for their go).** The panel opened by the i on the portrait (`updateStats` in `hud.ts`) should show only the necessary data, not everything, with a better design. Show a preview before shipping.
 
-12. **Recorded sounds (owner, 2026-11-06; IN REVIEW).** Replacing the code-made sounds with CC0 recordings from OpenGameArt. Listening page with picks: https://claude.ai/artifact/Y4foqsoAA3Zs3CcG1yKdq6 (read the `picks` collection with the ArtifactData tool; a doc per sound: choice, level, note). Kenney's and Sonniss's own sites refuse automated downloads. Owner's rules: all sounds at the same loudness (a sword must not hurt, a quiet sound must still be heard); walking makes no sound for anyone, ever (shipped 0.16.6).
+12. **Sounds (owner, 2026-11-06; shipped 0.17.0, in review).** All 72 sounds are designed by `scripts/sounds/design.py` (CC0 recordings + modelled natural sounds; sources in `docs/SOUND-SOURCES.md`), played from `public/sfx`. I can't hear audio: only the owner can judge. Review page: https://claude.ai/artifact/Y4foqsoAA3Zs3CcG1yKdq6 (read the `review` collection with ArtifactData; a doc per sound: verdict, note).
 
 ## Gotchas
 

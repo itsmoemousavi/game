@@ -1,0 +1,506 @@
+{
+"swing": {
+"seconds": 0.31,
+"level": -21.0,
+"peak": 0.37,
+"brightness": 5176,
+"kb": 4.4
+},
+"hit": {
+"seconds": 0.52,
+"level": -21.0,
+"peak": 0.41,
+"brightness": 2697,
+"kb": 6.9
+},
+"hammerAttack": {
+"seconds": 0.7,
+"level": -20.9,
+"peak": 0.42,
+"brightness": 180,
+"kb": 9.1
+},
+"daggerSlash": {
+"seconds": 0.54,
+"level": -21.0,
+"peak": 0.27,
+"brightness": 4980,
+"kb": 7.3
+},
+"woodPunch": {
+"seconds": 0.55,
+"level": -21.0,
+"peak": 0.46,
+"brightness": 1149,
+"kb": 7.3
+},
+"creep": {
+"seconds": 0.38,
+"level": -21.0,
+"peak": 0.32,
+"brightness": 527,
+"kb": 5.4
+},
+"impStab": {
+"seconds": 0.47,
+"level": -21.0,
+"peak": 0.29,
+"brightness": 397,
+"kb": 6.6
+},
+"wardenPunch": {
+"seconds": 0.63,
+"level": -20.9,
+"peak": 0.45,
+"brightness": 171,
+"kb": 8.5
+},
+"deny": {
+"seconds": 0.3,
+"level": -21.0,
+"peak": 0.39,
+"brightness": 2064,
+"kb": 4.4
+},
+"tower": {
+"seconds": 0.57,
+"level": -24.0,
+"peak": 0.2,
+"brightness": 601,
+"kb": 7.6
+},
+"shoot": {
+"seconds": 0.45,
+"level": -21.0,
+"peak": 0.27,
+"brightness": 1953,
+"kb": 6.3
+},
+"bowShot": {
+"seconds": 0.28,
+"level": -21.0,
+"peak": 0.25,
+"brightness": 2813,
+"kb": 4.1
+},
+"arrowHit": {
+"seconds": 0.22,
+"level": -20.9,
+"peak": 0.36,
+"brightness": 1834,
+"kb": 3.5
+},
+"piercingShot": {
+"seconds": 0.65,
+"level": -21.0,
+"peak": 0.23,
+"brightness": 2620,
+"kb": 8.5
+},
+"critPing": {
+"seconds": 0.32,
+"level": -21.0,
+"peak": 0.2,
+"brightness": 2143,
+"kb": 4.7
+},
+"arrowRain": {
+"seconds": 1.45,
+"level": -21.0,
+"peak": 0.25,
+"brightness": 3056,
+"kb": 18.2
+},
+"fireBolt": {
+"seconds": 0.3,
+"level": -20.9,
+"peak": 0.25,
+"brightness": 899,
+"kb": 4.4
+},
+"fireHit": {
+"seconds": 0.34,
+"level": -21.0,
+"peak": 0.36,
+"brightness": 713,
+"kb": 5.1
+},
+"fireballCast": {
+"seconds": 0.82,
+"level": -20.9,
+"peak": 0.36,
+"brightness": 1015,
+"kb": 10.7
+},
+"fireBlast": {
+"seconds": 1.48,
+"level": -20.9,
+"peak": 0.29,
+"brightness": 138,
+"kb": 18.5
+},
+"mendFlame": {
+"seconds": 1.35,
+"level": -21.0,
+"peak": 0.23,
+"brightness": 799,
+"kb": 17.0
+},
+"meteorFall": {
+"seconds": 1.86,
+"level": -21.0,
+"peak": 0.24,
+"brightness": 1102,
+"kb": 23.2
+},
+"meteorImpact": {
+"seconds": 2.89,
+"level": -21.0,
+"peak": 0.26,
+"brightness": 98,
+"kb": 35.5
+},
+"slam": {
+"seconds": 0.9,
+"level": -21.0,
+"peak": 0.38,
+"brightness": 95,
+"kb": 11.6
+},
+"earthsplitter": {
+"seconds": 1.62,
+"level": -21.0,
+"peak": 0.32,
+"brightness": 125,
+"kb": 20.1
+},
+"quakeCharge": {
+"seconds": 1.12,
+"level": -21.0,
+"peak": 0.38,
+"brightness": 330,
+"kb": 14.2
+},
+"shieldCharge": {
+"seconds": 0.53,
+"level": -20.9,
+"peak": 0.28,
+"brightness": 3320,
+"kb": 7.3
+},
+"shieldBash": {
+"seconds": 0.55,
+"level": -21.0,
+"peak": 0.3,
+"brightness": 202,
+"kb": 7.6
+},
+"ironClang": {
+"seconds": 0.45,
+"level": -21.0,
+"peak": 0.37,
+"brightness": 4772,
+"kb": 6.3
+},
+"armorFall": {
+"seconds": 0.78,
+"level": -21.0,
+"peak": 0.39,
+"brightness": 2012,
+"kb": 10.1
+},
+"bodyFall": {
+"seconds": 0.92,
+"level": -21.1,
+"peak": 0.68,
+"brightness": 3253,
+"kb": 12.0
+},
+"treeFall": {
+"seconds": 0.59,
+"level": -21.0,
+"peak": 0.4,
+"brightness": 2645,
+"kb": 7.9
+},
+"heroDeath": {
+"seconds": 0.56,
+"level": -21.0,
+"peak": 0.34,
+"brightness": 1658,
+"kb": 7.6
+},
+"stoneCrumble": {
+"seconds": 1.59,
+"level": -20.9,
+"peak": 0.48,
+"brightness": 288,
+"kb": 19.8
+},
+"collapse": {
+"seconds": 1.88,
+"level": -21.0,
+"peak": 0.32,
+"brightness": 162,
+"kb": 23.6
+},
+"shadowStep": {
+"seconds": 0.59,
+"level": -21.0,
+"peak": 0.25,
+"brightness": 1254,
+"kb": 7.9
+},
+"vanish": {
+"seconds": 0.96,
+"level": -21.0,
+"peak": 0.24,
+"brightness": 1410,
+"kb": 12.3
+},
+"execute": {
+"seconds": 0.6,
+"level": -21.0,
+"peak": 0.25,
+"brightness": 3340,
+"kb": 8.2
+},
+"rootSnare": {
+"seconds": 0.39,
+"level": -21.0,
+"peak": 0.46,
+"brightness": 927,
+"kb": 5.4
+},
+"rootsErupt": {
+"seconds": 0.84,
+"level": -20.9,
+"peak": 0.34,
+"brightness": 646,
+"kb": 11.0
+},
+"barkSkin": {
+"seconds": 0.42,
+"level": -21.0,
+"peak": 0.45,
+"brightness": 3229,
+"kb": 6.0
+},
+"overgrowth": {
+"seconds": 1.09,
+"level": -21.0,
+"peak": 0.39,
+"brightness": 569,
+"kb": 13.8
+},
+"waterBolt": {
+"seconds": 0.46,
+"level": -21.0,
+"peak": 0.21,
+"brightness": 928,
+"kb": 6.3
+},
+"splash": {
+"seconds": 0.58,
+"level": -20.9,
+"peak": 0.23,
+"brightness": 877,
+"kb": 7.9
+},
+"tidalWave": {
+"seconds": 2.27,
+"level": -21.0,
+"peak": 0.25,
+"brightness": 614,
+"kb": 27.9
+},
+"brineVeil": {
+"seconds": 1.36,
+"level": -21.0,
+"peak": 0.25,
+"brightness": 1357,
+"kb": 17.3
+},
+"maelstrom": {
+"seconds": 2.44,
+"level": -21.0,
+"peak": 0.27,
+"brightness": 616,
+"kb": 30.1
+},
+"zap": {
+"seconds": 0.62,
+"level": -21.0,
+"peak": 0.33,
+"brightness": 158,
+"kb": 8.2
+},
+"heal": {
+"seconds": 1.5,
+"level": -21.0,
+"peak": 0.19,
+"brightness": 969,
+"kb": 18.9
+},
+"cast": {
+"seconds": 0.7,
+"level": -21.0,
+"peak": 0.22,
+"brightness": 1340,
+"kb": 9.1
+},
+"glyph": {
+"seconds": 1.3,
+"level": -21.0,
+"peak": 0.19,
+"brightness": 370,
+"kb": 16.3
+},
+"frostNova": {
+"seconds": 0.69,
+"level": -21.0,
+"peak": 0.28,
+"brightness": 2667,
+"kb": 9.1
+},
+"bellToll": {
+"seconds": 2.2,
+"level": -21.0,
+"peak": 0.26,
+"brightness": 196,
+"kb": 27.3
+},
+"tpChannel": {
+"seconds": 3.69,
+"level": -21.0,
+"peak": 0.2,
+"brightness": 755,
+"kb": 45.2
+},
+"teleport": {
+"seconds": 2.08,
+"level": -21.0,
+"peak": 0.17,
+"brightness": 681,
+"kb": 25.7
+},
+"revive": {
+"seconds": 2.08,
+"level": -21.0,
+"peak": 0.18,
+"brightness": 712,
+"kb": 25.7
+},
+"levelUp": {
+"seconds": 1.23,
+"level": -21.0,
+"peak": 0.2,
+"brightness": 1261,
+"kb": 15.7
+},
+"rune": {
+"seconds": 0.64,
+"level": -21.0,
+"peak": 0.18,
+"brightness": 1603,
+"kb": 8.5
+},
+"buyback": {
+"seconds": 1.14,
+"level": -21.0,
+"peak": 0.22,
+"brightness": 2345,
+"kb": 14.5
+},
+"coin": {
+"seconds": 0.71,
+"level": -21.0,
+"peak": 0.2,
+"brightness": 6622,
+"kb": 9.4
+},
+"purchase": {
+"seconds": 0.32,
+"level": -21.0,
+"peak": 0.47,
+"brightness": 4812,
+"kb": 4.7
+},
+"itemDrop": {
+"seconds": 0.34,
+"level": -21.0,
+"peak": 0.56,
+"brightness": 3143,
+"kb": 5.1
+},
+"itemPickUp": {
+"seconds": 0.38,
+"level": -21.0,
+"peak": 0.44,
+"brightness": 4271,
+"kb": 5.4
+},
+"ward": {
+"seconds": 0.43,
+"level": -21.0,
+"peak": 0.48,
+"brightness": 2778,
+"kb": 6.0
+},
+"click": {
+"seconds": 0.05,
+"level": -21.1,
+"peak": 0.73,
+"brightness": 2550,
+"kb": 1.3
+},
+"clockTick": {
+"seconds": 0.39,
+"level": -21.0,
+"peak": 0.63,
+"brightness": 4384,
+"kb": 5.7
+},
+"clockTock": {
+"seconds": 0.03,
+"level": -21.0,
+"peak": 0.43,
+"brightness": 4426,
+"kb": 1.3
+},
+"clockGo": {
+"seconds": 1.01,
+"level": -21.0,
+"peak": 0.15,
+"brightness": 928,
+"kb": 12.9
+},
+"ping": {
+"seconds": 0.17,
+"level": -21.0,
+"peak": 0.66,
+"brightness": 3196,
+"kb": 2.9
+},
+"roar": {
+"seconds": 0.57,
+"level": -21.0,
+"peak": 0.17,
+"brightness": 507,
+"kb": 7.6
+},
+"victory": {
+"seconds": 3.51,
+"level": -21.0,
+"peak": 0.21,
+"brightness": 533,
+"kb": 43.0
+},
+"defeat": {
+"seconds": 3.14,
+"level": -21.0,
+"peak": 0.23,
+"brightness": 201,
+"kb": 38.6
+}
+}

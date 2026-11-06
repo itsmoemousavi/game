@@ -9,6 +9,7 @@ The version you're playing is shown in **Settings → View** in the game.
 
 | Version | Milestone | Date |
 |---|---|---|
+| [0.17.x](#017x--new-sounds) | New sounds | 2026-11-06 |
 | [0.16.x](#016x--play-with-friend) | Play with Friend | 2026-11-06 |
 | [0.15.x](#015x--a-real-start-and-finish) | A real start and finish | 2026-11-05 |
 | [0.14.x](#014x--new-controls-and-rules) | New controls and rules | 2026-11-05 |
@@ -25,6 +26,19 @@ The version you're playing is shown in **Settings → View** in the game.
 | [0.3.x](#03x--hero-balance) | Hero balance | 2026-11-01 |
 | [0.2.x](#02x--six-heroes-and-smarter-bots) | Six heroes and smarter bots | 2026-11-01 |
 | [0.1.x](#01x--first-playable-prototype) | First playable prototype (2D) | 2026-11-01 |
+
+---
+
+## 0.17.x · New sounds
+
+### 0.17.0
+
+- **Every sound in the game is new.** Natural recordings, layered and shaped: deep rumbling explosions and ground smashes, real rock and wood hits, soft chimes for healing, a choir and harp for teleporting, modelled water for Kaela. Nothing sounds electric any more.
+- **All sounds are about the same loudness.** A sword no longer hurts next to a quiet sound.
+- **Hits land on time.** A melee sound's impact now plays at the moment the swing visibly connects, for every hero and creature.
+- **No more late sounds.** Everything loads before the menu and plays at once. If the phone pauses its audio for a moment, sounds are skipped instead of coming out late.
+- A cancelled teleport's sound now fades straight away.
+- Using a Herbal Poultice now has its own soft sound.
 
 ---
 

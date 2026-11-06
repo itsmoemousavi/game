@@ -397,6 +397,7 @@ export function useItem(w: World, u: Unit, slot: number, x?: number, y?: number)
   }
   if (s.id === 'healingSalve') {
     w.addBuff(u, { key: 'salve', t: SALVE.duration, healPerSec: SALVE.heal / SALVE.duration });
+    w.events.push({ type: 'itemActive', unitId: u.id, kind: 'salve' });
     s.count--;
     if (s.count <= 0) h.items[slot] = null;
     return true;
