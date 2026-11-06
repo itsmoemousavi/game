@@ -41,7 +41,7 @@ import { CourierState, courierGround, dropCourierItem, newCourier, sendCourier, 
 import { Vision, isInvisible } from './vision';
 import { Rune, activateGlyph, buyback, onHillTop, placeWard, spawnBoss, updateObjectives } from './objectives';
 import { GameMap, LaneId, StructureTier, createMap, fits, heightAt, inHouse, isWalkable, lineClear, teamLanePath } from './map';
-import { Vec2, dist, distV } from './math';
+import { Vec2, dist, distV, dAtan2, dCos, dHypot, dSin } from './math';
 
 const distToSeg = (px: number, py: number, ax: number, ay: number, bx: number, by: number) => {
   const abx = bx - ax;
@@ -89,6 +89,8 @@ export type Command =
   | { type: 'setAutoLearn'; unitId: number; enabled: boolean }
   /** Give up: the other team wins. */
   | { type: 'surrender'; unitId: number }
+  /** Multiplayer, from the host only: this player has left (or come back). */
+  | { type: 'setAway'; unitId: number; away: boolean }
   /** Team ping on the map (bots on your team react to it). */
   | { type: 'ping'; unitId: number; kind: PingKind; x: number; y: number }
   | { type: 'stop'; unitId: number }
@@ -245,6 +247,8 @@ export interface Dash {
 export interface HeroState {
   defId: HeroId;
   controller: Controller;
+  /** Multiplayer: the player has left, so the hero stands inactive at base. */
+  away: boolean;
   slot: number;
   lane: LaneId;
   level: number;
@@ -658,14 +662,28 @@ export class World {
 
   // ---------------------------------------------------------------- commands
 
+  /** Multiplayer: our player's commands go here and come back later, in a numbered turn. */
+  netSend: ((cmd: Command) => void) | null = null;
+
   enqueue(cmd: Command) {
-    this.pending.push(cmd);
+    if (this.netSend) this.netSend(cmd);
+    else this.pending.push(cmd);
+  }
+
+  /** Multiplayer: a turn's commands, the same on every device. */
+  receive(cmds: Command[]) {
+    this.pending.push(...cmds);
   }
 
   applyCommand(cmd: Command) {
     const u = this.unit(cmd.unitId);
     if (!u || !u.hero) return;
     const h = u.hero;
+    if (cmd.type === 'setAway') {
+      this.setAway(u, cmd.away);
+      return;
+    }
+    if (h.away) return;
     // Shopping works while dead (you respawn at the fountain); everything else needs a living hero.
     const whileDead = ['buy', 'sell', 'buyTp', 'sellCourier', 'dropCourier', 'swapItems', 'learn', 'buyback', 'glyph', 'surrender', 'setAutoAttack', 'setAutoLearn', 'ping'];
     if (!u.alive && !whileDead.includes(cmd.type)) return;
@@ -673,7 +691,7 @@ export class World {
     if (h.channel && ['moveDir', 'moveTo', 'attack', 'attackOnce', 'attackNearest', 'cast', 'stop', 'useItem', 'placeWard', 'pickUp', 'teleport'].includes(cmd.type)) return;
     switch (cmd.type) {
       case 'moveDir': {
-        const l = Math.hypot(cmd.dx, cmd.dy);
+        const l = dHypot(cmd.dx, cmd.dy);
         if (l < 0.15) {
           if (h.order.type === 'dir') h.order = { type: 'idle' };
         } else {
@@ -833,6 +851,24 @@ export class World {
     else u.buffs.push(b);
   }
 
+  /** A player left: their hero goes home and does nothing until they return. */
+  private setAway(u: Unit, away: boolean) {
+    const h = u.hero!;
+    h.away = away;
+    if (!away) return;
+    h.order = { type: 'idle' };
+    h.channel = null;
+    h.autoAttack = false;
+    u.targetId = null;
+    u.path = null;
+    u.dash = null;
+    if (u.alive) {
+      const p = this.respawnPoint(u.team as Team, 0);
+      u.x = u.px = p.x;
+      u.y = u.py = p.y;
+    }
+  }
+
   stun(u: Unit, seconds: number) {
     if (!u.alive || u.kind === 'structure' || this.isSpellImmune(u)) return;
     u.stunTimer = Math.max(u.stunTimer, seconds);
@@ -952,6 +988,7 @@ export class World {
     u.hero = {
       defId: slot.heroId,
       controller: slot.controller,
+      away: false,
       slot: index,
       lane: slot.lane,
       level: 1,
@@ -999,7 +1036,7 @@ export class World {
     const f = this.map.fountains[team];
     const a = (index % 3) * ((2 * Math.PI) / 3);
     const dir = team === 0 ? 1 : -1;
-    return { x: f.x + dir * (5 + Math.cos(a) * 1.5), y: f.y - dir * (5 + Math.sin(a) * 1.5) };
+    return { x: f.x + dir * (5 + dCos(a) * 1.5), y: f.y - dir * (5 + dSin(a) * 1.5) };
   }
 
   /** Recompute hero stats from definition + level + items. */
@@ -1064,7 +1101,7 @@ export class World {
         const start = path[0];
         const dx = path[1].x - start.x;
         const dy = path[1].y - start.y;
-        const l = Math.hypot(dx, dy);
+        const l = dHypot(dx, dy);
         const types: ('melee' | 'ranged')[] = [
           ...Array<'melee'>(MELEE_PER_WAVE).fill('melee'),
           ...Array<'ranged'>(RANGED_PER_WAVE).fill('ranged'),
@@ -1098,7 +1135,7 @@ export class World {
             u.bountyGold = Math.round(u.bountyGold * SUPER_CREEP_MULT.gold);
           }
           u.creep = { type, lane, path, wp: 1, super: enemyRaxDown, mega };
-          u.facing = Math.atan2(dy, dx);
+          u.facing = dAtan2(dy, dx);
         });
       }
     }
@@ -1249,8 +1286,8 @@ export class World {
     for (const r of [0.15, 0.3, 0.5, 0.8]) {
       for (let i = 0; i < 12; i++) {
         const a = (i / 12) * Math.PI * 2;
-        const x = u.x + Math.cos(a) * r;
-        const y = u.y + Math.sin(a) * r;
+        const x = u.x + dCos(a) * r;
+        const y = u.y + dSin(a) * r;
         if (fits(m, x, y, u.radius)) {
           u.x = x;
           u.y = y;
@@ -1361,7 +1398,7 @@ export class World {
           break;
         }
         // In range: one swing as soon as it's ready, then stand still.
-        u.facing = Math.atan2(t.y - u.y, t.x - u.x);
+        u.facing = dAtan2(t.y - u.y, t.x - u.x);
         u.path = null;
         if (u.attackTimer <= 0) {
           this.tryAttack(u, t);
@@ -1426,7 +1463,7 @@ export class World {
   /** Morra calls a creature: a body of its own, fighting and following on its own. */
   spawnSummon(owner: Unit, s: SummonState, stats: CombatStats, angle: number): Unit {
     const r = 2.5;
-    const want = { x: owner.x + Math.cos(angle) * r, y: owner.y + Math.sin(angle) * r };
+    const want = { x: owner.x + dCos(angle) * r, y: owner.y + dSin(angle) * r };
     const cell = nearestWalkableCell(this.nav, want.x, want.y);
     const pos = cell >= 0 ? cellCenter(this.nav, cell) : { x: owner.x, y: owner.y };
     const u = this.newUnit('creep', owner.team, pos, stats);
@@ -1647,7 +1684,7 @@ export class World {
     // them. If it ends inside one, the hero comes out at the nearest open spot (a mountain top
     // counts as a place to stand).
     const size = this.map.size;
-    u.facing = Math.atan2(d.dy, d.dx);
+    u.facing = dAtan2(d.dy, d.dx);
     u.x = Math.max(1, Math.min(size - 1, u.x + d.dx * step));
     u.y = Math.max(1, Math.min(size - 1, u.y + d.dy * step));
     d.remaining -= step;
@@ -1764,7 +1801,7 @@ export class World {
   /** Attack if in reach (returns true), otherwise returns false so the caller can move closer. */
   private tryAttack(u: Unit, t: Unit): boolean {
     if (!this.inReach(u, t)) return false;
-    u.facing = Math.atan2(t.y - u.y, t.x - u.x);
+    u.facing = dAtan2(t.y - u.y, t.x - u.x);
     u.path = null;
     if (u.attackTimer > 0) return true;
     // The team shield (glyph) also doubles tower attack speed while it lasts.
@@ -2145,11 +2182,11 @@ export class World {
    * any building it ends up overlapping by the collision pass.
    */
   stepMove(u: Unit, dx: number, dy: number, d: number, throughBuildings = false) {
-    const l = Math.hypot(dx, dy);
+    const l = dHypot(dx, dy);
     if (l === 0 || d <= 0) return;
     dx /= l;
     dy /= l;
-    u.facing = Math.atan2(dy, dx);
+    u.facing = dAtan2(dy, dx);
     const nav = throughBuildings ? this.map : this.nav;
     // If we're already squeezed against a wall/footprint, only require the centre to be
     // walkable so the unit can always work itself free.
@@ -2180,8 +2217,8 @@ export class World {
     if (Math.abs(u.x - x0) + Math.abs(u.y - y0) > 1e-6) return;
     // Still blocked (e.g. heading straight along a building's edge): try angled directions.
     for (const a of [0.6, -0.6, 1.1, -1.1]) {
-      const c = Math.cos(a);
-      const sn = Math.sin(a);
+      const c = dCos(a);
+      const sn = dSin(a);
       const tx = u.x + (dx * c - dy * sn) * d;
       const ty = u.y + (dx * sn + dy * c) * d;
       if (ok(tx, ty)) {
@@ -2317,7 +2354,7 @@ export class World {
         const dx = a.x - s.x;
         const dy = a.y - s.y;
         const min = a.radius + s.radius;
-        const d = Math.hypot(dx, dy);
+        const d = dHypot(dx, dy);
         if (d >= min || d === 0) continue;
         this.nudge(a, (dx / d) * (min - d), (dy / d) * (min - d));
       }

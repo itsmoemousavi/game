@@ -59,6 +59,14 @@ export class DraftUi {
     }
   }
 
+  /** Abandon a draft in progress (the host left). */
+  cancel() {
+    cancelAnimationFrame(this.raf);
+    this.stopShowcase();
+    this.root.classList.add('hidden');
+    this.draft = null;
+  }
+
   start(draft: Draft, onDone: (d: Draft) => void) {
     this.draft = draft;
     this.onDone = onDone;

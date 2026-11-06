@@ -2,7 +2,7 @@ import { DT, Team } from './constants';
 import { ITEMS, ItemId } from './data/items';
 import { CourierSlot, ItemSlot, emptyCourierBag, inShop } from './inventory';
 import { GameMap, LANE_WIDTH } from './map';
-import { Vec2, dist, distToSegment } from './math';
+import { Vec2, dist, distToSegment, dAtan2 } from './math';
 import { cellCenter, findPath, nearestWalkableCell } from './pathfinding';
 import type { Unit, World } from './world';
 
@@ -210,7 +210,7 @@ function moveCourier(w: World, c: CourierState, goal: Vec2) {
     const p = path[0];
     const d = dist(c.x, c.y, p.x, p.y);
     if (d <= step) {
-      c.facing = Math.atan2(p.y - c.y, p.x - c.x);
+      c.facing = dAtan2(p.y - c.y, p.x - c.x);
       c.x = p.x;
       c.y = p.y;
       step -= d;
@@ -226,7 +226,7 @@ function stepToward(c: CourierState, p: Vec2, step: number) {
   const d = dist(c.x, c.y, p.x, p.y);
   if (d < 1e-6) return;
   const k = Math.min(1, step / d);
-  c.facing = Math.atan2(p.y - c.y, p.x - c.x);
+  c.facing = dAtan2(p.y - c.y, p.x - c.x);
   c.x += (p.x - c.x) * k;
   c.y += (p.y - c.y) * k;
 }

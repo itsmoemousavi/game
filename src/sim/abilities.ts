@@ -1,6 +1,6 @@
 import { AbilityDef, AbilityId, HEROES } from './data/heroes';
 import { SUMMONS } from './data/units';
-import { dist } from './math';
+import { dist, dAtan2, dCos, dHypot, dSin } from './math';
 import type { DamageKind, Order, Unit, World } from './world';
 
 /**
@@ -89,8 +89,8 @@ function autoTarget(w: World, u: Unit, def: AbilityDef, req: CastRequest) {
           req.x = t.x;
           req.y = t.y;
         } else {
-          req.x = u.x + Math.cos(u.facing) * def.castRange;
-          req.y = u.y + Math.sin(u.facing) * def.castRange;
+          req.x = u.x + dCos(u.facing) * def.castRange;
+          req.y = u.y + dSin(u.facing) * def.castRange;
         }
       }
       break;
@@ -155,8 +155,8 @@ function execute(w: World, u: Unit, slot: number, def: AbilityDef, x: number, y:
   u.path = null;
   const dx = x - u.x;
   const dy = y - u.y;
-  const len = Math.hypot(dx, dy) || 1;
-  if (len > 0.01) u.facing = Math.atan2(dy, dx);
+  const len = dHypot(dx, dy) || 1;
+  if (len > 0.01) u.facing = dAtan2(dy, dx);
   w.events.push({ type: 'cast', unitId: u.id, slot });
 
   switch (def.id) {
@@ -253,14 +253,14 @@ function execute(w: World, u: Unit, slot: number, def: AbilityDef, x: number, y:
     case 'shadowLunge': {
       // Land right next to the target (on our side of it) and strike.
       const t = target!;
-      const d = Math.hypot(t.x - u.x, t.y - u.y) || 1;
+      const d = dHypot(t.x - u.x, t.y - u.y) || 1;
       const off = t.radius + u.radius + 0.2;
       const lx = t.x - ((t.x - u.x) / d) * off;
       const ly = t.y - ((t.y - u.y) / d) * off;
       w.events.push({ type: 'blink', unitId: u.id, fromX: u.x, fromY: u.y });
       u.x = u.px = lx;
       u.y = u.py = ly;
-      u.facing = Math.atan2(t.y - u.y, t.x - u.x);
+      u.facing = dAtan2(t.y - u.y, t.x - u.x);
       w.dealDamage(u.id, t, val(def, 'damage', lvl), 'spell');
       u.hero!.order = { type: 'attack', targetId: t.id };
       break;

@@ -42,6 +42,8 @@ export class Draft {
     readonly human: { team: Team; seat: number } | null,
     readonly order: DraftStep[] = DRAFT_ORDER,
     private random: () => number = Math.random,
+    /** Multiplayer: which seats of each team (0-2) are people. Bots choose for the rest. */
+    readonly humanSeats: boolean[][] | null = null,
   ) {
     this.timeLeft = this.turnTime();
   }
@@ -58,7 +60,17 @@ export class Draft {
   humanTurn(): boolean {
     const s = this.current;
     if (!s || !this.human || s.team !== this.human.team) return false;
-    return s.kind === 'ban' || this.picks[s.team].length === this.human.seat;
+    // With several people on a team, its first player bans for it.
+    if (s.kind === 'ban') return !this.humanSeats || this.humanSeats[s.team].indexOf(true) === this.human.seat;
+    return this.picks[s.team].length === this.human.seat;
+  }
+
+  /** Is a person (anyone) choosing right now, rather than a bot? */
+  private personChooses(): boolean {
+    if (!this.humanSeats) return this.humanTurn();
+    const s = this.current;
+    if (!s) return false;
+    return s.kind === 'ban' ? this.humanSeats[s.team].includes(true) : !!this.humanSeats[s.team][this.picks[s.team].length];
   }
 
   isBanned(id: HeroId) {
@@ -94,7 +106,7 @@ export class Draft {
   /** Advance the clock: bots choose after a short pause; a human who runs out of time gets a random pick (or no ban). */
   update(dt: number) {
     if (this.done) return;
-    if (!this.humanTurn()) {
+    if (!this.personChooses()) {
       this.botWait -= dt;
       if (this.botWait <= 0) this.choose(this.botChoice());
       return;

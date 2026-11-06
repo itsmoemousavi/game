@@ -26,3 +26,4 @@ export { DRAFT_ORDER, DRAFT_TIME, Draft, WARMUP_SECONDS } from './draft';
 export type { DraftStep } from './draft';
 export { STATUS_INFO, statusEffects } from './status';
 export type { Status, StatusId } from './status';
+export { stateHash } from './hash';

@@ -1,6 +1,6 @@
 import type { Team } from '../constants';
 import { LaneId, teamLanePath } from '../map';
-import { dist, pointAlong, polylineLength, projectOnPolyline } from '../math';
+import { dist, pointAlong, polylineLength, projectOnPolyline, dAtan2, dCos, dHypot, dSin } from '../math';
 import type { Unit, World } from '../world';
 import { inHouse } from '../map';
 import { isInvisible } from '../vision';
@@ -344,7 +344,7 @@ function cast(w: World, me: Unit, slot: number, t: Unit) {
   const lead = me.hero!.bot.difficulty === 'hard' ? 0.25 * w.speedOf(t) : 0;
   const ex = (w.rng.next() - 0.5) * 2 * aim.error;
   const ey = (w.rng.next() - 0.5) * 2 * aim.error;
-  w.applyCommand({ type: 'cast', unitId: me.id, slot, x: t.x + Math.cos(t.facing) * lead + ex, y: t.y + Math.sin(t.facing) * lead + ey });
+  w.applyCommand({ type: 'cast', unitId: me.id, slot, x: t.x + dCos(t.facing) * lead + ex, y: t.y + dSin(t.facing) * lead + ey });
 }
 
 /** Item buttons: cloak up when hurt in a fight, blink onto a hero we want to fight. */
@@ -373,7 +373,7 @@ function useItems(w: World, me: Unit, target: Unit, d: number): boolean {
     return true;
   }
   const censer = slotOf('mendersCenser');
-  if (ready(censer) && w.heroes.some((a) => a.alive && a.team === me.team && a.hp < a.maxHp * 0.55 && Math.hypot(a.x - me.x, a.y - me.y) < 9)) {
+  if (ready(censer) && w.heroes.some((a) => a.alive && a.team === me.team && a.hp < a.maxHp * 0.55 && dHypot(a.x - me.x, a.y - me.y) < 9)) {
     w.applyCommand({ type: 'useItem', unitId: me.id, slot: censer });
     return true;
   }
@@ -419,8 +419,8 @@ function useAbilities(w: World, me: Unit, target: Unit): boolean {
       // Gale Step keeps a shooter alive: away from danger when hurt, in only to finish someone running.
       if (def.id === 'galeStep') {
         if (me.hp < me.maxHp * 0.55 && d < me.attackRange) {
-          const away = Math.atan2(me.y - target.y, me.x - target.x);
-          w.applyCommand({ type: 'cast', unitId: me.id, slot, x: me.x + Math.cos(away) * def.castRange, y: me.y + Math.sin(away) * def.castRange });
+          const away = dAtan2(me.y - target.y, me.x - target.x);
+          w.applyCommand({ type: 'cast', unitId: me.id, slot, x: me.x + dCos(away) * def.castRange, y: me.y + dSin(away) * def.castRange });
           return true;
         }
         if (d < me.attackRange + 2 || target.hp > target.maxHp * 0.35 || me.hp < me.maxHp * 0.6) continue;

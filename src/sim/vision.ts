@@ -1,3 +1,4 @@
+import { dHypot } from './math';
 import { DAY_SECONDS, NIGHT_SECONDS, OBSERVER_MOUNTAIN_VISION, SENTRY_VISION_SECONDS, TRUE_SIGHT_RADIUS, Team } from './constants';
 import type { House } from './map';
 import type { Unit, World } from './world';
@@ -64,7 +65,7 @@ export class Vision {
     this.houses = houses.map((h) => {
       const cells: number[] = [];
       for (let cy = 0; cy < grid; cy++)
-        for (let cx = 0; cx < grid; cx++) if (Math.hypot((cx + 0.5) * cell - h.x, (cy + 0.5) * cell - h.y) < h.inner + cell * 0.5) cells.push(cy * grid + cx);
+        for (let cx = 0; cx < grid; cx++) if (dHypot((cx + 0.5) * cell - h.x, (cy + 0.5) * cell - h.y) < h.inner + cell * 0.5) cells.push(cy * grid + cx);
       return { h, cells: Int32Array.from(cells) };
     });
   }
@@ -88,7 +89,7 @@ export class Vision {
       for (const u of w.units) {
         if (!u.alive || u.team !== team) continue;
         // Inside the house you only see the house: its walls block sight both ways.
-        const home = this.houses.findIndex(({ h }) => Math.hypot(u.x - h.x, u.y - h.y) < h.inner);
+        const home = this.houses.findIndex(({ h }) => dHypot(u.x - h.x, u.y - h.y) < h.inner);
         if (home >= 0) {
           inside[home] = true;
           continue;

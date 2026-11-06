@@ -1,5 +1,5 @@
 import { CELL, GRID, MAP_SIZE, Team } from './constants';
-import { Vec2, distToSegment, distV, pointAlong, polylineLength, projectOnPolyline } from './math';
+import { Vec2, distToSegment, distV, pointAlong, polylineLength, projectOnPolyline, dAtan2, dCos, dHypot, dSin } from './math';
 
 export type LaneId = 'top' | 'mid' | 'bot';
 export const LANE_IDS: LaneId[] = ['top', 'mid', 'bot'];
@@ -128,7 +128,7 @@ const RIVER_BEND = 6 * S;
  */
 function riverAt(t: number): Vec2 {
   const c = MAP_SIZE / 2;
-  const o = RIVER_BEND * Math.sin(2 * Math.PI * t);
+  const o = RIVER_BEND * dSin(2 * Math.PI * t);
   const k = Math.SQRT1_2;
   return { x: c + c * t + o * k, y: c + c * t - o * k };
 }
@@ -311,7 +311,7 @@ export function createMap(): GameMap {
     }
   };
   const carveSeg = (a: Vec2, b: Vec2, w: number) => carve((x, y) => distToSegment(x, y, a, b) <= w / 2);
-  const carveCircle = (c: Vec2, r: number) => carve((x, y) => Math.hypot(x - c.x, y - c.y) <= r);
+  const carveCircle = (c: Vec2, r: number) => carve((x, y) => dHypot(x - c.x, y - c.y) <= r);
 
   for (const id of LANE_IDS) {
     const p = LANES[id];
@@ -341,7 +341,7 @@ export function createMap(): GameMap {
       for (let i = 1; i < pts.length; i++) {
         const a = pts[i - 1];
         const b = pts[i];
-        const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        const l = dHypot(b.x - a.x, b.y - a.y) || 1;
         const nx = (-(b.y - a.y) / l) * side * off;
         const ny = ((b.x - a.x) / l) * side * off;
         carveSeg({ x: a.x + nx, y: a.y + ny }, { x: b.x + nx, y: b.y + ny }, LEDGE_WIDTH);
@@ -354,7 +354,7 @@ export function createMap(): GameMap {
       const x = (cx + 0.5) * CELL;
       const y = (cy + 0.5) * CELL;
       for (const h of HOUSES) {
-        if (Math.hypot(x - h.x, y - h.y) <= HOUSE_CLEARING) walkable[cy * GRID + cx] = isHouseWallAt(h, x, y) ? 0 : 1;
+        if (dHypot(x - h.x, y - h.y) <= HOUSE_CLEARING) walkable[cy * GRID + cx] = isHouseWallAt(h, x, y) ? 0 : 1;
       }
     }
   }
@@ -367,7 +367,7 @@ export function createMap(): GameMap {
     // Unit vector perpendicular to the lane at distance d, pointing to the map's inside.
     const a = pointAlong(path, Math.max(0, d - 1));
     const b = pointAlong(path, d + 1);
-    const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const l = dHypot(b.x - a.x, b.y - a.y) || 1;
     let px = -(b.y - a.y) / l;
     let py = (b.x - a.x) / l;
     const dot = px * (MAP_SIZE / 2 - a.x) + py * (MAP_SIZE / 2 - a.y);
@@ -417,7 +417,7 @@ export function createMap(): GameMap {
     for (const p of [meleePos, rangedPos]) carveCircle(p, 6.5);
   }
   // Shrine towers flank the Shrine on the side facing the lanes.
-  const toCenter = Math.atan2(-1, 1);
+  const toCenter = dAtan2(-1, 1);
   // Close to the Shrine and to each other, so they cover it (and each other) together.
   for (const sign of [-1, 1]) {
     const a = toCenter + (sign * 24 * Math.PI) / 180;
@@ -425,7 +425,7 @@ export function createMap(): GameMap {
       team: 0,
       tier: 'shrineTower',
       lane: null,
-      pos: { x: SHRINE0.x + Math.cos(a) * 11, y: SHRINE0.y + Math.sin(a) * 11 },
+      pos: { x: SHRINE0.x + dCos(a) * 11, y: SHRINE0.y + dSin(a) * 11 },
     });
   }
   structures.push({ team: 0, tier: 'shrine', lane: null, pos: SHRINE0 });
@@ -494,10 +494,10 @@ export function createMap(): GameMap {
       const x = (cx + 0.5) * CELL;
       const y = (cy + 0.5) * CELL;
       const i = cy * GRID + cx;
-      const b0 = Math.hypot(x - BASE0.x, y - BASE0.y);
-      const b1 = Math.hypot(MAP_SIZE - x - BASE0.x, MAP_SIZE - y - BASE0.y);
+      const b0 = dHypot(x - BASE0.x, y - BASE0.y);
+      const b1 = dHypot(MAP_SIZE - x - BASE0.x, MAP_SIZE - y - BASE0.y);
       if (Math.min(b0, b1) <= BASE_PLATEAU) height[i] = 2;
-      if (hills.some((h) => Math.hypot(x - h.x, y - h.y) <= HILL_RADIUS)) height[i] = 3;
+      if (hills.some((h) => dHypot(x - h.x, y - h.y) <= HILL_RADIUS)) height[i] = 3;
     }
   }
 
@@ -511,8 +511,8 @@ export function createMap(): GameMap {
   for (const path of FOREST_PATHS) for (let i = 1; i < path.length; i++) ramps.push({ a: path[i - 1], b: path[i], w: FOREST_PATH_WIDTH + 3 });
   const onRamp = (x: number, y: number) =>
     ramps.some((r) => distToSegment(x, y, r.a, r.b) <= r.w / 2) ||
-    Math.hypot(x - RUNE_SPOT.x, y - RUNE_SPOT.y) <= RUNE_RAMP ||
-    Math.hypot(x - HOUSE.x, y - HOUSE.y) <= HOUSE_CLEARING + 1;
+    dHypot(x - RUNE_SPOT.x, y - RUNE_SPOT.y) <= RUNE_RAMP ||
+    dHypot(x - HOUSE.x, y - HOUSE.y) <= HOUSE_CLEARING + 1;
   const half = RIVER_WIDTH / 2;
   for (let cy = 0; cy < GRID; cy++) {
     for (let cx = 0; cx < GRID; cx++) {
@@ -528,7 +528,7 @@ export function createMap(): GameMap {
         // Only the water itself is low ground; the top of a slope counts as the bank.
         const water = d <= half - 1.6;
         const onSideLane = sideLaneDist(x, y) <= LANE_WIDTH / 2;
-        if (water && !onSideLane && Math.hypot(x - HOUSE.x, y - HOUSE.y) > HOUSE_CLEARING && Math.hypot(MAP_SIZE - x - HOUSE.x, MAP_SIZE - y - HOUSE.y) > HOUSE_CLEARING) height[i] = 0;
+        if (water && !onSideLane && dHypot(x - HOUSE.x, y - HOUSE.y) > HOUSE_CLEARING && dHypot(MAP_SIZE - x - HOUSE.x, MAP_SIZE - y - HOUSE.y) > HOUSE_CLEARING) height[i] = 0;
         if (ramp && d > half) continue; // the top of a slope keeps whatever is there
         // The Warden's house sits on the river: its wall stays solid.
         if (HOUSES.some((h) => isHouseWallAt(h, x, y))) continue;
@@ -556,10 +556,10 @@ export function createMap(): GameMap {
     const r = Math.ceil(6 / CELL);
     const ox = Math.floor(t.x / CELL);
     const oy = Math.floor(t.y / CELL);
-    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (Math.hypot(dx, dy) * CELL <= 6 && cliff[(oy + dy) * GRID + ox + dx]) c++;
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (dHypot(dx, dy) * CELL <= 6 && cliff[(oy + dy) * GRID + ox + dx]) c++;
     return c;
   };
-  const lone = trees.filter((t) => !onCurb(t) && curbsNear(t) >= 3 && trees.every((o) => o === t || Math.hypot(o.x - t.x, o.y - t.y) > 6));
+  const lone = trees.filter((t) => !onCurb(t) && curbsNear(t) >= 3 && trees.every((o) => o === t || dHypot(o.x - t.x, o.y - t.y) > 6));
   for (const t of lone) walkable[Math.floor(t.y / CELL) * GRID + Math.floor(t.x / CELL)] = 1;
   const keptTrees = trees.filter((t) => !onCurb(t) && !lone.includes(t));
 
@@ -647,14 +647,14 @@ export function heightAt(map: GameMap, x: number, y: number): number {
 
 /** True for a point inside the Warden's house (on its floor, not in the doorway or the wall). */
 export function inHouse(map: GameMap, x: number, y: number): boolean {
-  return map.houses.some((h) => Math.hypot(x - h.x, y - h.y) < h.inner);
+  return map.houses.some((h) => dHypot(x - h.x, y - h.y) < h.inner);
 }
 
 /** True where the house wall stands (the ring between inner and outer, minus the doorway). */
 export function isHouseWallAt(h: House, x: number, y: number): boolean {
   const dx = x - h.x;
   const dy = y - h.y;
-  const d = Math.hypot(dx, dy);
+  const d = dHypot(dx, dy);
   if (d < h.inner || d > h.outer) return false;
   const along = dx * h.door.x + dy * h.door.y;
   const across = Math.abs(-dx * h.door.y + dy * h.door.x);
@@ -685,7 +685,7 @@ function noise(x: number, y: number, k = 0): number {
 }
 
 /** The Warden's house and its clearing (and the matching open pit) are laid out by hand. */
-const nearHouse = (x: number, y: number) => Math.hypot(x - HOUSE.x, y - HOUSE.y) <= HOUSE_CLEARING || Math.hypot(MAP_SIZE - x - HOUSE.x, MAP_SIZE - y - HOUSE.y) <= HOUSE_CLEARING;
+const nearHouse = (x: number, y: number) => dHypot(x - HOUSE.x, y - HOUSE.y) <= HOUSE_CLEARING || dHypot(MAP_SIZE - x - HOUSE.x, MAP_SIZE - y - HOUSE.y) <= HOUSE_CLEARING;
 
 /** Thicket (solid) belt around each base: you only get in along the lanes. */
 const BASE_WALL = BASE_PLATEAU + 9;
@@ -722,7 +722,7 @@ function plantForest(walkable: Uint8Array): Tree[] {
       const y = (cy + 0.5) * CELL;
       if (nearHouse(x, y)) continue;
       const edge = Math.min(x, y, MAP_SIZE - x, MAP_SIZE - y);
-      const nearBase = Math.hypot(x - BASE0.x, y - BASE0.y) < BASE_WALL;
+      const nearBase = dHypot(x - BASE0.x, y - BASE0.y) < BASE_WALL;
       const d = noise(x / 26, y / 26) * 0.75 + noise(x / 9, y / 9, 1) * 0.25;
       let p: number;
       if (edge < BORDER_THICKET || nearBase || d > 0.52) {

@@ -57,6 +57,8 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
 
 ## Code map
 
+- The sim must use `dSin/dCos/dAtan2/dHypot` from `sim/math.ts`, never `Math.sin` etc, and nothing random outside its `Rng`: multiplayer runs the same match on every device (Chrome and Safari engines compared identical). World changes must go through commands.
+
 - `src/sim/` deterministic 30 Hz simulation, no DOM. Commands pattern (players and bots send the same `Command`s).
   `world.ts` (units, combat, waves, structure rules), `map.ts` (layout written for 200 m and scaled by
   `MAP_SIZE / 200`, now 300 m), `abilities.ts`, `inventory.ts` (shop, sell refund window, courier purchases), `courier.ts` (courier movement + delivery), `objectives.ts`
@@ -132,7 +134,7 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
 5. Living world: shipped in 0.11.0. Phone frame rate and battery with the new art still need the owner's check.
 6. More heroes: Morra, Seren and Rhen shipped in 0.13.0. A 4th only if playing them shows a missing role (owner agreed to wait).
    Balance after 0.15.9 (240 matches, about 160 games per hero, luck still ±4-8%): Vexa 58.6%, Grom 51.6%, Brakk 51.2%, Seren 49.7%, Syl 49.4%, Rhen 48.3%, Kaela 46.9%, Orin 46.4%, Morra 46.2%. Vexa is the one left above 55%. Single runs swing a lot, even 13% on the same numbers: pool runs before tuning.
-7. **Multiplayer (owner's design, 2026-11-06, not built).** Play with Friend opens two choices. Local: someone hosts a lobby, others join, bots fill empty slots. Online (locked, "Coming soon"): host invites up to 2 friends, Find Match joins 6 humans, no bots. In both, a leaver's hero goes inactive and stays at base (owner chose this for local too). Any player can pause (limited per match); dropped players can rejoin the same hero. Plan: lockstep over WebRTC so it runs from GitHub Pages with no server beyond a small service that introduces the phones (awaiting owner's OK on that service); the host's phone relays. Needs own sin/cos etc. for cross-browser determinism plus a desync check.
+7. **Multiplayer.** Local shipped in 0.16.0: `src/net/` (session.ts lockstep + lobby, peer.ts WebRTC via the free public PeerJS service, works from GitHub Pages), `src/client/friend-ui.ts`. Owner's rules: Play with Friend holds Local (host lobby, code, bots fill seats) and Online (locked: invite up to 2 friends, Find Match, 6 humans, no bots). A leaver's hero goes inactive at base in both. Any player pauses (3 per match); dropped players rejoin by replaying the match. Host leaving or locking the phone stops the match (no host migration). Not done: TURN relay for strict networks, own introduction service, real iPhone test.
 8. Later: killable courier + bounty, Capacitor app builds, store release.
 
 ## Gotchas

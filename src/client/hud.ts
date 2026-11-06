@@ -325,7 +325,7 @@ export class Hud {
         const items = r.h.items
           .map((it) => (it ? `<i title="${esc(ITEMS[it.id].name)}">${itemIcon(it.id)}${it.count > 1 ? `<b>${it.count}</b>` : ''}</i>` : '<i class="empty"></i>'))
           .join('');
-        const status = r.u.alive ? '' : ` <span class="dead">☠ ${Math.ceil(r.h.respawnTimer)}s</span>`;
+        const status = r.h.away ? ' <span class="dead">Left</span>' : r.u.alive ? '' : ` <span class="dead">☠ ${Math.ceil(r.h.respawnTimer)}s</span>`;
         html += `<tr class="${r.u.id === meId ? 'me' : ''}">
           <td><span class="hero"><span class="dot" style="background:${def.color}">${r.h.level}</span>${esc(def.name)}${r.h.controller === 'bot' ? ' <small>(bot)</small>' : ''}${status}</span></td>
           <td>${r.h.kills} / ${r.h.deaths} / ${r.h.assists}</td>

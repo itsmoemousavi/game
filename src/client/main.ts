@@ -16,6 +16,10 @@ import { Renderer } from './renderer';
 import { GraphicsOptions, PRESETS, Quality, Renderer3D } from './renderer3d';
 import { MenuShowcase } from './menu3d';
 import { enterImmersive, setupLandscape } from './screen';
+import { FriendUi } from './friend-ui';
+import { GuestSession, HostSession, MatchInfo, Session } from '../net/session';
+import { HostPeer, hostPeer, joinPeer } from '../net/peer';
+import type { Link } from '../net/link';
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 
@@ -34,7 +38,7 @@ let myHeroId = 0;
 const myTeam: Team = 0;
 let devPick: HeroId | null = null;
 // Local dev server only (never in the published game): lets test scripts look at the match.
-if (import.meta.env.DEV) Object.assign(window, { dbg: { world: () => world, me: () => world?.unit(myHeroId), pick: (h: HeroId) => (devPick = h), renderer: () => renderer } });
+if (import.meta.env.DEV) Object.assign(window, { dbg: { world: () => world, me: () => world?.unit(myHeroId), pick: (h: HeroId) => (devPick = h), renderer: () => renderer, net: () => net, draft: () => draftUi } });
 let pickedLane: LaneId = 'mid';
 let pickedDifficulty: BotDifficulty = 'normal';
 try {
@@ -96,6 +100,156 @@ void boot();
 
 const draftUi = new DraftUi($<HTMLElement>('#draft'));
 
+// ------------------------------------------------------------- play with friend
+
+/** The multiplayer session in progress, if any. */
+let net: (Session & { attachWorld(w: World): void }) | null = null;
+let netPeer: HostPeer | null = null;
+const friendUi = new FriendUi($<HTMLElement>('.menu-panel'), $<HTMLElement>('#friend-panel'), $<HTMLElement>('#lobby-panel'));
+/** What we need to find our way back into a match we dropped out of. */
+const REJOIN_KEY = 'ovra-rejoin';
+const savedRejoin = (): { code: string; token: string } | null => {
+  try {
+    return JSON.parse(localStorage.getItem(REJOIN_KEY) ?? 'null');
+  } catch {
+    return null;
+  }
+};
+const saveRejoin = (v: { code: string; token: string } | null) => {
+  try {
+    if (v) localStorage.setItem(REJOIN_KEY, JSON.stringify(v));
+    else localStorage.removeItem(REJOIN_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+};
+// Keeps the host's turns going and guests' commands flowing even if drawing is slow.
+setInterval(() => net?.update(performance.now()), 25);
+
+/** Common wiring for a host or guest session. */
+function useSession(s: Session & { attachWorld(w: World): void }) {
+  net = s;
+  s.onLobby = (state) => friendUi.renderLobby(state);
+  s.onNote = (t) => hud.toast(t, '#f3dc9f');
+  s.onPause = (on, by) => {
+    setPaused(on);
+    $<HTMLElement>('#pause-title').textContent = on ? `Paused by ${by}` : 'Paused';
+  };
+  s.onDesync = (tick) => {
+    console.warn('Match out of sync at tick', tick);
+    hud.toast('Players have gone out of sync: this match may look different on each phone', '#ffb4b4');
+  };
+  s.onDraftStart = (d) => {
+    friendUi.hideAll();
+    select.classList.add('hidden');
+    draftUi.start(d, (done) => {
+      if (s instanceof HostSession) void startMatch('friend', done, s.draftDone(done));
+      else if ((s as GuestSession).matchInfo) void startMatch('friend', done, (s as GuestSession).matchInfo!);
+      else draftOver = done;
+    });
+  };
+  let draftOver: Draft | null = null;
+  s.onMatch = (info, _seat, catchUp) => {
+    if (catchUp) {
+      draftUi.cancel();
+      friendUi.hideAll();
+      void startMatch('friend', new Draft(null), info, true);
+    } else if (draftOver) void startMatch('friend', draftOver, info);
+  };
+  s.onEnd = (why) => leaveToMenu(why);
+}
+
+/** Out of the multiplayer game and back to the menu. */
+function leaveToMenu(why: string) {
+  const s = net;
+  net = null;
+  if (s) saveRejoin(null);
+  netPeer?.close();
+  netPeer = null;
+  if (s) draftUi.cancel();
+  app.classList.add('hidden');
+  app.classList.remove('net');
+  endScreen.hide();
+  world = null;
+  select.classList.remove('hidden');
+  if (why) {
+    friendUi.showFriend(false);
+    friendUi.error(why);
+  } else friendUi.showMenu();
+}
+
+/** Guests: the connection dropped. Keep trying for a little while. */
+function retryLink(g: GuestSession, code: string) {
+  if (net !== g) return; // we left on purpose
+  let tries = 6;
+  const again = () => {
+    if (net !== g) return;
+    joinPeer(code, 6000).then(
+      (link: Link) => {
+        if (net === g) g.reconnect(link);
+        else link.close();
+      },
+      () => {
+        if (--tries > 0) setTimeout(again, 2000);
+        else leaveToMenu('Lost the connection to the host');
+      },
+    );
+  };
+  hud.toast('Connection lost: trying to get back in', '#ffb4b4');
+  again();
+}
+
+function startGuest(link: Link, name: string, code: string, token: string) {
+  const g = new GuestSession(link, token, name);
+  useSession(g);
+  g.onLinkLost = () => retryLink(g, code);
+  saveRejoin({ code, token });
+  g.state.code = code;
+  friendUi.showLobby(g);
+}
+
+friendUi.onHost = (name) => {
+  friendUi.busy(true);
+  hostPeer().then(
+    (peer) => {
+      friendUi.busy(false);
+      netPeer = peer;
+      const h = new HostSession(peer.code, name);
+      peer.onLink = (link) => h.addLink(link);
+      useSession(h);
+      friendUi.showLobby(h);
+    },
+    (err: Error) => {
+      friendUi.busy(false);
+      friendUi.error(err.message);
+    },
+  );
+};
+const joinWith = (name: string, code: string, token: string) => {
+  friendUi.busy(true);
+  joinPeer(code).then(
+    (link) => {
+      friendUi.busy(false);
+      startGuest(link, name, code, token);
+    },
+    (err: Error) => {
+      friendUi.busy(false);
+      friendUi.error(err.message);
+    },
+  );
+};
+friendUi.onJoin = (name, code) => joinWith(name, code, Math.random().toString(36).slice(2) + Date.now().toString(36));
+friendUi.onRejoin = (name) => {
+  const r = savedRejoin();
+  if (r) joinWith(name, r.code, r.token);
+};
+friendUi.onBack = () => friendUi.showMenu();
+friendUi.onStart = () => (net as HostSession | null)?.startDraft?.();
+friendUi.onLeaveLobby = () => {
+  net?.leave();
+};
+$<HTMLButtonElement>('#btn-friend').addEventListener('click', () => friendUi.showFriend(!!savedRejoin()));
+
 /** Play → the draft (bans, then picks) → the match. Practice and the tutorial only pick your hero. */
 function startDraft(m: Mode) {
   select.classList.add('hidden');
@@ -143,11 +297,6 @@ for (const d of ['easy', 'normal', 'hard'] as BotDifficulty[]) {
 
 $<HTMLButtonElement>('#btn-play').addEventListener('click', () => startDraft('bots'));
 $<HTMLButtonElement>('#btn-practice').addEventListener('click', () => startDraft('practice'));
-$<HTMLButtonElement>('#btn-friend').addEventListener('click', () => {
-  const b = $<HTMLElement>('#btn-friend small');
-  b.textContent = 'Not ready yet';
-  setTimeout(() => (b.textContent = 'Coming soon'), 1500);
-});
 $<HTMLButtonElement>('#btn-tutorial').addEventListener('click', () => startDraft('tutorial'));
 
 // ------------------------------------------------------------- match setup
@@ -177,6 +326,10 @@ const endScreen = new EndScreen(
   app,
   () => lastMatch && startMatch(lastMatch.m, lastMatch.d),
   () => {
+    if (net) {
+      net.leave();
+      return;
+    }
     app.classList.add('hidden');
     select.classList.remove('hidden');
     world = null;
@@ -481,7 +634,7 @@ function setPaused(p: boolean) {
   paused = p;
   pauseEl.classList.toggle('hidden', !p);
   surrenderBtn.classList.remove('confirm');
-  surrenderBtn.textContent = 'Surrender';
+  surrenderBtn.textContent = net ? 'Leave match' : 'Surrender';
 }
 setPaused(false);
 
@@ -491,12 +644,16 @@ const scorePanel = $<HTMLElement>('#scoreboard');
 onTap('#btn-settings', () => settingsPanel.classList.toggle('hidden'));
 onTap('#portrait', () => statsPanel.classList.toggle('hidden'));
 onTap('#topbar', () => scorePanel.classList.toggle('hidden'));
-onTap('#btn-pause', () => setPaused(true));
-onTap('#btn-resume', () => setPaused(false));
+onTap('#btn-pause', () => (net ? net.setPaused(true) : setPaused(true)));
+onTap('#btn-resume', () => (net ? net.setPaused(false) : setPaused(false)));
 onTap('#btn-surrender', () => {
   if (!surrenderBtn.classList.contains('confirm')) {
     surrenderBtn.classList.add('confirm');
-    surrenderBtn.textContent = 'Tap again to surrender';
+    surrenderBtn.textContent = net ? 'Tap again to leave' : 'Tap again to surrender';
+    return;
+  }
+  if (net) {
+    net.leave();
     return;
   }
   world?.applyCommand({ type: 'surrender', unitId: myHeroId });
@@ -578,7 +735,7 @@ function announce(w: World, events: GameEvent[]) {
   }
 }
 
-type Mode = 'bots' | 'practice' | 'tutorial';
+type Mode = 'bots' | 'practice' | 'tutorial' | 'friend';
 let tutorial: Tutorial | null = null;
 const practicePanel = $<HTMLElement>('#practice');
 
@@ -610,7 +767,8 @@ practicePanel.querySelectorAll<HTMLElement>('[data-cheat]').forEach((b) =>
   }),
 );
 
-async function startMatch(m: Mode, d: Draft) {
+/** `info`: a multiplayer match. `catchUp`: we dropped out and are replaying it to get back in. */
+async function startMatch(m: Mode, d: Draft, info?: MatchInfo, catchUp = false) {
   showLoading('Preparing the battlefield', 55);
   await nextPaint();
   ending = false;
@@ -621,14 +779,32 @@ async function startMatch(m: Mode, d: Draft) {
   lastMatch = { m, d };
   select.classList.add('hidden');
   app.classList.remove('hidden');
-  const slots = m === 'bots' ? buildSlots(d) : [{ team: myTeam, heroId: d.picks[myTeam][0], controller: 'human' as const, lane: pickedLane }];
+  app.classList.toggle('net', !!info);
+  const slots = info ? info.slots : m === 'bots' ? buildSlots(d) : [{ team: myTeam, heroId: d.picks[myTeam][0], controller: 'human' as const, lane: pickedLane }];
   // Vs bots: a 30 s warm-up (the clock counts up from -0:30) to shop and walk to lane before creeps come.
-  world = new World({ seed: (Date.now() & 0xffff) + 1, slots, warmup: m === 'bots' ? WARMUP_SECONDS : 0 });
-  if (m === 'bots') hud.toast(`Creeps arrive in ${WARMUP_SECONDS} s: buy items and head to your lane`, '#ffd23f');
+  world = new World({ seed: info ? info.seed : (Date.now() & 0xffff) + 1, slots, warmup: m === 'bots' || info ? WARMUP_SECONDS : 0 });
+  if (info && net) {
+    net.attachWorld(world);
+    if (catchUp) {
+      // Rebuild the match by replaying every turn so far, a slice at a time.
+      const w = world;
+      const total = () => net!.ticksAvailable(w) + w.tick;
+      while (net && net.ticksAvailable(w) > 3) {
+        for (let i = 0; i < 300 && net.ticksAvailable(w) > 0; i++) {
+          net.beforeStep(w);
+          w.step();
+        }
+        showLoading('Getting back into the match', Math.round((w.tick / total()) * 100));
+        await nextPaint();
+      }
+      if (!net || world !== w) return;
+    }
+  }
+  if (m === 'bots' || (info && !catchUp)) hud.toast(`Creeps arrive in ${WARMUP_SECONDS} s: buy items and head to your lane`, '#ffd23f');
   practicePanel.classList.toggle('hidden', m !== 'practice');
   tutorial?.hide();
   tutorial = m === 'tutorial' ? new Tutorial($<HTMLElement>('#tutorial'), () => (tutorial = null)) : null;
-  myHeroId = world.heroes.find((h) => h.hero!.controller === 'human')!.id;
+  myHeroId = info && net ? world.heroes[net.mySeat].id : world.heroes.find((h) => h.hero!.controller === 'human')!.id;
   renderer = makeRenderer(world.map);
   input?.destroy();
   input = new Input(canvas, renderer, () => world!, () => myHeroId, app);
@@ -641,7 +817,7 @@ async function startMatch(m: Mode, d: Draft) {
   $<HTMLElement>('#btn-ping').style.top = `${mm.y + mm.size + 58}px`;
   $<HTMLElement>('#ping-menu').style.top = `${mm.y + mm.size + 10}px`;
   hud.setHero(world.unit(myHeroId)!);
-  world.applyCommand({ type: 'setAutoAttack', unitId: myHeroId, enabled: settings.autoAttack });
+  world.enqueue({ type: 'setAutoAttack', unitId: myHeroId, enabled: settings.autoAttack });
   settingsPanel.classList.add('hidden');
   statsPanel.classList.add('hidden');
   scorePanel.classList.add('hidden');
@@ -653,6 +829,8 @@ async function startMatch(m: Mode, d: Draft) {
   showLoading('Ready', 100);
   await nextPaint();
   loadingEl.classList.add('done');
+  if (info && !catchUp) net?.ready();
+  if (info && net?.paused) setPaused(true);
 }
 
 setupLandscape($<HTMLElement>('#root'), () => {
@@ -666,6 +844,13 @@ setupLandscape($<HTMLElement>('#root'), () => {
 });
 
 // ------------------------------------------------------------- loop
+
+let lastTurnSeen = 0;
+const netWaitEl = $<HTMLElement>('#net-wait');
+function showNetWait(text: string) {
+  netWaitEl.classList.toggle('hidden', !text);
+  if (text) netWaitEl.textContent = text;
+}
 
 let acc = 0;
 let last = performance.now();
@@ -685,10 +870,25 @@ function frame(now: number) {
   }
   if (draw) lastDraw = now;
   if (world && renderer && input) {
-    while (acc >= DT) {
+    if (net) {
+      // Multiplayer: we may only simulate turns the host has sent. Behind by a lot? Hurry to catch up.
       input.flush(world);
+      const have = net.ticksAvailable(world);
+      if (have > 6 && !paused) acc += Math.min(have - 6, 30) * DT;
+      if (have <= 0) {
+        acc = Math.min(acc, DT);
+        if (now - lastTurnSeen > 1500 && !paused && world.winner === null) showNetWait(world.tick === 0 ? 'Waiting for everyone to load' : 'Waiting for the host');
+      } else {
+        lastTurnSeen = now;
+        showNetWait('');
+      }
+    }
+    while (acc >= DT && (!net || net.ticksAvailable(world) > 0)) {
+      if (net) net.beforeStep(world);
+      else input.flush(world);
       const before = world.time;
       world.step();
+      net?.afterStep(world);
       if (before < 0 && world.time >= 0) hud.toast('The battle begins: creeps are on their way!', '#ffd23f');
       renderer.pushEvents(world, world.events, myHeroId);
       tutorial?.update(world, world.unit(myHeroId)!);

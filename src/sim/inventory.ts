@@ -1,6 +1,6 @@
 import { Side, Team } from './constants';
 import { BLINK_DAMAGE_LOCK, COURIER_SLOTS, INVENTORY_SLOTS, ITEMS, ItemId, ItemStats, MANA_FLASK, SALVE, SHOP_RADIUS, TELEPORT } from './data/items';
-import { dist } from './math';
+import { dist, dAtan2, dCos, dSin } from './math';
 import { cellCenter, nearestWalkableCell } from './pathfinding';
 import { onHillTop } from './objectives';
 import type { Unit, World } from './world';
@@ -307,8 +307,8 @@ export function useItem(w: World, u: Unit, slot: number, x?: number, y?: number)
     if (itemBlocker(w, u, slot)) return false;
     if (active.kind === 'blink') {
       const range = active.range ?? 10;
-      let tx = x ?? u.x + Math.cos(u.facing) * range;
-      let ty = y ?? u.y + Math.sin(u.facing) * range;
+      let tx = x ?? u.x + dCos(u.facing) * range;
+      let ty = y ?? u.y + dSin(u.facing) * range;
       const d = dist(u.x, u.y, tx, ty);
       if (d > range) {
         tx = u.x + ((tx - u.x) / d) * range;
@@ -321,7 +321,7 @@ export function useItem(w: World, u: Unit, slot: number, x?: number, y?: number)
       const p = hill ? { x: tx, y: ty } : cellCenter(w.nav, cell);
       const near = hill || dist(p.x, p.y, tx, ty) < 1.2 ? { x: tx, y: ty } : p;
       w.events.push({ type: 'blink', unitId: u.id, fromX: u.x, fromY: u.y });
-      u.facing = Math.atan2(near.y - u.y, near.x - u.x);
+      u.facing = dAtan2(near.y - u.y, near.x - u.x);
       u.x = u.px = near.x;
       u.y = u.py = near.y;
       u.path = null;
@@ -520,8 +520,8 @@ export function dropItem(w: World, u: Unit, slot: number): boolean {
   const s = h.items[slot];
   if (!s || !u.alive || s.reserved) return false;
   // A step in front of the hero, on walkable ground.
-  const fx = u.x + Math.cos(u.facing) * (u.radius + 0.6);
-  const fy = u.y + Math.sin(u.facing) * (u.radius + 0.6);
+  const fx = u.x + dCos(u.facing) * (u.radius + 0.6);
+  const fy = u.y + dSin(u.facing) * (u.radius + 0.6);
   const cell = nearestWalkableCell(w.nav, fx, fy);
   const p = cell >= 0 && dist(cellCenter(w.nav, cell).x, cellCenter(w.nav, cell).y, fx, fy) > 1.2 ? { x: u.x, y: u.y } : { x: fx, y: fy };
   h.items[slot] = null;

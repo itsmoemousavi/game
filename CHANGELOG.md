@@ -9,6 +9,7 @@ The version you're playing is shown in **Settings → View** in the game.
 
 | Version | Milestone | Date |
 |---|---|---|
+| [0.16.x](#016x--play-with-friend) | Play with Friend | 2026-11-06 |
 | [0.15.x](#015x--a-real-start-and-finish) | A real start and finish | 2026-11-05 |
 | [0.14.x](#014x--new-controls-and-rules) | New controls and rules | 2026-11-05 |
 | [0.13.x](#013x--three-new-heroes) | Three new heroes | 2026-11-05 |
@@ -26,6 +27,22 @@ The version you're playing is shown in **Settings → View** in the game.
 | [0.1.x](#01x--first-playable-prototype) | First playable prototype (2D) | 2026-11-01 |
 
 ---
+
+## 0.16.x · Play with Friend
+
+### 0.16.0
+*2026-11-06*
+
+**You can now play with friends:**
+- Tap Play with Friend, then Host a game. Friends enter the 4 letter code to join.
+- Tap a seat in the lobby to change team or lane. Bots fill the empty seats, and the host sets how strong they are.
+- Everyone drafts together, then plays the match.
+- If someone leaves, their hero goes home and stands inactive at base. They can come back with Rejoin your last match and carry on with the same hero.
+- Any player can pause, up to 3 times a match. Leave match replaces Surrender.
+- If the host leaves or locks their phone, the match stops for everyone.
+- Online is on the same screen, locked for now.
+
+**Behind the scenes:** the simulation now uses its own math, so a match plays out exactly the same on every phone.
 
 ## 0.15.x · A real start and finish
 
