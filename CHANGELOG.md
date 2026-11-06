@@ -29,6 +29,12 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.15.x · A real start and finish
 
+### 0.15.5
+*2026-11-05*
+
+- The spells are back beside the Attack button.
+- The health, items and hero panel now stops just short of the first spell on every screen size, and the item slots are slightly smaller so everything fits.
+
 ### 0.15.4
 *2026-11-05*
 
@@ -36,6 +42,7 @@ The version you're playing is shown in **Settings → View** in the game.
 - The health, mana and XP bars are wider, with a little more space above the XP bar.
 - The gold amount is centred.
 - The three spells moved up to sit in an arc above the Attack button, so the panel doesn't cover them.
+
 
 ### 0.15.3
 *2026-11-05*
