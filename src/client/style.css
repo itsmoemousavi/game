@@ -51,7 +51,6 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 .seg { display: flex; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 3px; gap: 3px; }
 .seg button { flex: 1; padding: 7px 4px; border: 0; border-radius: 7px; background: transparent; font-weight: 700; font-size: 13px; opacity: 0.7; }
 .seg button.picked { background: linear-gradient(180deg, #ffe58a, #e0a91a); color: #2a1d00; opacity: 1; box-shadow: 0 2px 0 #7a5600; }
-  background: linear-gradient(180deg, #ffd84d, #e09b10 60%, #b87500); color: #2a1a00; box-shadow: 0 4px 0 #6b4700, 0 0 24px rgba(255,200,60,0.35); text-shadow: 0 1px 0 rgba(255,255,255,0.4); }
 .menu-minor { display: flex; gap: 6px; }
 #select .menu-minor .alt { flex: 1; padding: 8px 0; border-radius: 10px; border: 1px solid rgba(156,199,255,0.5); background: rgba(20,40,70,0.55); font-weight: 700; font-size: 13px; }
 #hero-cards { display: flex; gap: 8px; justify-content: center; z-index: 1; padding-top: 4px; }

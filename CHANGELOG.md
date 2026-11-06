@@ -30,6 +30,11 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.16.x · Play with Friend
 
+### 0.16.1
+*2026-11-06*
+
+- Behind the scenes: removed a broken leftover style line.
+
 ### 0.16.0
 *2026-11-06*
 
