@@ -56,6 +56,7 @@
         </div>
         <button id="btn-tutorial" class="textlink">New here? Play the tutorial</button>
       </div>
+      <button id="btn-menu-settings" title="Settings" aria-label="Settings">⚙</button>
       <div id="friend-panel" class="friend-screen hidden"></div>
       <div id="lobby-panel" class="friend-screen hidden"></div>
       <canvas id="menu3d"></canvas>
@@ -170,42 +171,6 @@
         <div id="score-body"></div>
       </div>
       <div id="ability-tip" class="hidden"></div>
-      <div id="settings" class="panel hidden">
-        <div class="panel-head"><b>Settings</b><button class="close" data-close="settings">✕</button></div>
-        <div class="set-body">
-          <nav class="set-tabs">
-            <button data-tab="general" class="on">General</button>
-            <button data-tab="graphics">Graphics</button>
-            <button data-tab="sound">Sound</button>
-            <button data-tab="controls">Controls</button>
-          </nav>
-          <div class="set-pages">
-            <section data-page="general">
-              <label class="toggle"><span>Auto attack<small>On: hits the nearest enemy in range by itself, also while walking. Off: one attack per tap</small></span><input type="checkbox" id="set-autoattack" checked /></label>
-              <label class="toggle"><span>Auto-learn abilities<small>Spend skill points automatically (ultimate first)</small></span><input type="checkbox" id="set-autolearn" /></label>
-              <div class="toggle "><span>Camera zoom<small>Drag to zoom in. All the way left is the default view</small></span><input type="range" id="set-zoom" min="1" max="1.8" step="0.05" value="1" /></div>
-            </section>
-            <section data-page="graphics" class="hidden">
-              <div class="toggle"><span>View<small>2D is a flat top-down map: lightest on battery and older phones</small><small id="gfx-status"></small></span><span class="seg" id="set-gfx"><button data-v="3d">3D</button><button data-v="2d">2D</button></span></div>
-              <div class="toggle only3d"><span>Preset<small><span id="gfx-preset-note">Sets everything below. Low saves the most battery</span></small></span><span class="seg" id="set-quality"><button data-v="low">Low</button><button data-v="medium">Medium</button><button data-v="high">High</button></span></div>
-              <div class="toggle "><span>Frame rate<small>Fewer frames per second use less battery. Smoother at 60</small></span><span class="seg" id="set-fps"><button data-v="30">30</button><button data-v="40">40</button><button data-v="60">60</button></span></div>
-              <div class="toggle only3d"><span>Sharpness<small>How many pixels are drawn: the biggest battery saver</small></span><span class="seg" id="set-sharpness"><button data-v="low">Low</button><button data-v="medium">Medium</button><button data-v="high">High</button></span></div>
-              <div class="toggle only3d"><span>Shadows<small>Off saves a lot of battery</small></span><span class="seg" id="set-shadows"><button data-v="off">Off</button><button data-v="low">Low</button><button data-v="high">High</button></span></div>
-              <div class="toggle only3d"><span>Shadow updates<small>Battery redraws them less often</small></span><span class="seg" id="set-shadowRate"><button data-v="saver">Battery</button><button data-v="balanced">Balanced</button><button data-v="smooth">Smooth</button></span></div>
-              <div class="toggle only3d"><span>World detail<small>Grass, swaying trees and ground detail</small></span><span class="seg" id="set-detail"><button data-v="low">Low</button><button data-v="medium">Medium</button><button data-v="high">High</button></span></div>
-              <label class="toggle only3d"><span>Smooth edges<small>Cleaner lines, a little more battery</small></span><input type="checkbox" id="set-smoothing" /></label>
-            </section>
-            <section data-page="sound" class="hidden">
-              <label class="toggle"><span>Game sound<small>The phone's silent switch also mutes the game</small></span><input type="checkbox" id="set-sound" checked /></label>
-              <label class="toggle"><span>Vibration<small>Buzz when you're hit, get a kill or die (Android)</small></span><input type="checkbox" id="set-vibrate" checked /></label>
-            </section>
-            <section data-page="controls" class="hidden">
-              <label class="toggle"><span>Left-handed layout<small>Joystick on the right, buttons on the left</small></span><input type="checkbox" id="set-lefty" /></label>
-              <div class="toggle "><span>Joystick size</span><span class="seg" id="set-joy"><button data-v="S">S</button><button data-v="M">M</button><button data-v="L">L</button></span></div>
-            </section>
-          </div>
-        </div>
-      </div>
       <div id="stats" class="panel hidden">
         <div class="panel-head"><b id="stats-title">Stats</b><button class="close" data-close="stats">✕</button></div>
         <div id="stats-body"></div>
@@ -220,6 +185,47 @@
         <button data-cheat="gold">+1000 gold</button>
         <button data-cheat="refresh">Refresh</button>
         <button data-cheat="dummy">Dummy</button>
+      </div>
+    </div>
+    <div id="settings" class="panel hidden">
+      <div class="panel-head"><b>Settings</b><button class="close" data-close="settings">✕</button></div>
+      <div class="set-body">
+        <nav class="set-tabs">
+          <button data-tab="profile">Profile</button>
+          <button data-tab="general" class="on">General</button>
+          <button data-tab="graphics">Graphics</button>
+          <button data-tab="sound">Sound</button>
+          <button data-tab="controls">Controls</button>
+        </nav>
+        <div class="set-pages">
+          <section data-page="profile" class="hidden">
+            <div class="toggle"><span>Display name<small>What other players see. New names show from your next match</small></span><input type="text" id="set-name" maxlength="14" autocomplete="off" autocorrect="off" spellcheck="false" /></div>
+            <div class="toggle"><span>Player ID<small>Yours for good. It's your name until you choose one</small></span><b id="set-id"></b></div>
+          </section>
+          <section data-page="general">
+            <label class="toggle"><span>Auto attack<small>On: hits the nearest enemy in range by itself, also while walking. Off: one attack per tap</small></span><input type="checkbox" id="set-autoattack" checked /></label>
+            <label class="toggle"><span>Auto-learn abilities<small>Spend skill points automatically (ultimate first)</small></span><input type="checkbox" id="set-autolearn" /></label>
+            <div class="toggle "><span>Camera zoom<small>Drag to zoom in. All the way left is the default view</small></span><input type="range" id="set-zoom" min="1" max="1.8" step="0.05" value="1" /></div>
+          </section>
+          <section data-page="graphics" class="hidden">
+            <div class="toggle"><span>View<small>2D is a flat top-down map: lightest on battery and older phones</small><small id="gfx-status"></small></span><span class="seg" id="set-gfx"><button data-v="3d">3D</button><button data-v="2d">2D</button></span></div>
+            <div class="toggle only3d"><span>Preset<small><span id="gfx-preset-note">Sets everything below. Low saves the most battery</span></small></span><span class="seg" id="set-quality"><button data-v="low">Low</button><button data-v="medium">Medium</button><button data-v="high">High</button></span></div>
+            <div class="toggle "><span>Frame rate<small>Fewer frames per second use less battery. Smoother at 60</small></span><span class="seg" id="set-fps"><button data-v="30">30</button><button data-v="40">40</button><button data-v="60">60</button></span></div>
+            <div class="toggle only3d"><span>Sharpness<small>How many pixels are drawn: the biggest battery saver</small></span><span class="seg" id="set-sharpness"><button data-v="low">Low</button><button data-v="medium">Medium</button><button data-v="high">High</button></span></div>
+            <div class="toggle only3d"><span>Shadows<small>Off saves a lot of battery</small></span><span class="seg" id="set-shadows"><button data-v="off">Off</button><button data-v="low">Low</button><button data-v="high">High</button></span></div>
+            <div class="toggle only3d"><span>Shadow updates<small>Battery redraws them less often</small></span><span class="seg" id="set-shadowRate"><button data-v="saver">Battery</button><button data-v="balanced">Balanced</button><button data-v="smooth">Smooth</button></span></div>
+            <div class="toggle only3d"><span>World detail<small>Grass, swaying trees and ground detail</small></span><span class="seg" id="set-detail"><button data-v="low">Low</button><button data-v="medium">Medium</button><button data-v="high">High</button></span></div>
+            <label class="toggle only3d"><span>Smooth edges<small>Cleaner lines, a little more battery</small></span><input type="checkbox" id="set-smoothing" /></label>
+          </section>
+          <section data-page="sound" class="hidden">
+            <label class="toggle"><span>Game sound<small>The phone's silent switch also mutes the game</small></span><input type="checkbox" id="set-sound" checked /></label>
+            <label class="toggle"><span>Vibration<small>Buzz when you're hit, get a kill or die (Android)</small></span><input type="checkbox" id="set-vibrate" checked /></label>
+          </section>
+          <section data-page="controls" class="hidden">
+            <label class="toggle"><span>Left-handed layout<small>Joystick on the right, buttons on the left</small></span><input type="checkbox" id="set-lefty" /></label>
+            <div class="toggle "><span>Joystick size</span><span class="seg" id="set-joy"><button data-v="S">S</button><button data-v="M">M</button><button data-v="L">L</button></span></div>
+          </section>
+        </div>
       </div>
     </div>
     </div>

@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { GLYPH_DURATION, WARDEN_MOVE_SECONDS, GameMap, HEROES, HERO_IDS, Team, Unit, World, courierFlying, isInvisible, isNight, trueSightRadius } from '../sim';
+import { GLYPH_DURATION, WARDEN_MOVE_SECONDS, GameMap, HERO_IDS, Team, Unit, World, courierFlying, isInvisible, isNight, trueSightRadius } from '../sim';
 import type { Aim } from './input';
 import { Renderer, TEAM_COLORS, drawTrueSightEye } from './renderer';
+import { heroName } from './player-names';
 import { JOINTS, Joint, TEAM_HEX, model } from './three/models';
 import { Fx3D } from './three/fx';
 import { Anim, AnimCtx, Corpse, animateHero, buffFx, heroAttack, heroBlink, heroCast, heroCorpse, newAnim, pose, setGround } from './three/hero-anims';
@@ -1162,14 +1163,13 @@ export class Renderer3D extends Renderer {
       const y = u.py + (u.y - u.py) * alpha;
       if (u.kind === 'hero') {
         const p = this.toScreen(x, y, 2.3 * HERO_SCALE);
-        const def = HEROES[u.hero!.defId];
         bar(p.x, p.y, 50, 6, u.hp / u.maxHp, TEAM_COLORS[u.team]);
         bar(p.x, p.y + 8, 50, 3, u.mana / Math.max(1, u.maxMana), '#5aa9ff');
         ctx.font = 'bold 11px system-ui, sans-serif';
         ctx.lineWidth = 3;
         ctx.strokeStyle = 'rgba(0,0,0,0.7)';
         ctx.fillStyle = u === focus ? '#ffe066' : '#fff';
-        const label = `${u.hero!.level} ${def.name}`;
+        const label = `${u.hero!.level} ${heroName(u)}`;
         ctx.strokeText(label, p.x, p.y - 4);
         ctx.fillText(label, p.x, p.y - 4);
         if (u.stunTimer > 0) this.stars(p.x, p.y - 20, w.time);

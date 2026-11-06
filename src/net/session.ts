@@ -20,6 +20,8 @@ const HASH_EVERY = 90;
 /** Pauses each player may start per match. */
 export const PAUSES_PER_PLAYER = 3;
 const HUMAN_BY_NAME = /^.{1,14}$/;
+/** The ticking countdown between the host tapping Start and the draft. */
+export const COUNTDOWN_SECONDS = 3;
 
 export interface LobbyPlayer {
   id: number;
@@ -90,6 +92,8 @@ export abstract class Session {
   abstract readonly isHost: boolean;
   /** The lobby changed. */
   onLobby: (s: LobbyState) => void = () => {};
+  /** The host tapped Start: count down on every phone, then `onDraftStart` follows. */
+  onCountdown: (seconds: number) => void = () => {};
   onDraftStart: (d: Draft, mySeat: number) => void = () => {};
   /** The match is ready to build. Call `ready()` once it's on screen. */
   onMatch: (info: MatchInfo, mySeat: number, catchUp: boolean) => void = () => {};
@@ -165,6 +169,8 @@ export class HostSession extends Session {
   comparisons = 0;
   private readyWaitUntil = 0;
   private iAmReady = false;
+  /** When the countdown ends; 0 when none is running. */
+  private countdownEnd = 0;
 
   constructor(
     code: string,
@@ -192,7 +198,7 @@ export class HostSession extends Session {
       g.link = link;
       g.lastSeen = performance.now();
     } else {
-      if (this.info || this.draft) {
+      if (this.info || this.draft || this.countdownEnd) {
         link.send({ t: 'refused', why: 'That game has already started' });
         return;
       }
@@ -300,7 +306,7 @@ export class HostSession extends Session {
   }
 
   private seatPlayer(id: number, seat: number) {
-    if (this.draft || this.info || seat < 0 || seat > 5 || this.state.seats[seat] !== null) return;
+    if (this.draft || this.info || this.countdownEnd || seat < 0 || seat > 5 || this.state.seats[seat] !== null) return;
     this.state.seats[this.state.seats.indexOf(id)] = null;
     this.state.seats[seat] = id;
     this.lobby();
@@ -309,11 +315,20 @@ export class HostSession extends Session {
     this.seatPlayer(1, seat);
   }
   setDifficulty(d: BotDifficulty) {
+    if (this.countdownEnd) return;
     this.state.difficulty = d;
     this.lobby();
   }
 
-  /** The host starts the match: on to the draft. */
+  /** The host tapped Start: seats are final now, and the draft follows the countdown. */
+  startCountdown() {
+    if (this.countdownEnd || this.draft || this.info) return;
+    this.countdownEnd = performance.now() + COUNTDOWN_SECONDS * 1000;
+    this.toAll({ t: 'countdown', seconds: COUNTDOWN_SECONDS });
+    this.onCountdown(COUNTDOWN_SECONDS);
+  }
+
+  /** On to the draft. */
   startDraft() {
     if (this.draft || this.info) return;
     const mySeat = this.mySeat;
@@ -365,6 +380,10 @@ export class HostSession extends Session {
   }
 
   update(now: number) {
+    if (this.countdownEnd && now >= this.countdownEnd) {
+      this.countdownEnd = 0;
+      this.startDraft();
+    }
     this.maybeStart();
     if (this.info) {
       for (const g of this.guests) if (g.link && !g.away && now - g.lastSeen > SILENT_MS) this.setAway(g, true);
@@ -470,6 +489,9 @@ export class GuestSession extends Session {
       case 'lobby':
         this.state = m.state as LobbyState;
         this.onLobby(this.state);
+        break;
+      case 'countdown':
+        this.onCountdown(m.seconds as number);
         break;
       case 'draft': {
         this.state = m.state as LobbyState;

@@ -1,18 +1,23 @@
 import { TEAM_NAMES } from '../sim';
 import type { BotDifficulty } from '../sim';
 import type { HostSession, LobbyState, Session } from '../net/session';
+import { botName, esc } from './player-names';
 
 const LANES = ['Top', 'Mid', 'Bot'];
 
 /** Play with Friend: choose Local or Online, host or join, then the lobby. */
 export class FriendUi {
-  onHost: (name: string) => void = () => {};
-  onJoin: (name: string, code: string) => void = () => {};
-  onRejoin: (name: string) => void = () => {};
+  onHost: () => void = () => {};
+  onJoin: (code: string) => void = () => {};
+  onRejoin: () => void = () => {};
+  /** Tapped Change next to their name. */
+  onProfile: () => void = () => {};
   onBack: () => void = () => {};
   onStart: () => void = () => {};
   onLeaveLobby: () => void = () => {};
   private session: Session | null = null;
+  private clock: HTMLElement;
+  private clockTimer = 0;
 
   constructor(
     private menu: HTMLElement,
@@ -21,7 +26,7 @@ export class FriendUi {
   ) {
     friend.innerHTML = `
       <div class="fr-title">Play with Friend</div>
-      <label class="fr-name"><span>Your name</span><input id="fr-name" maxlength="14" autocomplete="off" placeholder="Player" /></label>
+      <div class="fr-name"><span>Playing as <b id="fr-name"></b></span><button id="fr-profile" class="textlink">Change</button></div>
       <div class="fr-cards">
         <div class="fr-card">
           <h3>Local</h3>
@@ -47,28 +52,21 @@ export class FriendUi {
         <button id="lb-leave">Leave</button>
         <button id="lb-start" class="primary">Start</button>
       </div>`;
-    const name = () => (friend.querySelector<HTMLInputElement>('#fr-name')!.value.trim() || 'Player').slice(0, 14);
-    const input = friend.querySelector<HTMLInputElement>('#fr-name')!;
-    try {
-      input.value = localStorage.getItem('ovra-name') ?? '';
-    } catch {
-      /* storage unavailable */
-    }
-    input.addEventListener('change', () => {
-      try {
-        localStorage.setItem('ovra-name', input.value.trim());
-      } catch {
-        /* storage unavailable */
-      }
-    });
+    this.clock = document.createElement('div');
+    this.clock.id = 'countdown';
+    this.clock.className = 'hidden';
+    const marks = Array.from({ length: 12 }, (_, i) => `<line x1="50" y1="${i % 4 === 0 ? 7 : 6}" x2="50" y2="${i % 4 === 0 ? 15 : 11}" class="${i % 4 === 0 ? 'big' : ''}" transform="rotate(${i * 30} 50 50)"/>`).join('');
+    this.clock.innerHTML = `<small>Match starting</small><div class="cd-clock"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="46"/>${marks}<line class="cd-hand" x1="50" y1="56" x2="50" y2="12"/></svg><b></b></div>`;
+    lobby.parentElement!.appendChild(this.clock);
     const on = (root: HTMLElement, sel: string, f: () => void) => root.querySelector<HTMLElement>(sel)!.addEventListener('click', f);
-    on(friend, '#fr-host', () => this.onHost(name()));
+    on(friend, '#fr-host', () => this.onHost());
     on(friend, '#fr-join', () => {
       const code = friend.querySelector<HTMLInputElement>('#fr-code')!.value.trim().toUpperCase();
       if (code.length !== 4) this.error('Enter the 4 letter code');
-      else this.onJoin(name(), code);
+      else this.onJoin(code);
     });
-    on(friend, '#fr-rejoin', () => this.onRejoin(name()));
+    on(friend, '#fr-rejoin', () => this.onRejoin());
+    on(friend, '#fr-profile', () => this.onProfile());
     on(friend, '#fr-back', () => this.onBack());
     on(friend, '#fr-online', () => {
       const b = friend.querySelector<HTMLElement>('#fr-online small')!;
@@ -87,12 +85,17 @@ export class FriendUi {
   }
 
   /** Show the Local / Online choice. */
-  showFriend(canRejoin: boolean) {
+  showFriend(canRejoin: boolean, name: string) {
+    this.showName(name);
     this.menu.classList.add('hidden');
     this.lobby.classList.add('hidden');
     this.friend.classList.remove('hidden');
     this.friend.querySelector('#fr-rejoin')!.classList.toggle('hidden', !canRejoin);
     this.error('');
+  }
+  /** Their name changed. */
+  showName(name: string) {
+    this.friend.querySelector('#fr-name')!.textContent = name;
   }
   showMenu() {
     this.friend.classList.add('hidden');
@@ -126,7 +129,7 @@ export class FriendUi {
           const seat = team * 3 + i;
           const id = s.seats[seat];
           const player = s.players.find((p) => p.id === id);
-          const label = player ? esc(player.name) + (id === me.myId ? ' (you)' : '') : 'Bot';
+          const label = player ? esc(player.name) + (id === me.myId ? ' (you)' : '') : botName(seat);
           return `<button class="lb-seat ${player ? 'taken' : ''} ${id === me.myId ? 'me' : ''}" data-seat="${seat}"><small>${lane}</small><span>${label}</span></button>`;
         }).join('');
     });
@@ -137,10 +140,33 @@ export class FriendUi {
     diff.querySelectorAll<HTMLElement>('button').forEach((b) => b.classList.toggle('picked', b.dataset.v === s.difficulty));
   }
 
+  /** A clock counting down, with `onTick` on each second it shows. It waits at 1 for `hideCountdown`. */
+  showCountdown(seconds: number, onTick: (left: number) => void) {
+    this.hideCountdown();
+    this.clock.classList.remove('hidden');
+    const hand = this.clock.querySelector<SVGElement>('.cd-hand')!;
+    const num = this.clock.querySelector<HTMLElement>('b')!;
+    let left = seconds;
+    const tick = () => {
+      num.textContent = String(left);
+      // Restart the number's little jump.
+      num.classList.remove('go');
+      void num.offsetWidth;
+      num.classList.add('go');
+      hand.style.transform = `rotate(${((seconds - left) * 360) / seconds}deg)`;
+      onTick(left);
+      if (--left < 1) clearInterval(this.clockTimer);
+    };
+    tick();
+    this.clockTimer = window.setInterval(tick, 1000);
+  }
+  hideCountdown() {
+    clearInterval(this.clockTimer);
+    this.clock.classList.add('hidden');
+  }
+
   hideAll() {
     this.friend.classList.add('hidden');
     this.lobby.classList.add('hidden');
   }
 }
-
-const esc = (t: string) => t.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);

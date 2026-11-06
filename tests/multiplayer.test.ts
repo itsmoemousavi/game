@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Draft, World, stateHash } from '../src/sim';
 import { linkPair } from '../src/net/link';
-import { GuestSession, HostDraft, HostSession, MatchInfo, Session } from '../src/net/session';
+import { COUNTDOWN_SECONDS, GuestSession, HostDraft, HostSession, MatchInfo, Session } from '../src/net/session';
 
 const pause = () => new Promise((r) => setTimeout(r, 0));
 
@@ -55,6 +55,45 @@ const makeWorld = (i: MatchInfo, s: Session & { attachWorld(w: World): void }) =
 };
 
 describe('multiplayer', () => {
+  it('counts down on every phone, freezes the lobby, then starts the draft', () => {
+    const clock = realNowStub();
+    try {
+      const { host, guests } = lobby(1);
+      const counted: number[] = [];
+      let hostDraft = 0;
+      let guestDraft = 0;
+      host.onCountdown = (s) => counted.push(s);
+      guests[0].onCountdown = (s) => counted.push(s);
+      host.onDraftStart = () => hostDraft++;
+      guests[0].onDraftStart = () => guestDraft++;
+
+      host.startCountdown();
+      host.startCountdown(); // a second tap changes nothing
+      expect(counted).toEqual([COUNTDOWN_SECONDS, COUNTDOWN_SECONDS]);
+
+      // Too late to join or to change seats.
+      const pair = linkPair();
+      host.addLink(pair[0]);
+      new GuestSession(pair[1], 'late', 'Late');
+      const seats = [...host.state.seats];
+      guests[0].sit(5);
+      expect(host.state.seats).toEqual(seats);
+      expect(host.state.players.length).toBe(2);
+
+      clock.advance(COUNTDOWN_SECONDS * 1000 - 1);
+      host.update(clock.now());
+      expect(hostDraft).toBe(0);
+      clock.advance(1);
+      host.update(clock.now());
+      expect(hostDraft).toBe(1);
+      expect(guestDraft).toBe(1);
+      host.update(clock.now() + 5000);
+      expect(hostDraft).toBe(1);
+    } finally {
+      clock.restore();
+    }
+  });
+
   it('seats players on both teams, and frees a seat when someone leaves the lobby', () => {
     const { host, guests, links } = lobby(2);
     expect(host.state.players.length).toBe(3);

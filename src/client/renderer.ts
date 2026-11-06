@@ -1,6 +1,7 @@
 import { trueSightRadius, GameEvent, groundItemExpiry, GameMap, HEROES, ITEMS, canPickUp, PING_DURATION, PingKind, RUNE_INFO, Side, Team, Unit, WARD_CAST_RANGE, WARDEN_SLAM, World, isInvisible, isNight } from '../sim';
 import { ATTACK_AIM, type Aim } from './input';
 import { itemImage } from './icons';
+import { heroName } from './player-names';
 import { bakeMap } from './map-art';
 
 /** How many meters of the map fit top to bottom at the default zoom (bigger = farther out). */
@@ -364,7 +365,7 @@ export class Renderer {
       ctx.fillStyle = '#fff';
       ctx.font = 'bold 0.8px system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`${h.hero!.level} ${def.name}`, p.x, p.y - h.radius - 1.2);
+      ctx.fillText(`${h.hero!.level} ${heroName(h)}`, p.x, p.y - h.radius - 1.2);
       ctx.globalAlpha = 1;
     }
 

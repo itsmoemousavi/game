@@ -1,3 +1,4 @@
+import { esc, heroName, rosterName } from './player-names';
 import {
   AbilityDef,
   HeroId,
@@ -225,7 +226,7 @@ export class Hud {
     const color = (u: Unit | undefined) => (u && u.team !== 2 ? (u.team === 0 ? '#6fb0ff' : '#ff7b7f') : '#d9a25f');
     const label = (u: Unit | undefined) => {
       if (!u) return 'Unknown';
-      if (u.hero) return HEROES[u.hero.defId].name;
+      if (u.hero) return heroName(u);
       if (u.structure) return u.structure.tier === 'fountain' ? 'Fountain' : u.structure.tier === 'shrineTower' ? 'Shrine tower' : 'Tower';
       if (u.neutral?.boss) return 'Warden';
       if (u.neutral) return 'Jungle camp';
@@ -315,8 +316,7 @@ export class Hud {
       .join('|');
     if (key === this.scoreKey) return;
     this.scoreKey = key;
-    const esc = (t: string) => t.replace(/[<>&]/g, '');
-    let html = '<table><tr><th>Hero</th><th>K / D / A</th><th>LH / DN</th><th>Net worth</th><th>Items</th></tr>';
+    let html = '<table><tr><th>Player</th><th>K / D / A</th><th>LH / DN</th><th>Net worth</th><th>Items</th></tr>';
     for (const team of [myTeam, (1 - myTeam) as Team]) {
       const total = rows.filter((r) => r.u.team === team).reduce((s, r) => s + r.worth, 0);
       html += `<tr><td class="team" colspan="5" style="color:${team === 0 ? '#6fb0ff' : '#ff7b7f'}">${TEAM_NAMES[team]}${team === myTeam ? ' (you)' : ''} · ${w.teamKills[team]} kills · ${total} worth</td></tr>`;
@@ -327,7 +327,7 @@ export class Hud {
           .join('');
         const status = r.h.away ? ' <span class="dead">Left</span>' : r.u.alive ? '' : ` <span class="dead">☠ ${Math.ceil(r.h.respawnTimer)}s</span>`;
         html += `<tr class="${r.u.id === meId ? 'me' : ''}">
-          <td><span class="hero"><span class="dot" style="background:${def.color}">${r.h.level}</span>${esc(def.name)}${r.h.controller === 'bot' ? ' <small>(bot)</small>' : ''}${status}</span></td>
+          <td><span class="hero"><span class="dot" style="background:${def.color}">${r.h.level}</span>${esc(rosterName(r.u))}${status}</span></td>
           <td>${r.h.kills} / ${r.h.deaths} / ${r.h.assists}</td>
           <td>${r.h.lastHits} / ${r.h.denies}</td>
           <td>${r.worth}</td>
@@ -399,7 +399,7 @@ export class Hud {
     d.style.color = u.team === myTeam ? '#8cc4ff' : '#ff8f92';
     d.textContent = lines[0];
     const sub = document.createElement('small');
-    sub.textContent = `${HEROES[u.hero.defId].name}${lines.length > 1 ? ' · ' + lines.slice(1).join(' · ') : ''}`;
+    sub.textContent = `${heroName(u)}${lines.length > 1 ? ' · ' + lines.slice(1).join(' · ') : ''}`;
     d.appendChild(sub);
     const box = this.el.toasts.ownerDocument.getElementById('announce')!;
     box.replaceChildren(d);

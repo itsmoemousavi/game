@@ -17,6 +17,8 @@ import { GraphicsOptions, PRESETS, Quality, Renderer3D } from './renderer3d';
 import { MenuShowcase } from './menu3d';
 import { enterImmersive, setupLandscape } from './screen';
 import { FriendUi } from './friend-ui';
+import { loadProfile, phoneStorage, setDisplayName, shownName } from './profile';
+import { botName, seatNames, seatOf, setHeroNames } from './player-names';
 import { GuestSession, HostSession, MatchInfo, Session } from '../net/session';
 import { HostPeer, hostPeer, joinPeer } from '../net/peer';
 import type { Link } from '../net/link';
@@ -39,6 +41,7 @@ const myTeam: Team = 0;
 let devPick: HeroId | null = null;
 // Local dev server only (never in the published game): lets test scripts look at the match.
 if (import.meta.env.DEV) Object.assign(window, { dbg: { world: () => world, me: () => world?.unit(myHeroId), pick: (h: HeroId) => (devPick = h), renderer: () => renderer, net: () => net, draft: () => draftUi } });
+const profile = loadProfile(phoneStorage);
 let pickedLane: LaneId = 'mid';
 let pickedDifficulty: BotDifficulty = 'normal';
 try {
@@ -130,6 +133,8 @@ setInterval(() => net?.update(performance.now()), 25);
 function useSession(s: Session & { attachWorld(w: World): void }) {
   net = s;
   s.onLobby = (state) => friendUi.renderLobby(state);
+  s.onCountdown = (seconds) =>
+    friendUi.showCountdown(seconds, (left) => sfx.play(left % 2 ? 'clockTick' : 'clockTock'));
   s.onNote = (t) => hud.toast(t, '#f3dc9f');
   s.onPause = (on, by) => {
     setPaused(on);
@@ -140,9 +145,12 @@ function useSession(s: Session & { attachWorld(w: World): void }) {
     hud.toast('Players have gone out of sync: this match may look different on each phone', '#ffb4b4');
   };
   s.onDraftStart = (d) => {
+    friendUi.hideCountdown();
+    sfx.play('clockGo');
     friendUi.hideAll();
     select.classList.add('hidden');
-    draftUi.start(d, (done) => {
+    const names = seatNames(s.state.seats, s.state.players);
+    draftUi.start(d, (team, seat) => names[seatOf(team, seat)], (done) => {
       if (s instanceof HostSession) void startMatch('friend', done, s.draftDone(done));
       else if ((s as GuestSession).matchInfo) void startMatch('friend', done, (s as GuestSession).matchInfo!);
       else draftOver = done;
@@ -167,13 +175,15 @@ function leaveToMenu(why: string) {
   netPeer?.close();
   netPeer = null;
   if (s) draftUi.cancel();
+  friendUi.hideCountdown();
+  settingsPanel.classList.add('hidden');
   app.classList.add('hidden');
   app.classList.remove('net');
   endScreen.hide();
   world = null;
   select.classList.remove('hidden');
   if (why) {
-    friendUi.showFriend(false);
+    friendUi.showFriend(false, shownName(profile));
     friendUi.error(why);
   } else friendUi.showMenu();
 }
@@ -199,8 +209,8 @@ function retryLink(g: GuestSession, code: string) {
   again();
 }
 
-function startGuest(link: Link, name: string, code: string, token: string) {
-  const g = new GuestSession(link, token, name);
+function startGuest(link: Link, code: string, token: string) {
+  const g = new GuestSession(link, token, shownName(profile));
   useSession(g);
   g.onLinkLost = () => retryLink(g, code);
   saveRejoin({ code, token });
@@ -208,13 +218,13 @@ function startGuest(link: Link, name: string, code: string, token: string) {
   friendUi.showLobby(g);
 }
 
-friendUi.onHost = (name) => {
+friendUi.onHost = () => {
   friendUi.busy(true);
   hostPeer().then(
     (peer) => {
       friendUi.busy(false);
       netPeer = peer;
-      const h = new HostSession(peer.code, name);
+      const h = new HostSession(peer.code, shownName(profile));
       peer.onLink = (link) => h.addLink(link);
       useSession(h);
       friendUi.showLobby(h);
@@ -225,12 +235,12 @@ friendUi.onHost = (name) => {
     },
   );
 };
-const joinWith = (name: string, code: string, token: string) => {
+const joinWith = (code: string, token: string) => {
   friendUi.busy(true);
   joinPeer(code).then(
     (link) => {
       friendUi.busy(false);
-      startGuest(link, name, code, token);
+      startGuest(link, code, token);
     },
     (err: Error) => {
       friendUi.busy(false);
@@ -238,17 +248,18 @@ const joinWith = (name: string, code: string, token: string) => {
     },
   );
 };
-friendUi.onJoin = (name, code) => joinWith(name, code, Math.random().toString(36).slice(2) + Date.now().toString(36));
-friendUi.onRejoin = (name) => {
+friendUi.onJoin = (code) => joinWith(code, Math.random().toString(36).slice(2) + Date.now().toString(36));
+friendUi.onRejoin = () => {
   const r = savedRejoin();
-  if (r) joinWith(name, r.code, r.token);
+  if (r) joinWith(r.code, r.token);
 };
 friendUi.onBack = () => friendUi.showMenu();
-friendUi.onStart = () => (net as HostSession | null)?.startDraft?.();
+friendUi.onStart = () => (net as HostSession | null)?.startCountdown?.();
+friendUi.onProfile = () => openSettings('profile');
 friendUi.onLeaveLobby = () => {
   net?.leave();
 };
-$<HTMLButtonElement>('#btn-friend').addEventListener('click', () => friendUi.showFriend(!!savedRejoin()));
+$<HTMLButtonElement>('#btn-friend').addEventListener('click', () => friendUi.showFriend(!!savedRejoin(), shownName(profile)));
 
 /** Play → the draft (bans, then picks) → the match. Practice and the tutorial only pick your hero. */
 function startDraft(m: Mode) {
@@ -263,7 +274,8 @@ function startDraft(m: Mode) {
       else d.update(DRAFT_TIME.bot + 0.01);
     }
   }
-  draftUi.start(d, (done) => startMatch(m, done));
+  const me = shownName(profile);
+  draftUi.start(d, (team, s) => (team === myTeam && s === seat ? me : botName(seatOf(team, s))), (done) => startMatch(m, done));
 }
 
 const lanes = $<HTMLElement>('#lane-pick');
@@ -423,6 +435,7 @@ pingMenu.querySelectorAll<HTMLElement>('[data-ping]').forEach((b) =>
 onTap('#btn-buyback', () => world?.enqueue({ type: 'buyback', unitId: myHeroId }));
 // ------------------------------------------------------------- settings
 
+const settingsPanel = $<HTMLElement>('#settings');
 interface Settings {
   autoAttack: boolean;
   sound: boolean;
@@ -582,12 +595,29 @@ $<HTMLInputElement>('#set-smoothing').addEventListener('change', (e) => {
   saveSettings();
   if (settings.graphics === '3d') void rebuildView();
 });
-document.querySelectorAll<HTMLElement>('.set-tabs button').forEach((b) =>
-  b.addEventListener('click', () => {
-    document.querySelectorAll<HTMLElement>('.set-tabs button').forEach((x) => x.classList.toggle('on', x === b));
-    document.querySelectorAll<HTMLElement>('.set-pages section').forEach((p) => p.classList.toggle('hidden', p.dataset.page !== b.dataset.tab));
-  }),
-);
+function showSettingsTab(tab: string) {
+  document.querySelectorAll<HTMLElement>('.set-tabs button').forEach((x) => x.classList.toggle('on', x.dataset.tab === tab));
+  document.querySelectorAll<HTMLElement>('.set-pages section').forEach((p) => p.classList.toggle('hidden', p.dataset.page !== tab));
+}
+function openSettings(tab: string) {
+  showSettingsTab(tab);
+  settingsPanel.classList.remove('hidden');
+}
+document.querySelectorAll<HTMLElement>('.set-tabs button').forEach((b) => b.addEventListener('click', () => showSettingsTab(b.dataset.tab!)));
+
+// Profile: the display name is saved on the phone as it's typed.
+const nameInput = $<HTMLInputElement>('#set-name');
+nameInput.value = shownName(profile);
+$<HTMLElement>('#set-id').textContent = `ovra-${profile.id}`;
+nameInput.addEventListener('input', () => {
+  setDisplayName(profile, nameInput.value, phoneStorage);
+  friendUi.showName(shownName(profile));
+});
+// Left empty: back to the id.
+nameInput.addEventListener('blur', () => (nameInput.value = shownName(profile)));
+nameInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') nameInput.blur();
+});
 document.querySelectorAll<HTMLElement>('#set-gfx button').forEach((b) =>
   b.addEventListener('click', () => {
     settings.graphics = b.dataset.v as Settings['graphics'];
@@ -626,6 +656,10 @@ function buzz(pattern: number | number[], minGap = 250) {
   navigator.vibrate(pattern);
 }
 
+// Settings can be opened from the start menu, before any match has set them up.
+applySettings();
+showGfx(settings.graphics.toUpperCase());
+
 // ------------------------------------------------------------- pause / surrender
 let paused = false;
 const pauseEl = $<HTMLElement>('#pause');
@@ -638,10 +672,21 @@ function setPaused(p: boolean) {
 }
 setPaused(false);
 
-const settingsPanel = $<HTMLElement>('#settings');
 const statsPanel = $<HTMLElement>('#stats');
 const scorePanel = $<HTMLElement>('#scoreboard');
 onTap('#btn-settings', () => settingsPanel.classList.toggle('hidden'));
+$<HTMLElement>('#btn-menu-settings').addEventListener('click', () => openSettings('profile'));
+// On the start menu the panel doesn't cover everything: a tap beside it just closes it.
+select.addEventListener(
+  'click',
+  (e) => {
+    if (settingsPanel.classList.contains('hidden')) return;
+    e.stopPropagation();
+    (document.activeElement as HTMLElement | null)?.blur();
+    settingsPanel.classList.add('hidden');
+  },
+  { capture: true },
+);
 onTap('#portrait', () => statsPanel.classList.toggle('hidden'));
 onTap('#topbar', () => scorePanel.classList.toggle('hidden'));
 onTap('#btn-pause', () => (net ? net.setPaused(true) : setPaused(true)));
@@ -664,6 +709,7 @@ document.querySelectorAll<HTMLElement>('[data-close]').forEach((b) =>
   b.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     e.stopPropagation();
+    (document.activeElement as HTMLElement | null)?.blur(); // puts the phone's keyboard away
     $<HTMLElement>(`#${b.dataset.close}`).classList.add('hidden');
   }),
 );
@@ -783,6 +829,9 @@ async function startMatch(m: Mode, d: Draft, info?: MatchInfo, catchUp = false) 
   const slots = info ? info.slots : m === 'bots' ? buildSlots(d) : [{ team: myTeam, heroId: d.picks[myTeam][0], controller: 'human' as const, lane: pickedLane }];
   // Vs bots: a 30 s warm-up (the clock counts up from -0:30) to shop and walk to lane before creeps come.
   world = new World({ seed: info ? info.seed : (Date.now() & 0xffff) + 1, slots, warmup: m === 'bots' || info ? WARMUP_SECONDS : 0 });
+  // Who plays each hero, in the order of the world's heroes (which is seat order).
+  const me = shownName(profile);
+  setHeroNames(world.heroes, info && net ? seatNames(info.seats, net.state.players) : slots.map((s, i) => (s.controller === 'human' ? me : botName(i))));
   if (info && net) {
     net.attachWorld(world);
     if (catchUp) {
@@ -819,6 +868,7 @@ async function startMatch(m: Mode, d: Draft, info?: MatchInfo, catchUp = false) 
   hud.setHero(world.unit(myHeroId)!);
   world.enqueue({ type: 'setAutoAttack', unitId: myHeroId, enabled: settings.autoAttack });
   settingsPanel.classList.add('hidden');
+  showSettingsTab('general');
   statsPanel.classList.add('hidden');
   scorePanel.classList.add('hidden');
   setPaused(false);

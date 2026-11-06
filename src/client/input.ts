@@ -263,6 +263,7 @@ export class Input {
   // ---------------------------------------------------------------- keyboard
 
   private onKey(e: KeyboardEvent, down: boolean) {
+    if (e.target instanceof HTMLInputElement && e.target.type === 'text') return; // typing a name or a code
     const k = e.key.toLowerCase();
     if (down && !e.repeat) {
       const slot = k === 'q' ? 0 : k === 'w' ? 1 : k === 'r' ? 2 : -1;

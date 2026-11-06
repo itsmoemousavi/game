@@ -40,6 +40,9 @@ export type SoundName =
   | 'itemDrop'
   | 'itemPickUp'
   | 'click'
+  | 'clockTick'
+  | 'clockTock'
+  | 'clockGo'
   | 'ping'
   | 'victory'
   | 'defeat'
@@ -173,6 +176,19 @@ const RECIPES: Record<SoundName, Recipe> = {
     s.tone('sine', 2000, 2000, 0.12, 0.15 * v, 0.05);
   },
   click: (s, v) => s.tone('sine', 900, 700, 0.04, 0.12 * v),
+  // A wind-up clock: a dry click with a bit of wooden body.
+  clockTick: (s, v) => {
+    s.noise(0.025, 0.5 * v, 'bandpass', 3400);
+    s.tone('square', 1500, 900, 0.022, 0.12 * v);
+  },
+  clockTock: (s, v) => {
+    s.noise(0.03, 0.5 * v, 'bandpass', 2300);
+    s.tone('square', 1050, 620, 0.028, 0.14 * v);
+  },
+  clockGo: (s, v) => {
+    s.tone('sine', 660, 660, 0.7, 0.24 * v);
+    s.tone('sine', 1320, 1320, 0.45, 0.1 * v);
+  },
   ping: (s, v) => {
     s.tone('sine', 1180, 1180, 0.09, 0.2 * v);
     s.tone('sine', 1580, 1580, 0.12, 0.2 * v, 0.09);

@@ -2,6 +2,7 @@ import { Draft, HEROES, HERO_IDS, HeroId, TEAM_NAMES, Team } from '../sim';
 import { heroCards, heroPortraits } from './hud';
 import { abilityIcon } from './icons';
 import { MenuShowcase } from './menu3d';
+import { esc } from './player-names';
 
 /**
  * The draft screen shown when a match starts: each team bans a hero, then the teams pick
@@ -22,6 +23,7 @@ export class DraftUi {
   private onDone: (d: Draft) => void = () => {};
   private showcase: MenuShowcase | null = null;
   private shown: HeroId | null = null;
+  private seatName: (team: Team, seat: number) => string = () => '';
 
   constructor(private root: HTMLElement) {
     root.innerHTML = `
@@ -67,8 +69,9 @@ export class DraftUi {
     this.draft = null;
   }
 
-  start(draft: Draft, onDone: (d: Draft) => void) {
+  start(draft: Draft, seatName: (team: Team, seat: number) => string, onDone: (d: Draft) => void) {
     this.draft = draft;
+    this.seatName = seatName;
     this.onDone = onDone;
     this.sel = null;
     this.key = '';
@@ -159,7 +162,9 @@ export class DraftUi {
         ? step.kind === 'ban'
           ? 'Ban a hero: nobody can play it this match'
           : 'Your turn: pick your hero'
-        : `${TEAM_NAMES[step.team]} ${step.kind === 'ban' ? 'is banning' : 'is picking'}…`;
+        : step.kind === 'ban'
+          ? `${TEAM_NAMES[step.team]} is banning…`
+          : `${this.seatName(step.team, d.picks[step.team].length)} is picking…`;
 
     // Step tracker: one marker per ban / pick, in order, coloured by team.
     this.root.querySelector('#draft-steps')!.innerHTML = d.order
@@ -181,7 +186,7 @@ export class DraftUi {
         .map((i) => {
           const id = d.picks[team][i];
           const you = human?.team === team && human.seat === i;
-          const who = you ? 'You' : 'Bot';
+          const who = esc(this.seatName(team, i));
           if (id) {
             const pic = heroCards[id] ?? heroPortraits[id];
             return `<div class="slot done${you ? ' you' : ''}" style="--c:${HEROES[id].color}">${pic ? `<img alt="" src="${pic}">` : ''}<span class="nm"><b>${HEROES[id].name}</b><small>${who}</small></span></div>`;

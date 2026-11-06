@@ -1,6 +1,7 @@
 import { HEROES, TEAM_NAMES, Team, Unit, World } from '../sim';
 import { heroCards, heroPortraits } from './hud';
 import { itemIcon } from './icons';
+import { esc, heroName, rosterName } from './player-names';
 
 /** One sample of the match every few seconds: each team's total gold earned and experience. */
 interface Sample {
@@ -105,7 +106,7 @@ export class EndScreen {
         <div class="es-mvp t${mvp.team}" style="--c:${HEROES[mh.defId].color}">
           ${card ? `<img alt="" src="${card}">` : ''}
           <span class="es-star">★ MVP</span>
-          <div class="es-mvp-plate"><b>${HEROES[mh.defId].name}</b><small>${mvp.id === meId ? 'You' : mh.controller === 'bot' ? 'Bot' : 'Player'} · ${TEAM_NAMES[mvp.team as Team]}</small>
+          <div class="es-mvp-plate"><b>${esc(rosterName(mvp))}</b><small>${TEAM_NAMES[mvp.team as Team]}</small>
           <div class="es-mvp-stats"><span><b>${mh.kills}/${mh.deaths}/${mh.assists}</b><small>K/D/A</small></span><span><b>${n(mh.stats.heroDamage)}</b><small>hero dmg</small></span></div></div>
         </div>
         <div class="es-panel">
@@ -145,7 +146,7 @@ export class EndScreen {
   }
 
   private who(u: Unit) {
-    return u.id === this.meId ? '<em class="you">You</em>' : u.hero!.controller === 'bot' ? '<em>Bot</em>' : '';
+    return u.id === this.meId ? '<em class="you">You</em>' : '';
   }
 
   private scoreboard(): string {
@@ -159,7 +160,7 @@ export class EndScreen {
             const pic = heroPortraits[h.defId];
             const items = h.items.map((it) => `<i>${it ? itemIcon(it.id) : ''}</i>`).join('');
             return `<tr class="${u.id === this.meId ? 'me' : ''}">
-              <td class="hn"><span class="pf" style="--c:${HEROES[h.defId].color}">${pic ? `<img alt="" src="${pic}">` : ''}</span><span><b>${HEROES[h.defId].name}${u === mvp ? ' <span class="star">★</span>' : ''}</b>${this.who(u)}</span></td>
+              <td class="hn"><span class="pf" style="--c:${HEROES[h.defId].color}">${pic ? `<img alt="" src="${pic}">` : ''}</span><span><b>${esc(rosterName(u))}${u === mvp ? ' <span class="star">★</span>' : ''}</b>${this.who(u)}</span></td>
               <td>${h.level}</td><td>${h.kills}/${h.deaths}/${h.assists}</td><td>${h.lastHits}/${h.denies}</td><td>${n(h.goldEarned)}</td>
               <td class="its"><span>${items}</span></td></tr>`;
           })
@@ -177,8 +178,8 @@ export class EndScreen {
       .map((u) => {
         const h = u.hero!;
         const pct = (100 * h.stats.heroDamage) / max;
-        return `<div class="bar-row${u.id === this.meId ? ' me' : ''}" title="${HEROES[h.defId].name}: ${n(h.stats.heroDamage)} damage to heroes">
-          <span class="bn"><b>${HEROES[h.defId].name}</b>${this.who(u)}</span>
+        return `<div class="bar-row${u.id === this.meId ? ' me' : ''}" title="${esc(heroName(u))}: ${n(h.stats.heroDamage)} damage to heroes">
+          <span class="bn"><b>${esc(rosterName(u))}</b></span>
           <span class="track"><span class="fill t${u.team}" style="width:${pct.toFixed(1)}%"></span></span>
           <span class="bv"><b>${n(h.stats.heroDamage)}</b><small>bldg ${n(h.stats.buildingDamage)} · heal ${n(h.stats.healing)}</small></span>
         </div>`;

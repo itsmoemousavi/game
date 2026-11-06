@@ -30,6 +30,15 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.16.x · Play with Friend
 
+### 0.16.2
+
+- **You now have a player name.** Every player gets a permanent ID like `ovra-k3x9q2`, kept on their phone. That's also their name until they choose one.
+- **Settings opens from the start menu** (gear at the top right), with a new **Profile** tab where you can change your display name whenever you like. It's remembered on your phone. A new name shows from your next match.
+- **Your name is used everywhere:** lobby, draft, kill feed, announcements, pings, over your hero's head. Scoreboards show the name and the hero, like `Moe (Brakk)`.
+- **Bots have names too:** Bot Ash, Bot Rook and friends, so a kill feed tells you which bot it was.
+- **Ticking countdown:** when the host taps Start, a clock counts down 3, 2, 1 on every phone, then the draft begins. Nobody can join or change seats during it.
+- Typing Q, W or R in a text box on a computer no longer casts spells or gets swallowed.
+
 ### 0.16.1
 *2026-11-06*
 
