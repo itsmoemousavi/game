@@ -92,11 +92,11 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #clock { font-variant-numeric: tabular-nums; font-size: 13px; line-height: 1; text-align: center; }
 
 /* Bottom group, just left of the ability buttons: status icons above the hero bar, items to its right. */
-#bottom-hud { --slot: clamp(32px, min(9.5vh, 5.6vw), 44px); position: absolute; right: calc(max(32px, env(safe-area-inset-right)) + 188px); bottom: max(0px, calc(env(safe-area-inset-bottom) - 6px)); display: flex; flex-direction: column; align-items: flex-start; gap: 4px; pointer-events: none; }
+#bottom-hud { --slot: clamp(32px, min(9.5vh, 5.6vw), 44px); position: absolute; right: calc(max(32px, env(safe-area-inset-right)) + 176px); bottom: max(0px, calc(env(safe-area-inset-bottom) - 6px)); display: flex; flex-direction: column; align-items: flex-start; gap: 4px; pointer-events: none; }
 /* One glassy black panel holding the hero bar, items, TP and shop. */
-#hud-panel { position: relative; display: flex; align-items: center; gap: 8px; padding: 5px 22px 5px 5px; border-radius: 12px; background: rgba(8,10,12,0.55); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 4px 18px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08); -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); pointer-events: none; }
-#app.lefty #bottom-hud { right: auto; left: calc(max(32px, env(safe-area-inset-left)) + 188px); }
-#herobar { position: relative; display: flex; gap: 8px; align-items: center; padding: 0; width: clamp(164px, calc(100vw - 536px), 384px); box-sizing: border-box; pointer-events: none; }
+#hud-panel { position: relative; display: flex; align-items: center; gap: 14px; padding: 5px 48px 5px 5px; border-radius: 12px; background: rgba(8,10,12,0.55); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 4px 18px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08); -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); pointer-events: none; }
+#app.lefty #bottom-hud { right: auto; left: calc(max(32px, env(safe-area-inset-left)) + 176px); }
+#herobar { position: relative; display: flex; gap: 12px; align-items: center; padding: 0; width: clamp(140px, calc(100vw - 550px), 360px); box-sizing: border-box; pointer-events: none; }
 #portrait { flex: none; width: calc(var(--slot) * 2 + 4px); height: calc(var(--slot) * 2 + 4px); border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #111; border: 2px solid rgba(255,255,255,0.55); box-sizing: border-box; }
 #portrait .face { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; display: grid; place-items: center; font-size: 18px; }
 #portrait .face img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.15); }
@@ -189,7 +189,7 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #itembar .tp .cd { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,0.6); border-radius: 5px; font-size: 13px; font-weight: 800; }
 #itembar .tp .cd:empty { display: none; }
 /* Shop: a round button sitting on the panel's bottom-right corner. */
-#btn-shop { position: absolute; right: -8px; bottom: max(-5px, calc(2px - max(0px, calc(env(safe-area-inset-bottom) - 6px)))); z-index: 2; width: 46px; height: 46px; border-radius: 50%; border: 2px solid #ffd23f; background: #6b4e16; padding: 1px; display: grid; place-items: center; overflow: hidden; pointer-events: auto; touch-action: none; box-shadow: 0 3px 10px rgba(0,0,0,0.55); }
+#btn-shop { position: absolute; right: 4px; bottom: max(-5px, calc(2px - max(0px, calc(env(safe-area-inset-bottom) - 6px)))); z-index: 2; width: 40px; height: 40px; border-radius: 50%; border: 2px solid #ffd23f; background: #6b4e16; padding: 1px; display: grid; place-items: center; overflow: hidden; pointer-events: auto; touch-action: none; box-shadow: 0 3px 10px rgba(0,0,0,0.55); }
 #btn-shop svg { border-radius: 50%; }
 
 /* ---------- shop ---------- */
@@ -538,7 +538,7 @@ svg.icon { display: block; width: 100%; height: 100%; }
 #btn-courier .state { position: absolute; left: 50%; bottom: -1px; transform: translateX(-50%); font-size: 8px; font-weight: 900; letter-spacing: 0.04em; color: #fff; text-shadow: 0 1px 2px #000; white-space: nowrap; z-index: 1; }
 #btn-courier .state { bottom: 0; width: 16px; height: 16px; border-radius: 50%; background: rgba(20,14,30,0.85); box-shadow: 0 0 0 1px rgba(196,181,253,0.7); }
 #btn-courier .state svg { display: block; width: 12px; height: 12px; margin: 2px; fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
-#courier-slots { --cs: calc((var(--slot) * 2 + 4px - 6px) / 3); grid-column: 6; grid-row: 1 / span 2; display: flex; flex-direction: column; gap: 3px; margin-left: 2px; padding: 0 3px; border-left: 1px solid rgba(196,181,253,0.35); }
+#courier-slots { --cs: calc((var(--slot) * 2 + 4px - 6px) / 3); grid-column: 6; grid-row: 1 / span 2; display: flex; flex-direction: column; gap: 3px; margin-left: 6px; padding: 0 3px 0 7px; border-left: 1px solid rgba(196,181,253,0.35); }
 #itembar #courier-slots .cslot { width: var(--cs); height: var(--cs); border-radius: 5px; border-color: rgba(196,181,253,0.55); background: rgba(40,28,52,0.85); }
 #itembar #courier-slots .cslot.empty { background: rgba(0,0,0,0.4); border-style: dashed; border-color: rgba(196,181,253,0.3); }
 #itembar #courier-slots .cslot.waiting .lbl { opacity: 0.45; }

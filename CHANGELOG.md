@@ -29,6 +29,12 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.15.x · A real start and finish
 
+### 0.15.6
+*2026-11-06*
+
+- The bottom panel moved further left and has more space between the hero picture, bars, items and courier.
+- The shop button has its own spot at the end of the panel and no longer covers the courier slots.
+
 ### 0.15.5
 *2026-11-05*
 
