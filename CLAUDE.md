@@ -150,6 +150,8 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
 10. **Mega Creep look (owner, 2026-11-06; PLANNED, not started, wait for their go).** When creeps turn Mega they should be a little bigger and their current look should read as stronger. Show a preview before shipping (art rule). Check what 3D already does first (`creep(..., mega)` in `three/models.ts`, scale in `renderer3d.ts`), and the 2D view too. Owner saw a still of the current models and said they're fine (keep the size); add armor to them, done well.
 11. **Hero stats panel (owner, 2026-11-06; PLANNED, not started, wait for their go).** The panel opened by the i on the portrait (`updateStats` in `hud.ts`) should show only the necessary data, not everything, with a better design. Show a preview before shipping.
 
+12. **Recorded sounds (owner, 2026-11-06; IN REVIEW).** Replacing the code-made sounds with CC0 recordings from OpenGameArt. Listening page with picks: https://claude.ai/artifact/Y4foqsoAA3Zs3CcG1yKdq6 (read the `picks` collection with the ArtifactData tool; a doc per sound: choice, level, note). Kenney's and Sonniss's own sites refuse automated downloads. Owner's rules: all sounds at the same loudness (a sword must not hurt, a quiet sound must still be heard); walking makes no sound for anyone, ever (shipped 0.16.6).
+
 ## Gotchas
 
 - iPhone web pages cannot truly hide the status bar: Safari has no fullscreen API on iPhone. Only the Capacitor app can guarantee it. Manifest changes need the home-screen icon re-added.

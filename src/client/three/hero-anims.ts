@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { HeroId, Unit, World, abilityLevel, isInvisible } from '../../sim';
+import { HeroId, Unit, World, abilityLevel } from '../../sim';
 import type { Fx3D } from './fx';
 import type { Joint } from './models';
 import type { MonsterKind } from './monster-anims';
@@ -8,7 +8,7 @@ import type { MonsterKind } from './monster-anims';
  * Hand-made animation for the six heroes: idle, walk, attacks, every spell, buffs and deaths.
  * Each hero is posed by adding small rotations (radians) to its joints on top of the model's
  * rest stance, from a few keyframes per move. Effects (dust, sparks, slashes, roots…) come from
- * Fx3D; sounds tied to the motion (footsteps, impacts) go through `ctx.sound`.
+ * Fx3D; sounds tied to the motion (impacts) go through `ctx.sound`.
  */
 
 /** What the animations need from the renderer. */
@@ -126,7 +126,7 @@ interface Walk {
   speed: number;
 }
 
-/** Shared walk cycle + footstep detection. `cadence` = cycle speed at rest, `perMs` per m/s. */
+/** Shared walk cycle + footstep detection (for dust: walking makes no sound, for anyone). `cadence` = cycle speed at rest, `perMs` per m/s. */
 export function locomotion(c: AnimCtx, u: Unit, a: Anim, cadence: number, perMs: number, onStep?: (side: number) => void): Walk {
   const speed = Math.hypot(u.x - u.px, u.y - u.py) * 30;
   const dashing = !!u.dash;
@@ -182,7 +182,6 @@ const brakk: Animator = (c, _o, j, u, a, time) => {
   const dashing = !!u.dash;
   const { s, walk } = locomotion(c, u, a, 4.2, 0.75, (side) => {
     footDust(c, u, side, 0x8a7558, 0.7);
-    if (u.id === c.meId) c.sound('stomp', u.x, u.y, 0.5);
   });
   const P = new Pose();
   const breathe = Math.sin(time * 1.8 + u.id) * 0.035 * (1 - walk);
@@ -265,7 +264,6 @@ const vexa: Animator = (c, o, j, u, a, time) => {
   const now = c.clock;
   const { s, walk } = locomotion(c, u, a, 5.2, 0.95, (side) => {
     footDust(c, u, side, 0x8a7558, 0.45);
-    if (u.id === c.meId) c.sound('step', u.x, u.y, 0.35);
   });
   const P = new Pose();
   const ta = now - a.atkAt;
@@ -420,7 +418,6 @@ const orin: Animator = (c, o, j, u, a, time) => {
 const syl: Animator = (c, _o, j, u, a, time) => {
   const now = c.clock;
   const { s, walk } = locomotion(c, u, a, 6, 1.0, (side) => {
-    if (u.id === c.meId && !isInvisible(u)) c.sound('step', u.x, u.y, 0.25);
     void side;
   });
   const P = new Pose();
@@ -483,7 +480,6 @@ const grom: Animator = (c, o, j, u, a, time) => {
   const now = c.clock;
   const { s, walk } = locomotion(c, u, a, 3.2, 0.55, (side) => {
     footDust(c, u, side, 0x7a6448, 0.9);
-    if (u.id === c.meId) c.sound('treeStep', u.x, u.y, 0.5);
   });
   const P = new Pose();
   const idle = 1 - walk;
@@ -684,7 +680,6 @@ const seren: Animator = (c, o, j, u, a, time) => {
   const now = c.clock;
   const { s, walk } = locomotion(c, u, a, 4.6, 0.8, (side) => {
     footDust(c, u, side, 0x8a7558, 0.4);
-    if (u.id === c.meId) c.sound('step', u.x, u.y, 0.35);
   });
   const P = new Pose();
   const ta = now - a.atkAt;
@@ -759,7 +754,6 @@ const rhen: Animator = (c, o, j, u, a, time) => {
   const now = c.clock;
   const { s, walk } = locomotion(c, u, a, 5.8, 1, (side) => {
     footDust(c, u, side, 0x8a7558, 0.4);
-    if (u.id === c.meId) c.sound('step', u.x, u.y, 0.32);
   });
   const P = new Pose();
   const ta = now - a.atkAt;

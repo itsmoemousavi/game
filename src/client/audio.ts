@@ -46,7 +46,6 @@ export type SoundName =
   | 'ping'
   | 'victory'
   | 'defeat'
-  | 'stomp'
   | 'hammerAttack'
   | 'shieldCharge'
   | 'shieldBash'
@@ -55,8 +54,6 @@ export type SoundName =
   | 'ironClang'
   | 'armorFall'
   | 'tpChannel'
-  | 'step'
-  | 'treeStep'
   | 'bowShot'
   | 'arrowHit'
   | 'piercingShot'
@@ -196,8 +193,6 @@ const RECIPES: Record<SoundName, Recipe> = {
   victory: (s, v) => [523, 659, 784, 1046, 1318].forEach((f, i) => s.tone('triangle', f, f, 0.4, 0.25 * v, i * 0.15)),
   defeat: (s, v) => [392, 349, 311, 262].forEach((f, i) => s.tone('triangle', f, f, 0.5, 0.22 * v, i * 0.22)),
   // ---- shared
-  /** A light footstep on dirt. */
-  step: (s, v) => s.noise(0.06, 0.12 * v, 'lowpass', 900, 300),
   /** A body (cloth and leather) hitting the ground. */
   bodyFall: (s, v) => {
     s.tone('sine', 110, 50, 0.25, 0.4 * v);
@@ -300,12 +295,6 @@ const RECIPES: Record<SoundName, Recipe> = {
     s.tone('square', 900, 600, 0.12, 0.05 * v, 0.2);
   },
   // ---- Grom
-  /** A heavy wooden footstep with a creak. */
-  treeStep: (s, v) => {
-    s.tone('sine', 65, 40, 0.2, 0.4 * v);
-    s.noise(0.08, 0.1 * v, 'lowpass', 600, 200);
-    s.tone('sawtooth', 180, 140, 0.12, 0.025 * v, 0.03);
-  },
   /** A wooden fist swing, then a heavy knock as it lands. */
   woodPunch: (s, v) => {
     s.noise(0.16, 0.2 * v, 'bandpass', 500, 1500);
@@ -406,11 +395,6 @@ const RECIPES: Record<SoundName, Recipe> = {
     s.tone('triangle', 600, 300, 0.05, 0.05 * v, 0.1);
   },
   // ---- Brakk
-  /** A heavy armored footstep. */
-  stomp: (s, v) => {
-    s.tone('sine', 75, 45, 0.16, 0.35 * v);
-    s.noise(0.08, 0.12 * v, 'lowpass', 500, 200);
-  },
   /** Hammer swing whoosh, then the heavy crunch of the hit as it lands. */
   hammerAttack: (s, v) => {
     s.noise(0.14, 0.28 * v, 'bandpass', 700, 2200);

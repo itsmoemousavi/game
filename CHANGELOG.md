@@ -30,6 +30,10 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.16.x · Play with Friend
 
+### 0.16.6
+
+- **Walking is silent now.** No footstep sounds for any hero or creature.
+
 ### 0.16.5
 
 - **Changing your name is now clearer.** Settings → Profile shows your name with an edit button. It opens a small window with Cancel and Save.

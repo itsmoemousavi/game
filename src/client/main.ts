@@ -529,7 +529,7 @@ function makeRenderer(map: World['map']): Renderer {
     try {
       canvas3d.classList.remove('hidden');
       const r = new Renderer3D(canvas, canvas3d, map, settings.gfx);
-      // Animation sounds (footsteps, Iron Hide, falling armor) fade with distance from the camera.
+      // Animation sounds (Iron Hide, falling armor) fade with distance from the camera.
       r.sound = (name, x, y, volume) => {
         const d = Math.hypot(x - r.camX, y - r.camY);
         sfx.play(name as SoundName, volume * (d < 22 ? 1 : Math.max(0, 1 - (d - 22) / 25)));
