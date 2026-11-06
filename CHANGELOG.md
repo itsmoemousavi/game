@@ -29,6 +29,12 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.15.x · A real start and finish
 
+### 0.15.7
+*2026-11-06*
+
+- The courier button moved to the end of the bottom panel, right above the shop button.
+- The panel moved further left, and the health, mana and XP bars got their extra width back.
+
 ### 0.15.6
 *2026-11-06*
 
