@@ -13,14 +13,14 @@ import { EndScreen } from './end-screen';
 import { GameEvent, HERO_IDS, HEROES as HERO_DEFS, PingKind, RUNE_INFO, RuneKind, TEAM_NAMES } from '../sim';
 import { PING_STYLE } from './renderer';
 import { Renderer } from './renderer';
-import { QUALITY, Quality, Renderer3D } from './renderer3d';
+import { GraphicsOptions, PRESETS, Quality, Renderer3D } from './renderer3d';
 import { MenuShowcase } from './menu3d';
 import { enterImmersive, setupLandscape } from './screen';
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 
 const canvas = $<HTMLCanvasElement>('#game');
-const canvas3d = $<HTMLCanvasElement>('#game3d');
+let canvas3d = $<HTMLCanvasElement>('#game3d');
 const screenFx = new ScreenFx(canvas); // after both canvases (#game3d comes first in the page)
 declare const __BUILD__: string;
 declare const __VERSION__: string;
@@ -279,15 +279,20 @@ interface Settings {
   joystick: 'S' | 'M' | 'L';
   zoom: number;
   graphics: '3d' | '2d';
+  /** The last preset chosen. */
   quality: Quality;
+  /** What is actually in use: a preset's values, possibly changed one by one. */
+  gfx: GraphicsOptions;
 }
-const settings: Settings = { autoAttack: true, sound: true, autoLearn: false, leftHanded: false, vibrate: true, joystick: 'M', zoom: 1, graphics: '3d', quality: 'medium' };
+const settings: Settings = { autoAttack: true, sound: true, autoLearn: false, leftHanded: false, vibrate: true, joystick: 'M', zoom: 1, graphics: '3d', quality: 'medium', gfx: { ...PRESETS.medium } };
 const JOY_RADIUS = { S: 38, M: 58, L: 84 };
 try {
   Object.assign(settings, JSON.parse(localStorage.getItem('shrinefall-settings') ?? '{}'));
 } catch {
   /* storage unavailable */
 }
+if (!PRESETS[settings.quality]) settings.quality = 'medium';
+settings.gfx = { ...PRESETS[settings.quality], ...settings.gfx };
 const saveSettings = () => {
   try {
     localStorage.setItem('shrinefall-settings', JSON.stringify(settings));
@@ -330,23 +335,38 @@ function applySettings() {
   world?.enqueue({ type: 'setAutoLearn', unitId: myHeroId, enabled: settings.autoLearn });
   document.querySelectorAll<HTMLElement>('#set-joy button').forEach((b) => b.classList.toggle('on', b.dataset.v === settings.joystick));
   document.querySelectorAll<HTMLElement>('#set-gfx button').forEach((b) => b.classList.toggle('on', b.dataset.v === settings.graphics));
-  document.querySelectorAll<HTMLElement>('#set-quality button').forEach((b) => b.classList.toggle('on', b.dataset.v === settings.quality));
+  const same = (a: GraphicsOptions, b: GraphicsOptions) => (Object.keys(a) as (keyof GraphicsOptions)[]).every((k) => a[k] === b[k]);
+  const preset = (Object.keys(PRESETS) as Quality[]).find((q) => same(PRESETS[q], settings.gfx));
+  document.querySelectorAll<HTMLElement>('#set-quality button').forEach((b) => b.classList.toggle('on', b.dataset.v === preset));
+  $<HTMLElement>('#gfx-preset-note').textContent = preset ? 'Sets everything below. Low saves the most battery' : 'Custom: you changed the options below';
+  for (const key of ['fps', 'sharpness', 'shadows', 'shadowRate', 'detail'] as const) {
+    document.querySelectorAll<HTMLElement>(`#set-${key} button`).forEach((b) => b.classList.toggle('on', b.dataset.v === String(settings.gfx[key])));
+  }
+  $<HTMLInputElement>('#set-smoothing').checked = settings.gfx.smoothing;
+  $<HTMLElement>('#settings').classList.toggle('view-2d', settings.graphics === '2d');
 }
 
 /** 3D view, or the lighter top-down 2D view. Falls back to 2D if WebGL isn't available. */
 let gfxNote = '';
 function makeRenderer(map: World['map']): Renderer {
-  (renderer as Renderer3D | null)?.destroy?.();
+  // The old view gives up its graphics memory. Its canvas can't be reused after that (and a new
+  // canvas is the only way to change Smooth edges), so the next view gets a fresh one.
+  if (renderer instanceof Renderer3D) {
+    renderer.destroy();
+    const fresh = canvas3d.cloneNode() as HTMLCanvasElement;
+    canvas3d.replaceWith(fresh);
+    canvas3d = fresh;
+  }
   if (settings.graphics === '3d') {
     try {
       canvas3d.classList.remove('hidden');
-      const r = new Renderer3D(canvas, canvas3d, map, settings.quality);
+      const r = new Renderer3D(canvas, canvas3d, map, settings.gfx);
       // Animation sounds (footsteps, Iron Hide, falling armor) fade with distance from the camera.
       r.sound = (name, x, y, volume) => {
         const d = Math.hypot(x - r.camX, y - r.camY);
         sfx.play(name as SoundName, volume * (d < 22 ? 1 : Math.max(0, 1 - (d - 22) / 25)));
       };
-      showGfx(`3D ${settings.quality}`);
+      showGfx('3D');
       return r;
     } catch (err) {
       gfx3dFailed(err);
@@ -369,8 +389,10 @@ function gfx3dFailed(err: unknown) {
 }
 let forceDraw = false;
 /** Rebuild the view (after changing 3D/2D or the quality), keeping the camera where it was. */
-function rebuildView() {
+async function rebuildView() {
   if (!world || !renderer) return;
+  showLoading('Applying graphics', 70);
+  await nextPaint();
   const prev = renderer;
   renderer = makeRenderer(world.map);
   renderer.setZoomFactor(settings.zoom);
@@ -378,21 +400,46 @@ function rebuildView() {
   renderer.camY = prev.camY;
   if (input) input.renderer = renderer;
   forceDraw = true; // show the new view even while paused
+  loadingEl.classList.add('done');
 }
 document.querySelectorAll<HTMLElement>('#set-quality button').forEach((b) =>
   b.addEventListener('click', () => {
-    if (settings.quality === b.dataset.v) return;
     settings.quality = b.dataset.v as Quality;
+    settings.gfx = { ...PRESETS[settings.quality] };
     saveSettings();
-    if (settings.graphics === '3d') rebuildView();
     applySettings();
+    if (settings.graphics === '3d') void rebuildView();
+  }),
+);
+// One option at a time. Frame rate and shadow updates apply at once; the rest need a rebuilt view.
+for (const key of ['fps', 'sharpness', 'shadows', 'shadowRate', 'detail'] as const) {
+  document.querySelectorAll<HTMLElement>(`#set-${key} button`).forEach((b) =>
+    b.addEventListener('click', () => {
+      if (String(settings.gfx[key]) === b.dataset.v) return;
+      (settings.gfx as unknown as Record<string, unknown>)[key] = key === 'fps' ? Number(b.dataset.v) : b.dataset.v;
+      saveSettings();
+      applySettings();
+      if (key === 'shadowRate') (renderer as Renderer3D | null)?.setShadowRate?.(settings.gfx.shadowRate);
+      else if (key !== 'fps' && settings.graphics === '3d') void rebuildView();
+    }),
+  );
+}
+$<HTMLInputElement>('#set-smoothing').addEventListener('change', (e) => {
+  settings.gfx.smoothing = (e.target as HTMLInputElement).checked;
+  saveSettings();
+  if (settings.graphics === '3d') void rebuildView();
+});
+document.querySelectorAll<HTMLElement>('.set-tabs button').forEach((b) =>
+  b.addEventListener('click', () => {
+    document.querySelectorAll<HTMLElement>('.set-tabs button').forEach((x) => x.classList.toggle('on', x === b));
+    document.querySelectorAll<HTMLElement>('.set-pages section').forEach((p) => p.classList.toggle('hidden', p.dataset.page !== b.dataset.tab));
   }),
 );
 document.querySelectorAll<HTMLElement>('#set-gfx button').forEach((b) =>
   b.addEventListener('click', () => {
     settings.graphics = b.dataset.v as Settings['graphics'];
     saveSettings();
-    rebuildView();
+    void rebuildView();
     applySettings();
   }),
 );
@@ -629,7 +676,7 @@ function frame(now: number) {
   if (paused || ending) acc = 0;
   // Battery: never draw faster than the quality's frame rate (phones can refresh at 120 Hz),
   // and don't redraw a paused game.
-  const fps = settings.graphics === '3d' ? QUALITY[settings.quality].fps : 60;
+  const fps = settings.gfx.fps;
   const draw = forceDraw || (!paused && now - lastDraw >= 1000 / fps - 4);
   forceDraw = false;
   if (world && renderer && input && !draw) {

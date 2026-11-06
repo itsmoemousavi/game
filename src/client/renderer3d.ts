@@ -27,15 +27,35 @@ const FOV = 38;
 /** The ground-effects texture covers this many meters around the camera. */
 const FX_SPAN = 96;
 /**
- * Graphics quality. Low/Medium save battery: fewer pixels, no or smaller shadows, a smaller
- * ground-effects image and (Low) 30 frames per second.
+ * Graphics options. Each one trades looks for battery, and players choose: a preset fills them
+ * all in, and any can then be changed by itself in Settings > Graphics.
  */
 export type Quality = 'low' | 'medium' | 'high';
-export const QUALITY: Record<Quality, { dpr: number; antialias: boolean; shadows: number; fxPx: number; fps: number }> = {
-  low: { dpr: 1, antialias: false, shadows: 0, fxPx: 512, fps: 30 },
-  medium: { dpr: 1.25, antialias: true, shadows: 1024, fxPx: 768, fps: 60 },
-  high: { dpr: 2, antialias: true, shadows: 2048, fxPx: 1024, fps: 60 },
+export interface GraphicsOptions {
+  /** Most frames drawn per second (phones can refresh at 120 Hz). */
+  fps: 30 | 40 | 60;
+  /** Pixels drawn. The biggest battery saver: phones have 3x screens. */
+  sharpness: Quality;
+  shadows: 'off' | 'low' | 'high';
+  /** How often the shadows are redrawn. */
+  shadowRate: 'smooth' | 'balanced' | 'saver';
+  /** Grass, tree shapes, swaying, ground detail. */
+  detail: Quality;
+  /** Smooth edges. */
+  smoothing: boolean;
+}
+export const PRESETS: Record<Quality, GraphicsOptions> = {
+  low: { fps: 30, sharpness: 'low', shadows: 'off', shadowRate: 'saver', detail: 'low', smoothing: false },
+  medium: { fps: 40, sharpness: 'medium', shadows: 'low', shadowRate: 'balanced', detail: 'medium', smoothing: true },
+  high: { fps: 60, sharpness: 'high', shadows: 'high', shadowRate: 'smooth', detail: 'high', smoothing: true },
 };
+const SHARPNESS: Record<Quality, { dpr: number; fxPx: number }> = {
+  low: { dpr: 1, fxPx: 512 },
+  medium: { dpr: 1.25, fxPx: 768 },
+  high: { dpr: 2, fxPx: 1024 },
+};
+const SHADOW_SIZE = { off: 0, low: 1024, high: 2048 };
+const SHADOW_EVERY = { smooth: 1, balanced: 2, saver: 4 };
 /** Heroes are drawn a bit larger than life so they read well on a phone. */
 const HERO_SCALE = 2.0;
 const CREEP_SCALE = 1.75;
@@ -126,19 +146,22 @@ export class Renderer3D extends Renderer {
     overlay: HTMLCanvasElement,
     glCanvas: HTMLCanvasElement,
     map: GameMap,
-    readonly quality: Quality = 'medium',
+    readonly options: GraphicsOptions = PRESETS.medium,
   ) {
     super(overlay, map);
-    const q = QUALITY[quality];
-    this.fxPx = q.fxPx;
+    const sharp = SHARPNESS[options.sharpness];
+    const shadowSize = SHADOW_SIZE[options.shadows];
+    const quality = options.detail;
+    this.fxPx = sharp.fxPx;
+    this.setShadowRate(options.shadowRate);
     this.flat = false;
     this.overlay = this.ctx;
     // Phones have 3x screens; drawing fewer pixels is the biggest battery saver.
-    const dpr = Math.min(window.devicePixelRatio || 1, q.dpr);
-    this.gl = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: q.antialias, powerPreference: quality === 'high' ? 'high-performance' : 'low-power' });
+    const dpr = Math.min(window.devicePixelRatio || 1, sharp.dpr);
+    this.gl = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: options.smoothing, powerPreference: options.sharpness === 'high' ? 'high-performance' : 'low-power' });
     this.gl.setPixelRatio(dpr);
-    this.gl.shadowMap.enabled = q.shadows > 0;
-    this.gl.shadowMap.type = quality === 'high' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+    this.gl.shadowMap.enabled = shadowSize > 0;
+    this.gl.shadowMap.type = options.shadows === 'high' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
     this.gl.toneMapping = THREE.ACESFilmicToneMapping;
     this.gl.toneMappingExposure = 1.05;
     this.scene.background = new THREE.Color(0x0d150f);
@@ -146,8 +169,9 @@ export class Renderer3D extends Renderer {
     this.sky = new THREE.HemisphereLight(0xdfeeff, 0x3a4a30, 1.5);
     this.scene.add(this.sky);
     this.sun = new THREE.DirectionalLight(0xfff1dd, 2.4);
-    this.sun.castShadow = q.shadows > 0;
-    this.sun.shadow.mapSize.set(Math.max(512, q.shadows), Math.max(512, q.shadows));
+    this.sun.castShadow = shadowSize > 0;
+    this.sun.shadow.autoUpdate = false; // redrawn on our own schedule: see setShadowRate
+    this.sun.shadow.mapSize.set(Math.max(512, shadowSize), Math.max(512, shadowSize));
     Object.assign(this.sun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 120 });
     this.sun.shadow.bias = -0.0008;
     this.scene.add(this.sun, this.sun.target);
@@ -229,6 +253,7 @@ export class Renderer3D extends Renderer {
     // canvas covering the area around the camera.
     this.fxCanvas.width = this.fxCanvas.height = this.fxPx;
     this.fxCtx = this.fxCanvas.getContext('2d')!;
+    this.fxTrace = this.traced(this.fxCtx);
     this.fxTex = new THREE.CanvasTexture(this.fxCanvas);
     this.fxTex.colorSpace = THREE.SRGBColorSpace;
     this.fxTex.repeat.set(map.size / FX_SPAN, map.size / FX_SPAN);
@@ -295,7 +320,54 @@ export class Renderer3D extends Renderer {
   /** Free the GPU resources (when switching views or starting a new match). */
   destroy() {
     this.gl.dispose();
+    this.gl.forceContextLoss();
   }
+
+  /** Change how often shadows are redrawn. Takes effect at once. */
+  setShadowRate(rate: GraphicsOptions['shadowRate']) {
+    this.shadowEvery = SHADOW_EVERY[rate];
+  }
+  private shadowEvery = 2;
+  private drawCount = 0;
+
+  /**
+   * The ground-effects image is 1-4 MB and sending it to the graphics chip is costly, so it is only
+   * sent when it changed. This wraps its canvas so that every drawing call adds to a running
+   * fingerprint: the same fingerprint as last frame means the same picture.
+   */
+  private traced(c: CanvasRenderingContext2D): CanvasRenderingContext2D {
+    const add = (v: unknown) => {
+      if (typeof v === 'number') this.fxHash = (Math.imul(this.fxHash, 31) + Math.round(v * 256)) | 0;
+      else if (typeof v === 'string') for (let i = 0; i < v.length; i++) this.fxHash = (Math.imul(this.fxHash, 31) + v.charCodeAt(i)) | 0;
+      else this.fxHash = (Math.imul(this.fxHash, 31) + 7) | 0;
+    };
+    const wrapped = new Map<PropertyKey, unknown>();
+    return new Proxy(c, {
+      get: (t, k) => {
+        const v = (t as unknown as Record<PropertyKey, unknown>)[k];
+        if (typeof v !== 'function') return v;
+        let f = wrapped.get(k);
+        if (!f) {
+          f = (...args: unknown[]) => {
+            add(k as string);
+            args.forEach(add);
+            return (v as (...a: unknown[]) => unknown).apply(t, args);
+          };
+          wrapped.set(k, f);
+        }
+        return f;
+      },
+      set: (t, k, v) => {
+        add(k as string);
+        add(v);
+        (t as unknown as Record<PropertyKey, unknown>)[k] = v;
+        return true;
+      },
+    });
+  }
+  private fxTrace!: CanvasRenderingContext2D;
+  private fxHash = 0;
+  private fxSent = 1;
 
   /** Ground height at a world point (matches the terrain mesh). */
   elevationAt(x: number, y: number): number {
@@ -446,7 +518,8 @@ export class Renderer3D extends Renderer {
     this.dt = Math.min(0.1, (now - this.lastFrame) / 1000);
     this.lastFrame = now;
     // 1. Ground effects via the 2D renderer (also moves the camera).
-    this.ctx = this.fxCtx;
+    this.fxHash = (Math.round(this.fxX * 64) * 31 + Math.round(this.fxY * 64)) | 0;
+    this.ctx = this.fxTrace;
     super.render(w, alpha, focus, viewTeam, aim);
     this.ctx = this.overlay;
     const c = this.fxCtx;
@@ -456,7 +529,11 @@ export class Renderer3D extends Renderer {
     c.clearRect(0, 0, 2, this.fxPx);
     c.clearRect(this.fxPx - 2, 0, 2, this.fxPx);
     this.fxTex.offset.set(-this.fxX / FX_SPAN, 1 - this.mapSize / FX_SPAN + this.fxY / FX_SPAN);
-    this.fxTex.needsUpdate = true;
+    if (this.fxHash !== this.fxSent) {
+      this.fxSent = this.fxHash;
+      this.fxTex.needsUpdate = true;
+    }
+    if (this.sun.castShadow) this.sun.shadow.needsUpdate = this.drawCount++ % this.shadowEvery === 0;
 
     // 2. Fog of war + trees in fog + day/night.
     this.updateFog(w, viewTeam);

@@ -29,6 +29,18 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.15.x · A real start and finish
 
+### 0.15.10
+*2026-11-06*
+
+**Settings are now in sections:** General, Graphics, Sound and Controls.
+
+**You choose how much battery to spend,** under Graphics:
+- Frame rate (30, 40 or 60), Sharpness, Shadows, Shadow updates, World detail and Smooth edges, each on its own.
+- Low, Medium and High still set them all at once, and changing one shows Custom.
+- Medium now draws 40 frames a second instead of 60 and redraws shadows less often. High stays at 60 for the smoothest game.
+
+**Always on:** ground effects are only sent to the graphics chip when they change, which saves battery with no difference on screen.
+
 ### 0.15.9
 *2026-11-06*
 

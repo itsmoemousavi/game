@@ -93,6 +93,7 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
 - Match ending: everything freezes (heroes do not walk), the camera glides to the fallen Shrine, it explodes, result banner, then end screen.
 - Menu: Play with Bots, Practice, Play with Friend (locked until multiplayer). Courier art approved: pack mule, winged after 6:00.
 - Teleport: hero is frozen while channelling, only the X on the TP slot (or a stun) stops it, no walking cancels it; the destination is fixed when it starts, so a tower falling mid-channel doesn't matter. Channel bar over the health bar shows anything charging. Wayfarer Boots: always 1 TP, never used up, 30 s cooldown, allied heroes and creeps as targets too, can't buy scrolls; drop them and you keep 1.
+- Battery (owner, 2026-11-06): players decide. Settings has sections; Graphics lists every trade-off (frame rate, sharpness, shadows, shadow updates, world detail, smooth edges) with Low/Medium/High presets (`PRESETS` in renderer3d.ts).
 - Mega Creeps when all 6 enemy barracks are down. Camera: default is the farthest, can only zoom in.
 - Every hero starts the match with 1 TP scroll.
 - Shop: tabs + grid + detail panel with BUY/SELL; taps only select (no accidental buys when scrolling);
@@ -131,7 +132,8 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
 5. Living world: shipped in 0.11.0. Phone frame rate and battery with the new art still need the owner's check.
 6. More heroes: Morra, Seren and Rhen shipped in 0.13.0. A 4th only if playing them shows a missing role (owner agreed to wait).
    Balance after 0.15.9 (240 matches, about 160 games per hero, luck still ±4-8%): Vexa 58.6%, Grom 51.6%, Brakk 51.2%, Seren 49.7%, Syl 49.4%, Rhen 48.3%, Kaela 46.9%, Orin 46.4%, Morra 46.2%. Vexa is the one left above 55%. Single runs swing a lot, even 13% on the same numbers: pool runs before tuning.
-7. Later: multiplayer (first on owner's MacBook, local only), killable courier + bounty, Capacitor app builds, store release.
+7. **Multiplayer (owner's design, 2026-11-06, not built).** Play with Friend opens two choices. Local: someone hosts a lobby, others join, bots fill empty slots. Online (locked, "Coming soon"): host invites up to 2 friends, Find Match joins 6 humans, no bots. In both, a leaver's hero goes inactive and stays at base (owner chose this for local too). Any player can pause (limited per match); dropped players can rejoin the same hero. Plan: lockstep over WebRTC so it runs from GitHub Pages with no server beyond a small service that introduces the phones (awaiting owner's OK on that service); the host's phone relays. Needs own sin/cos etc. for cross-browser determinism plus a desync check.
+8. Later: killable courier + bounty, Capacitor app builds, store release.
 
 ## Gotchas
 
