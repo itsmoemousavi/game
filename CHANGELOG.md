@@ -29,6 +29,14 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.15.x · A real start and finish
 
+### 0.15.4
+*2026-11-05*
+
+- The health, items and hero panel now sits near the middle of the screen, 28 px left of centre.
+- The health, mana and XP bars are wider, with a little more space above the XP bar.
+- The gold amount is centred.
+- The three spells moved up to sit in an arc above the Attack button, so the panel doesn't cover them.
+
 ### 0.15.3
 *2026-11-05*
 

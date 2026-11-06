@@ -92,11 +92,11 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #clock { font-variant-numeric: tabular-nums; font-size: 13px; line-height: 1; text-align: center; }
 
 /* Bottom group, just left of the ability buttons: status icons above the hero bar, items to its right. */
-#bottom-hud { --slot: clamp(32px, min(10.5vh, 5.6vw), 46px); position: absolute; left: 28px; bottom: max(0px, calc(env(safe-area-inset-bottom) - 6px)); display: flex; flex-direction: column; align-items: flex-start; gap: 4px; pointer-events: none; }
+#bottom-hud { --slot: clamp(32px, min(10.5vh, 5.6vw), 46px); position: absolute; left: 50%; transform: translateX(calc(-50% - 28px)); bottom: max(0px, calc(env(safe-area-inset-bottom) - 6px)); display: flex; flex-direction: column; align-items: flex-start; gap: 4px; pointer-events: none; }
 /* One glassy black panel holding the hero bar, items, TP and shop. */
 #hud-panel { position: relative; display: flex; align-items: center; gap: 8px; padding: 5px 30px 5px 5px; border-radius: 12px; background: rgba(8,10,12,0.55); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 4px 18px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08); -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); pointer-events: none; }
-#app.lefty #bottom-hud { left: auto; right: 28px; }
-#herobar { position: relative; display: flex; gap: 8px; align-items: center; padding: 0; width: clamp(140px, calc(100vw - 560px), 360px); box-sizing: border-box; pointer-events: none; }
+#app.lefty #bottom-hud { transform: translateX(calc(-50% + 28px)); }
+#herobar { position: relative; display: flex; gap: 8px; align-items: center; padding: 0; width: clamp(164px, calc(100vw - 536px), 384px); box-sizing: border-box; pointer-events: none; }
 #portrait { flex: none; width: calc(var(--slot) * 2 + 4px); height: calc(var(--slot) * 2 + 4px); border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #111; border: 2px solid rgba(255,255,255,0.55); box-sizing: border-box; }
 #portrait .face { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; display: grid; place-items: center; font-size: 18px; }
 #portrait .face img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.15); }
@@ -106,8 +106,8 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 .bar > div { height: 100%; }
 .bar span { position: absolute; inset: 0; font-size: 10px; line-height: 13px; text-align: center; text-shadow: 0 1px 1px #000; }
 .bar.hp > div { background: #3fbf5f; } .bar.mana > div { background: #3d7bfd; }
-.bar.xp { height: 4px; } .bar.xp > div { background: #c58bff; }
-#pstats { grid-column: 4 / span 2; grid-row: 2; align-self: center; justify-self: start; margin-left: 4px; width: calc(var(--slot) * 2 + 4px); min-width: 0; display: flex; align-items: center; gap: 3px; white-space: nowrap; overflow: hidden; pointer-events: none; font-variant-numeric: tabular-nums; }
+.bar.xp { height: 4px; margin-top: 2px; } .bar.xp > div { background: #c58bff; }
+#pstats { grid-column: 4 / span 2; grid-row: 2; align-self: center; justify-self: start; margin-left: 4px; width: calc(var(--slot) * 2 + 4px); min-width: 0; display: flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap; overflow: hidden; pointer-events: none; font-variant-numeric: tabular-nums; }
 #pstats .coin { width: 13px; height: 13px; flex: none; }
 #pstats b { color: #ffd23f; font-size: 13px; font-weight: 900; }
 #kda { display: flex; flex-direction: column; font-size: 11px; font-weight: 700; line-height: 1.25; opacity: 0.85; white-space: nowrap; margin-top: 4px; font-variant-numeric: tabular-nums; }
@@ -130,13 +130,13 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 .ability.nomana { background: rgba(30,50,120,0.8) !important; }
 .ability.unlearned { opacity: 0.35; }
 .ability.passive { border-style: dashed !important; }
-#btn-q { right: 116px; bottom: 2px; } #btn-w { right: 104px; bottom: 72px; } #btn-r { right: 28px; bottom: 118px; border-color: #ffd23f !important; }
+#btn-q { right: 112px; bottom: 108px; } #btn-w { right: 54px; bottom: 122px; } #btn-r { right: -4px; bottom: 108px; border-color: #ffd23f !important; }
 #actions .learn { display: none; width: 26px; height: 26px; padding: 0; border-radius: 50%; background: #ffd23f !important; color: transparent; font-size: 0; border: 2px solid #fff; z-index: 2; }
 /* The plus is two bars drawn exactly in the middle (a text "+" sits off-centre in most fonts). */
 #actions .learn::before, #actions .learn::after { content: ''; position: absolute; left: 50%; top: 50%; width: 12px; height: 3px; margin: -1.5px 0 0 -6px; border-radius: 1px; background: #111; }
 #actions .learn::after { transform: rotate(90deg); }
 #actions .learn.show { display: grid; animation: pulse 1s infinite alternate; }
-#learn-q { right: 156px; bottom: 44px; } #learn-w { right: 144px; bottom: 116px; } #learn-r { right: 68px; bottom: 162px; }
+#learn-q { right: 152px; bottom: 150px; } #learn-w { right: 94px; bottom: 164px; } #learn-r { right: 36px; bottom: 150px; }
 @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.15); } }
 #cancel-zone { display: none; position: absolute; right: max(12px, env(safe-area-inset-right)); top: 64px; padding: 14px 18px; border-radius: 12px; background: rgba(160,30,30,0.75); border: 2px solid rgba(255,255,255,0.5); font-weight: 700; pointer-events: none; }
 #cancel-zone.show { display: block; }
@@ -189,7 +189,7 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #itembar .tp .cd { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,0.6); border-radius: 5px; font-size: 13px; font-weight: 800; }
 #itembar .tp .cd:empty { display: none; }
 /* Shop: a round button sitting on the panel's bottom-right corner. */
-#btn-shop { position: absolute; right: -20px; bottom: max(-5px, calc(2px - max(0px, calc(env(safe-area-inset-bottom) - 6px)))); z-index: 2; width: 46px; height: 46px; border-radius: 50%; border: 2px solid #ffd23f; background: #6b4e16; padding: 1px; display: grid; place-items: center; overflow: hidden; pointer-events: auto; touch-action: none; box-shadow: 0 3px 10px rgba(0,0,0,0.55); }
+#btn-shop { position: absolute; right: -12px; bottom: max(-5px, calc(2px - max(0px, calc(env(safe-area-inset-bottom) - 6px)))); z-index: 2; width: 46px; height: 46px; border-radius: 50%; border: 2px solid #ffd23f; background: #6b4e16; padding: 1px; display: grid; place-items: center; overflow: hidden; pointer-events: auto; touch-action: none; box-shadow: 0 3px 10px rgba(0,0,0,0.55); }
 #btn-shop svg { border-radius: 50%; }
 
 /* ---------- shop ---------- */
