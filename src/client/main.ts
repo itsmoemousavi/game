@@ -603,22 +603,39 @@ function showSettingsTab(tab: string) {
 }
 function openSettings(tab: string) {
   showSettingsTab(tab);
+  refreshProfile();
   settingsPanel.classList.remove('hidden');
 }
 document.querySelectorAll<HTMLElement>('.set-tabs button').forEach((b) => b.addEventListener('click', () => showSettingsTab(b.dataset.tab!)));
 
-// Profile: the display name is saved on the phone as it's typed.
-const nameInput = $<HTMLInputElement>('#set-name');
-nameInput.value = shownName(profile);
+// Profile: the name can only be edited from the start menu, never during a match.
+const nameModal = $<HTMLElement>('#name-modal');
+const nameInput = $<HTMLInputElement>('#name-input');
+const editNameBtn = $<HTMLButtonElement>('#btn-edit-name');
 $<HTMLElement>('#set-id').textContent = `ovra-${profile.id}`;
-nameInput.addEventListener('input', () => {
-  setDisplayName(profile, nameInput.value, phoneStorage);
-  friendUi.showName(shownName(profile));
+function refreshProfile() {
+  $<HTMLElement>('#set-name').textContent = shownName(profile);
+  editNameBtn.disabled = !app.classList.contains('hidden');
+}
+refreshProfile();
+editNameBtn.addEventListener('click', () => {
+  nameInput.value = shownName(profile);
+  nameModal.classList.remove('hidden');
+  nameInput.focus();
+  nameInput.select();
 });
-// Left empty: back to the id.
-nameInput.addEventListener('blur', () => (nameInput.value = shownName(profile)));
-nameInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') nameInput.blur();
+const closeNameModal = () => {
+  nameInput.blur(); // puts the phone's keyboard away
+  nameModal.classList.add('hidden');
+};
+$<HTMLElement>('#name-cancel').addEventListener('click', closeNameModal);
+// Save button, or Enter on the keyboard.
+nameModal.querySelector('form')!.addEventListener('submit', (e) => {
+  e.preventDefault();
+  setDisplayName(profile, nameInput.value, phoneStorage);
+  refreshProfile();
+  friendUi.showName(shownName(profile));
+  closeNameModal();
 });
 document.querySelectorAll<HTMLElement>('#set-gfx button').forEach((b) =>
   b.addEventListener('click', () => {
@@ -676,7 +693,10 @@ setPaused(false);
 
 const statsPanel = $<HTMLElement>('#stats');
 const scorePanel = $<HTMLElement>('#scoreboard');
-onTap('#btn-settings', () => settingsPanel.classList.toggle('hidden'));
+onTap('#btn-settings', () => {
+  refreshProfile();
+  settingsPanel.classList.toggle('hidden');
+});
 $<HTMLElement>('#btn-menu-settings').addEventListener('click', () => openSettings('profile'));
 // On the start menu the panel doesn't cover everything: a tap beside it just closes it.
 select.addEventListener(
@@ -684,7 +704,6 @@ select.addEventListener(
   (e) => {
     if (settingsPanel.classList.contains('hidden')) return;
     e.stopPropagation();
-    (document.activeElement as HTMLElement | null)?.blur();
     settingsPanel.classList.add('hidden');
   },
   { capture: true },
@@ -711,7 +730,6 @@ document.querySelectorAll<HTMLElement>('[data-close]').forEach((b) =>
   b.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     e.stopPropagation();
-    (document.activeElement as HTMLElement | null)?.blur(); // puts the phone's keyboard away
     $<HTMLElement>(`#${b.dataset.close}`).classList.add('hidden');
   }),
 );

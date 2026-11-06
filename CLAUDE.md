@@ -119,7 +119,7 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
   both ways; the Warden returns 8–11 min after dying (random, unannounced); wards die to exactly 2 attacks.
 - Courier (owner's design, 2026-11-03): 3 slots per hero, buys away from base go on it, delivers in slot order as many as fit,
   walks lanes only until 6:00 then flies, turns back on death, invulnerable for now (killable + bounty = later).
-- Player identity (owner, 2026-11-06): permanent random id `ovra-` + 6 letters and numbers (`src/client/profile.ts`), kept on the phone until there's a database to guarantee uniqueness. Display name changes any time in Settings → Profile (Settings also opens from the start menu) and falls back to the id when empty. Names everywhere (`player-names.ts`): lobby, draft, kill feed, announcements, overhead; scoreboards show `Name (Hero)`. Bots are named by seat (Bot Ash…, my choice). Names are client-only, never in the sim.
+- Player identity (owner, 2026-11-06): permanent random id `ovra-` + 6 letters and numbers (`src/client/profile.ts`), kept on the phone until there's a database to guarantee uniqueness. Display name is edited in Settings → Profile from the start menu only (edit icon → window with Cancel/Save); during a match it's shown with the edit icon disabled. It falls back to the id when empty. Names everywhere (`player-names.ts`): lobby, draft, kill feed, announcements, overhead; scoreboards show `Name (Hero)`. Bots are named by seat (Bot Ash…, my choice). Names are client-only, never in the sim.
 - Host taps Start: 3 s ticking clock on every phone, lobby frozen, then the draft.
 - Dying costs gold; buyback exists. Android build: not now. App stores: later.
 

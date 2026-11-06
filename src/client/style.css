@@ -303,7 +303,21 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 .set-pages section > .toggle:first-child { border-top: 0; padding-top: 2px; }
 #settings.view-2d .only3d { display: none; }
 #settings .seg { flex: none; }
-#set-name { flex: none; width: 150px; padding: 7px 9px; border-radius: 6px; border: 1px solid rgba(214,177,99,0.4); background: rgba(0,0,0,0.4); color: #e7e2d3; font-size: 16px; user-select: text; -webkit-user-select: text; }
+#set-name { font-size: 15px; color: #f3dc9f; user-select: text; -webkit-user-select: text; }
+.name-row { flex: none; display: flex; align-items: center; gap: 8px; }
+#btn-edit-name { width: 34px; height: 34px; padding: 0; border-radius: 8px; border: 1px solid rgba(214,177,99,0.5); background: rgba(214,177,99,0.12); display: grid; place-items: center; }
+#btn-edit-name svg { width: 17px; height: 17px; fill: none; stroke: #f3dc9f; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+#btn-edit-name:disabled { opacity: 0.3; cursor: default; }
+/* Near the top: the phone's keyboard takes the bottom. With the game turned sideways on an upright phone, it takes the game's right side. */
+#name-modal { position: absolute; inset: 0; z-index: 9; background: rgba(0,0,0,0.6); }
+#name-modal .box { position: absolute; top: max(10px, var(--st)); left: 50%; transform: translateX(-50%); width: min(320px, 90%); display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 12px; background: #141a15; border: 2px solid #3a5242; }
+#root.rotated #name-modal .box { top: 50%; left: max(24px, var(--sl)); transform: translateY(-50%); }
+#name-modal .box > b { font-size: 15px; }
+#name-modal .box > small { font-size: 11px; opacity: 0.6; }
+#name-input { width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(214,177,99,0.5); background: rgba(0,0,0,0.4); color: #e7e2d3; font-size: 16px; user-select: text; -webkit-user-select: text; }
+#name-modal .btns { display: flex; justify-content: flex-end; gap: 8px; }
+#name-modal button { padding: 8px 16px; border-radius: 7px; border: 1px solid rgba(214,177,99,0.42); background: rgba(40,37,31,0.9); color: #e7e2d3; font-weight: 700; font-size: 13px; }
+#name-modal #name-save { color: #211603; background: linear-gradient(180deg, #e7c678, #ad8236); border-color: #f0d797; }
 #set-id { flex: none; font-size: 14px; color: #f3dc9f; user-select: text; -webkit-user-select: text; }
 #btn-menu-settings { position: absolute; z-index: 2; right: max(14px, var(--sr)); top: max(10px, var(--st)); width: 38px; height: 38px; border-radius: 50%; border: 1px solid rgba(214,177,99,0.42); background: rgba(20,18,14,0.8); color: #e7e2d3; font-size: 19px; line-height: 1; padding: 0; }
 #settings .seg button.on { background: #d6b163; color: #211603; }

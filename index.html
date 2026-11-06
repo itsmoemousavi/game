@@ -199,7 +199,7 @@
         </nav>
         <div class="set-pages">
           <section data-page="profile" class="hidden">
-            <div class="toggle"><span>Display name<small>What other players see. New names show from your next match</small></span><input type="text" id="set-name" maxlength="14" autocomplete="off" autocorrect="off" spellcheck="false" /></div>
+            <div class="toggle"><span>Display name<small>What other players see. You can change it from the start menu</small></span><span class="name-row"><b id="set-name"></b><button id="btn-edit-name" title="Edit display name" aria-label="Edit display name"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1-5L16 4l4 4L9 19l-5 1zM14 6l4 4"/></svg></button></span></div>
             <div class="toggle"><span>Player ID<small>Yours for good. It's your name until you choose one</small></span><b id="set-id"></b></div>
           </section>
           <section data-page="general">
@@ -227,6 +227,14 @@
           </section>
         </div>
       </div>
+    </div>
+    <div id="name-modal" class="hidden">
+      <form class="box">
+        <b>Display name</b>
+        <input type="text" id="name-input" maxlength="14" autocomplete="off" autocorrect="off" spellcheck="false" />
+        <small>Leave it empty to use your Player ID</small>
+        <div class="btns"><button type="button" id="name-cancel">Cancel</button><button type="submit" id="name-save">Save</button></div>
+      </form>
     </div>
     </div>
     <script type="module" src="/src/client/main.ts"></script>
