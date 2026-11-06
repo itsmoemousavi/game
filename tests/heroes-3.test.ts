@@ -345,7 +345,7 @@ describe('bots play the new heroes', () => {
       for (const e of w.events) if (e.type === 'summon') wolves++;
       if (w.heroes.some((h) => h.buffs.some((b) => b.key === 'aegis'))) shields++;
       if (w.heroes.some((h) => h.buffs.some((b) => b.key === 'boltStorm'))) storms++;
-      if (i % 9000 === 0) await new Promise((r) => setTimeout(r, 0));
+      if (i % 600 === 0) await new Promise((r) => setTimeout(r, 0));
     }
     expect(wolves).toBeGreaterThan(0);
     expect(shields).toBeGreaterThan(0);

@@ -69,7 +69,7 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
   `three/models.ts` (our own models sculpted in code; every model goes through one paint finish when baked into few meshes with animatable joints, so new models match automatically), `menu3d.ts` (start screen 3D hero + portraits), `hud.ts`, `input.ts`, `items-ui.ts`
   (shop), `audio.ts` (synthesized sounds), `tutorial.ts`.
 - `tests/` vitest. Positions in tests are on the 300 m map. Long full-match tests must `await` a
-  `setTimeout(0)` now and then, or vitest's worker heartbeat times out on CI.
+  `setTimeout(0)` about every 600 ticks, or vitest's worker heartbeat times out on CI (all tests can pass and the run still fails).
 
 ## Decisions the owner made (keep them)
 

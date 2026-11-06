@@ -268,7 +268,7 @@ describe('trees block sight', () => {
 });
 
 describe('movement around buildings', () => {
-  it('creeps never get stuck on towers or barracks over a long game', () => {
+  it('creeps never get stuck on towers or barracks over a long game', async () => {
     const slots: PlayerSlot[] = [];
     for (const team of [0, 1] as Team[]) HERO_IDS.slice(0, 3).forEach((heroId, i) => slots.push({ team, heroId, controller: 'bot', lane: LANE_IDS[i] }));
     const w = new World({ seed: 9, slots });
@@ -276,6 +276,7 @@ describe('movement around buildings', () => {
     const idleSince = new Map<number, { x: number; y: number; t: number }>();
     for (let i = 0; i < 12 * 60 * TICK_RATE; i++) {
       w.step();
+      if (i % 600 === 0) await new Promise((r) => setTimeout(r, 0)); // keep the test runner's heartbeat alive
       for (const c of w.units) {
         if (!c.creep || !c.alive) continue;
         const busy =

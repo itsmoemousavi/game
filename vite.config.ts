@@ -8,5 +8,5 @@ export default defineConfig({
   define: { __VERSION__: JSON.stringify(pkg.version), __BUILD__: JSON.stringify((process.env.GITHUB_SHA ?? 'dev').slice(0, 7)) },
   build: { target: 'es2020', outDir: 'dist', chunkSizeWarningLimit: 900 },
   // Full-match simulation tests are slow on shared CI machines.
-  test: { testTimeout: 60000 },
+  test: { testTimeout: 180000 },
 });
