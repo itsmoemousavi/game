@@ -250,7 +250,6 @@ export function monsterCorpse(c: AnimCtx, k: MonsterCorpse): boolean {
       if (!k.thud && t > (big ? 0.75 : 0.5)) {
         k.thud = true;
         c.fx.dust(x, y, big ? 8 : 4, big ? 1.8 : 1, 0x7a6448, big ? 1.5 : 0.8, 0.9);
-        c.sound('bodyFall', x, y, big ? 1 : 0.5);
       }
       if (t > (big ? 1.8 : 1.2)) k.o.position.y -= c.dt * 1.4;
       end = big ? 2.6 : 1.9;
@@ -280,7 +279,6 @@ export function monsterCorpse(c: AnimCtx, k: MonsterCorpse): boolean {
       if (!k.thud && t > 0.75) {
         k.thud = true;
         c.fx.dust(x, y, 6, 1.4, 0x7a6448, 1.1, 0.9);
-        c.sound('bodyFall', x, y, 0.8);
       }
       if (t > 1.8) k.o.position.y -= c.dt * 1.4;
       end = 2.6;

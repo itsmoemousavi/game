@@ -1,5 +1,5 @@
 /**
- * Sound effects: short recordings in public/sfx, made by scripts/sounds/design.py, all leveled to
+ * Sound effects: short recordings in public/sfx, picked by the owner by ear (scripts/sounds/picks.json), all leveled to
  * the same loudness. They're all loaded and decoded before the start menu, so nothing waits on the
  * network or a decoder when a sound is needed.
  *
@@ -9,29 +9,30 @@
  * ring/silent switch is on, which is what we want. The in-game Sound setting mutes it too.
  */
 export const SOUND_NAMES = [
-  'swing', 'hit', 'shoot', 'tower', 'creep', 'cast', 'slam', 'fireBlast', 'heal', 'coin', 'levelUp', 'heroDeath', 'collapse', 'teleport',
+  'hit', 'shoot', 'tower', 'creep', 'cast', 'slam', 'fireBlast', 'heal', 'coin', 'levelUp', 'collapse', 'teleport',
   'deny', 'rune', 'buyback', 'glyph', 'ward', 'roar', 'revive', 'purchase', 'itemDrop', 'itemPickUp', 'click', 'clockTick', 'clockTock', 'clockGo',
-  'ping', 'matchHorn', 'deathSong', 'winSong', 'loseSong', 'shrineBoom', 'salve', 'bodyFall', 'bowShot', 'arrowHit', 'piercingShot', 'critPing', 'arrowRain', 'fireBolt', 'fireHit', 'fireballCast',
+  'ping', 'matchHorn', 'deathSong', 'endSong', 'shrineBoom', 'salve', 'bowShot', 'piercingShot', 'critPing', 'arrowRain', 'fireBolt', 'fireballCast',
   'mendFlame', 'meteorFall', 'meteorImpact', 'daggerSlash', 'shadowStep', 'vanish', 'execute', 'woodPunch', 'rootSnare', 'rootsErupt', 'barkSkin',
-  'overgrowth', 'treeFall', 'waterBolt', 'splash', 'tidalWave', 'brineVeil', 'maelstrom', 'zap', 'bellToll', 'frostNova', 'stoneCrumble',
+  'overgrowth', 'waterBolt', 'tidalWave', 'brineVeil', 'maelstrom', 'zap', 'bellToll', 'frostNova', 'stoneCrumble',
   'wardenPunch', 'impStab', 'hammerAttack', 'shieldCharge', 'shieldBash', 'quakeCharge', 'earthsplitter', 'ironClang', 'armorFall', 'tpChannel',
 ] as const;
 export type SoundName = (typeof SOUND_NAMES)[number];
 
 declare const __VERSION__: string;
 
-/** Seconds of swing baked in before the impact of a melee attack sound. */
-export const ATTACK_LEAD = 0.08;
-
 const SIMULTANEOUS_LOADS = 8;
 /** Louder sounds than this many at once only make mud (and each one costs battery). */
 const MAX_VOICES = 24;
 const MAX_SAME_SOUND = 3;
+/** The hit of an impact sound is its loudest moment within this long of its start. */
+const IMPACT_WINDOW = 0.4;
 
 interface Sample {
   buffer: AudioBuffer;
   /** Where the sound really begins: some browsers leave a few milliseconds of encoder silence in front. */
   offset: number;
+  /** Seconds from `offset` to the loudest moment of its opening, which is where a hit is heard. */
+  impact: number;
 }
 
 interface Voice {
@@ -90,7 +91,11 @@ export class Sfx {
           const d = buffer.getChannelData(0);
           let first = 0;
           while (first < d.length && Math.abs(d[first]) < 0.0005) first++;
-          this.samples.set(name, { buffer, offset: first < d.length ? first / buffer.sampleRate : 0 });
+          if (first >= d.length) first = 0;
+          let peak = first;
+          const end = Math.min(d.length, first + IMPACT_WINDOW * buffer.sampleRate);
+          for (let i = first; i < end; i++) if (Math.abs(d[i]) > Math.abs(d[peak])) peak = i;
+          this.samples.set(name, { buffer, offset: first / buffer.sampleRate, impact: (peak - first) / buffer.sampleRate });
         } catch (err) {
           console.warn('Sound unavailable', name, err);
         }
@@ -134,7 +139,7 @@ export class Sfx {
    * If the audio isn't running right now the sound is skipped: queued, it would come out late.
    * Returns a handle for `stop`.
    */
-  play(name: SoundName, volume = 1, delay = 0): Voice | null {
+  play(name: SoundName, volume = 1, delay = 0, skip = 0): Voice | null {
     const ctx = this.ctx;
     if (this.muted || !ctx || ctx.state !== 'running' || volume <= 0.02) return null;
     const sample = this.samples.get(name);
@@ -156,8 +161,17 @@ export class Sfx {
       this.voices = this.voices.filter((v) => v !== voice);
       gain.disconnect();
     };
-    src.start(now + delay, sample.offset);
+    src.start(now + delay, sample.offset + skip);
     return voice;
+  }
+
+  /**
+   * Play an impact sound so its hit is heard `hitIn` seconds from now. Its build-up plays first; if
+   * there isn't time for all of it, the start is left out rather than the hit coming late.
+   */
+  playHit(name: SoundName, volume: number, hitIn: number): Voice | null {
+    const wait = hitIn - (this.samples.get(name)?.impact ?? 0);
+    return this.play(name, volume, Math.max(0, wait), Math.max(0, -wait));
   }
 
   /** Fade a playing sound away quickly (a teleport that was cancelled). */

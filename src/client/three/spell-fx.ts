@@ -76,15 +76,12 @@ export class SpellFx {
       if (s.kind === 'orin') {
         fx.flashAt(at, 2.2, 0xff7a2a, 0.22);
         fx.burst(at, 6, 0xffa040, 4, 0.25, 0.35, 4);
-        if (s.mine) c.sound('fireHit', x, y, 0.5);
       } else if (s.kind === 'kaela') {
         fx.burst(at, 8, 0xc8f6ff, 4, 0.25, 0.45, 10, false);
         fx.flashAt(at, 1.6, 0x5fe0f5, 0.2);
-        if (s.mine) c.sound('splash', x, y, 0.5);
       } else if (s.kind === 'vexa') {
         fx.burst(at, s.crit ? 10 : 4, s.crit ? 0x6dff9e : 0xe8e0d0, s.crit ? 6 : 3, 0.22, 0.3, 8);
         if (s.crit) fx.flashAt(at, 2.5, 0x6dff9e, 0.25);
-        if (s.mine) c.sound('arrowHit', x, y, 0.45);
       } else if (s.kind === 'tower') {
         fx.flashAt(at, 2.4, 0xfff1c0, 0.2);
         fx.burst(at, 6, 0xfff1c0, 4, 0.22, 0.3, 6);

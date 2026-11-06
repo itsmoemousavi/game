@@ -1,0 +1,410 @@
+[
+{
+"sound": "matchHorn",
+"option": "E",
+"source": "https://freesound.org/s/714562/",
+"file": "714562.mp3"
+},
+{
+"sound": "clockTick",
+"option": "B",
+"source": "https://opengameart.org/content/various-sound-effects-0",
+"file": "tick_0.wav"
+},
+{
+"sound": "clockTock",
+"option": "A",
+"source": "https://opengameart.org/content/51-ui-sound-effects-buttons-switches-and-clicks",
+"file": "click4.wav"
+},
+{
+"sound": "clockGo",
+"option": "A",
+"source": "https://opengameart.org/content/100-cc0-sfx-2",
+"file": "bell_01.ogg"
+},
+{
+"sound": "deathSong",
+"option": "H",
+"source": "https://freesound.org/s/609656/",
+"file": "609656.mp3"
+},
+{
+"sound": "endSong",
+"option": "B",
+"source": "https://opengameart.org/content/medieval-defeat-theme",
+"file": "defeat_0.mp3"
+},
+{
+"sound": "shrineBoom",
+"option": "C",
+"source": "https://opengameart.org/content/battle-at-sea",
+"file": "ship_destroyed_short.ogg"
+},
+{
+"sound": "hit",
+"option": "A",
+"source": "https://opengameart.org/content/150-combat-sound-effects",
+"file": "impact_punch_medium_000_48kHz_16bit_0.36s_bd322da3_s02.wav"
+},
+{
+"sound": "creep",
+"option": "C",
+"source": "https://opengameart.org/content/20-sword-sound-effects-attacks-and-clashes",
+"file": "sword.6.ogg"
+},
+{
+"sound": "shoot",
+"option": "A",
+"source": "https://opengameart.org/content/various-sound-effects-0",
+"file": "snd_throw1.wav"
+},
+{
+"sound": "tower",
+"option": "E",
+"source": "https://opengameart.org/content/impact",
+"file": "qubodupImpactStone.flac"
+},
+{
+"sound": "deny",
+"option": "A",
+"source": "https://opengameart.org/content/100-cc0-metal-and-wood-sfx",
+"file": "wood_hit_03.ogg"
+},
+{
+"sound": "armorFall",
+"option": "D",
+"source": "https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx",
+"file": "bfh1_metal_falling_03.ogg"
+},
+{
+"sound": "collapse",
+"option": "E",
+"source": "https://opengameart.org/content/various-sound-effects-0",
+"file": "break_stone.wav"
+},
+{
+"sound": "hammerAttack",
+"option": "D",
+"source": "https://opengameart.org/content/impact",
+"file": "qubodupImpactMetal.flac"
+},
+{
+"sound": "shieldCharge",
+"option": "A",
+"source": "https://opengameart.org/content/150-combat-sound-effects",
+"file": "Wind Spell Impact 1_s07.wav"
+},
+{
+"sound": "shieldBash",
+"option": "D",
+"source": "https://opengameart.org/content/100-cc0-metal-and-wood-sfx",
+"file": "metal_slam_01.ogg"
+},
+{
+"sound": "quakeCharge",
+"option": "C",
+"source": "https://opengameart.org/content/earth-element-magic-spell",
+"file": "Earth Element Magic Spell_0.flac"
+},
+{
+"sound": "earthsplitter",
+"option": "A",
+"source": "https://freesound.org/s/513110/",
+"file": "513110.mp3"
+},
+{
+"sound": "slam",
+"option": "A",
+"source": "https://opengameart.org/content/150-combat-sound-effects",
+"file": "BlastImpact_03_s01.wav"
+},
+{
+"sound": "ironClang",
+"option": "E",
+"source": "https://opengameart.org/content/20-sword-sound-effects-attacks-and-clashes",
+"file": "sword_clash.5.ogg"
+},
+{
+"sound": "bowShot",
+"option": "B",
+"source": "https://freesound.org/s/384916/",
+"file": "384916.mp3"
+},
+{
+"sound": "piercingShot",
+"option": "D",
+"source": "https://freesound.org/s/384909/",
+"file": "384909.mp3"
+},
+{
+"sound": "critPing",
+"option": "D",
+"source": "https://opengameart.org/content/20-sword-sound-effects-attacks-and-clashes",
+"file": "sword.3.ogg"
+},
+{
+"sound": "arrowRain",
+"option": "E",
+"source": "https://opengameart.org/content/150-combat-sound-effects",
+"file": "Wind Spell Impact 5_s07.wav"
+},
+{
+"sound": "fireBolt",
+"option": "B",
+"source": "https://opengameart.org/content/catching-fire",
+"file": "flame_0.ogg"
+},
+{
+"sound": "fireballCast",
+"option": "D",
+"source": "https://freesound.org/s/267887/",
+"file": "267887.mp3"
+},
+{
+"sound": "fireBlast",
+"option": "A",
+"source": "https://freesound.org/s/587886/",
+"file": "587886.mp3"
+},
+{
+"sound": "mendFlame",
+"option": "A",
+"source": "https://opengameart.org/content/150-combat-sound-effects",
+"file": "Healing Spell Impact 1_s08.wav"
+},
+{
+"sound": "meteorFall",
+"option": "A",
+"source": "https://freesound.org/s/522705/",
+"file": "522705.mp3"
+},
+{
+"sound": "meteorImpact",
+"option": "E",
+"source": "https://opengameart.org/content/battle-at-sea",
+"file": "cannon_hit_1.ogg"
+},
+{
+"sound": "daggerSlash",
+"option": "B",
+"source": "https://opengameart.org/content/150-combat-sound-effects",
+"file": "knife_slice_48kHz_16bit_0.51s_9438a1db_s03.wav"
+},
+{
+"sound": "shadowStep",
+"option": "B",
+"source": "https://freesound.org/s/384909/",
+"file": "384909.mp3"
+},
+{
+"sound": "vanish",
+"option": "B",
+"source": "https://opengameart.org/content/202-more-sound-effects",
+"file": "Cloth_07.wav"
+},
+{
+"sound": "execute",
+"option": "E",
+"source": "https://opengameart.org/content/fantasy-weapons-and-apparel-sfx-library",
+"file": "sword-knife-clash-10.wav"
+},
+{
+"sound": "woodPunch",
+"option": "E",
+"source": "https://opengameart.org/content/35-wooden-crackshitsdestructions",
+"file": "impactwood14.mp3.flac"
+},
+{
+"sound": "rootSnare",
+"option": "A",
+"source": "https://opengameart.org/content/150-combat-sound-effects",
+"file": "Plant Spell Impact 1_s07.wav"
+},
+{
+"sound": "rootsErupt",
+"option": "A",
+"source": "https://opengameart.org/content/150-combat-sound-effects",
+"file": "Plant Spell Impact 2_s07.wav"
+},
+{
+"sound": "barkSkin",
+"option": "D",
+"source": "https://opengameart.org/content/fantasy-sound-effects-tinysized-sfx",
+"file": "floor-creak-01.wav"
+},
+{
+"sound": "overgrowth",
+"option": "C",
+"source": "https://opengameart.org/content/35-wooden-crackshitsdestructions",
+"file": "impactwood05.mp3.flac"
+},
+{
+"sound": "waterBolt",
+"option": "B",
+"source": "https://opengameart.org/content/40-cc0-water-splash-slime-sfx",
+"file": "splash_03.ogg"
+},
+{
+"sound": "tidalWave",
+"option": "E",
+"source": "https://freesound.org/s/563021/",
+"file": "563021.mp3"
+},
+{
+"sound": "brineVeil",
+"option": "B",
+"source": "https://opengameart.org/content/40-cc0-water-splash-slime-sfx",
+"file": "bubble_01.ogg"
+},
+{
+"sound": "maelstrom",
+"option": "D",
+"source": "https://opengameart.org/content/random-sfx",
+"file": "Falls.wav"
+},
+{
+"sound": "salve",
+"option": "D",
+"source": "https://opengameart.org/content/fantasy-accessory-sfx-library",
+"file": "bottle-glass-uncork-01.wav"
+},
+{
+"sound": "heal",
+"option": "G",
+"source": "https://freesound.org/s/554312/",
+"file": "554312.mp3"
+},
+{
+"sound": "teleport",
+"option": "E",
+"source": "https://opengameart.org/content/teleport-spell",
+"file": "teleport.wav"
+},
+{
+"sound": "tpChannel",
+"option": "B",
+"source": "https://freesound.org/s/274121/",
+"file": "274121.mp3"
+},
+{
+"sound": "revive",
+"option": "A",
+"source": "https://freesound.org/s/608892/",
+"file": "608892.mp3"
+},
+{
+"sound": "levelUp",
+"option": "A",
+"source": "https://opengameart.org/content/150-combat-sound-effects",
+"file": "Healing Spell Impact 14_s08.wav"
+},
+{
+"sound": "cast",
+"option": "F",
+"source": "https://opengameart.org/content/150-combat-sound-effects",
+"file": "Wind Spell Impact 2_s07.wav"
+},
+{
+"sound": "glyph",
+"option": "A",
+"source": "https://opengameart.org/content/150-combat-sound-effects",
+"file": "Healing Spell Impact 7_s08.wav"
+},
+{
+"sound": "rune",
+"option": "D",
+"source": "https://opengameart.org/content/various-sound-effects-0",
+"file": "small_amber.wav"
+},
+{
+"sound": "buyback",
+"option": "A",
+"source": "https://opengameart.org/content/150-combat-sound-effects",
+"file": "Healing Spell Impact 12_s08.wav"
+},
+{
+"sound": "frostNova",
+"option": "A",
+"source": "https://opengameart.org/content/freeze-spell-0",
+"file": "freeze.wav"
+},
+{
+"sound": "bellToll",
+"option": "B",
+"source": "https://opengameart.org/content/100-cc0-sfx-2",
+"file": "gong_01.ogg"
+},
+{
+"sound": "zap",
+"option": "D",
+"source": "https://opengameart.org/content/35-wooden-crackshitsdestructions",
+"file": "crack07.mp3.flac"
+},
+{
+"sound": "wardenPunch",
+"option": "D",
+"source": "https://freesound.org/s/640204/",
+"file": "640204.mp3"
+},
+{
+"sound": "impStab",
+"option": "A",
+"source": "https://opengameart.org/content/150-combat-sound-effects",
+"file": "draw_knife2_48kHz_16bit_0.45s_51d1db1d_s03.wav"
+},
+{
+"sound": "roar",
+"option": "C",
+"source": "https://opengameart.org/content/80-cc0-rpg-sfx",
+"file": "creature_roar_01.ogg"
+},
+{
+"sound": "stoneCrumble",
+"option": "B",
+"source": "https://opengameart.org/content/various-sound-effects-0",
+"file": "break_stone.wav"
+},
+{
+"sound": "coin",
+"option": "A",
+"source": "https://opengameart.org/content/12-coin-sound-effects",
+"file": "coin.1.ogg"
+},
+{
+"sound": "purchase",
+"option": "B",
+"source": "https://opengameart.org/content/sack-of-gold",
+"file": "gold_sack.wav"
+},
+{
+"sound": "itemDrop",
+"option": "A",
+"source": "https://opengameart.org/content/80-cc0-rpg-sfx",
+"file": "item_misc_01.ogg"
+},
+{
+"sound": "itemPickUp",
+"option": "C",
+"source": "https://kenney.nl/assets/rpg-audio",
+"file": "handleSmallLeather.ogg"
+},
+{
+"sound": "ward",
+"option": "B",
+"source": "https://opengameart.org/content/fantasy-accessory-sfx-library",
+"file": "wood-bowl-put-wood-02.wav"
+},
+{
+"sound": "click",
+"option": "E",
+"source": "https://opengameart.org/content/various-sound-effects-0",
+"file": "tick_0.wav"
+},
+{
+"sound": "ping",
+"option": "C",
+"source": "https://opengameart.org/content/point-bell",
+"file": "sd_0.wav"
+}
+]

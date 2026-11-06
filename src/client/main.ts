@@ -364,7 +364,7 @@ hud.onGameOver = (w) => playEnding(w);
  * the result comes up, and then the end screen.
  */
 let ending = false;
-/** The short song behind the end of the match, so leaving the end screen can stop it. */
+/** The song behind the end of the match, kept so leaving the end screen can stop it. */
 let endSong: ReturnType<Sfx['play']> = null;
 function stopEndSong() {
   sfx.stop(endSong);
@@ -380,10 +380,8 @@ function playEnding(w: World) {
     endScreen.show(w, myTeam, myHeroId);
   };
   const won = w.winner === myTeam;
-  const shrineFalls = () => {
-    sfx.play('shrineBoom');
-    endSong = sfx.play(won ? 'winSong' : 'loseSong', 0.8);
-  };
+  // The same song for both teams, from the moment the match ends and the camera sets off for the Shrine.
+  endSong = sfx.play('endSong', 0.8);
   const banner = () => {
     const v = $<HTMLElement>('#victory');
     v.classList.remove('hidden');
@@ -392,7 +390,7 @@ function playEnding(w: World) {
     v.querySelector('small')!.textContent = `${TEAM_NAMES[w.winner as Team]} destroyed the enemy Shrine`;
   };
   if (!(renderer instanceof Renderer3D)) {
-    shrineFalls();
+    sfx.play('shrineBoom');
     banner();
     setTimeout(show, 2200);
     return;
@@ -400,7 +398,7 @@ function playEnding(w: World) {
   const flash = $<HTMLElement>('#end-flash');
   renderer.playEnding(w, {
     onBoom: () => {
-      shrineFalls();
+      sfx.play('shrineBoom');
       flash.classList.remove('go');
       void flash.offsetWidth;
       flash.classList.add('go');

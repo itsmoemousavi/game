@@ -1,5 +1,5 @@
 import { GameEvent, HEROES, Team, Unit, World } from '../sim';
-import { ATTACK_LEAD, Sfx, SoundName } from './audio';
+import { Sfx, SoundName } from './audio';
 
 /** When each Brakk last started a Shield Charge (to give its hits a shield-bash sound). */
 const chargeAt = new Map<number, number>();
@@ -80,18 +80,18 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
         const t = w.unit(e.targetId);
         if (!s) break;
         const involvesMe = s.id === meId || t?.id === meId;
-        // Melee sounds carry a little swing before the impact, so the impact lands on the hit frame.
+        // A melee sound's hit lands on the animation's hit frame; ranged attacks start on the release.
         const hitAt = impactAt(s);
-        const swing = s.projectileSpeed === 0 ? Math.max(0, hitAt - ATTACK_LEAD) : hitAt;
+        const attack = (name: SoundName, volume: number) => (s.projectileSpeed === 0 ? sfx.playHit(name, volume, hitAt) : sfx.play(name, volume, hitAt));
         if (s.kind === 'structure') sfx.play('tower', near(s) * (involvesMe ? 1 : 0.5));
         else if (s.hero) {
-          sfx.play(s.hero.wolfForm ? 'impStab' : (ATTACK_SOUNDS[s.hero.defId] ?? 'swing'), near(s), swing);
+          attack(s.hero.wolfForm ? 'impStab' : (ATTACK_SOUNDS[s.hero.defId] ?? 'hit'), near(s));
           if (s.hero.defId === 'vexa' && s.hero.lastCrit) sfx.play('critPing', near(s));
         }
-        else if (s.kind === 'neutral' && s.neutral?.boss) sfx.play('wardenPunch', near(s), swing);
-        else if (s.kind === 'neutral') sfx.play(s.radius > 0.9 ? 'woodPunch' : 'impStab', near(s) * (involvesMe ? 0.9 : 0.5), swing);
-        else sfx.play(s.projectileSpeed > 0 ? 'shoot' : 'creep', near(s) * (involvesMe ? 1 : 0.4), swing);
-        if (t && t.id === meId && s.projectileSpeed === 0) sfx.play('hit', 0.6, hitAt);
+        else if (s.kind === 'neutral' && s.neutral?.boss) attack('wardenPunch', near(s));
+        else if (s.kind === 'neutral') attack(s.radius > 0.9 ? 'woodPunch' : 'impStab', near(s) * (involvesMe ? 0.9 : 0.5));
+        else attack(s.projectileSpeed > 0 ? 'shoot' : 'creep', near(s) * (involvesMe ? 1 : 0.4));
+        if (t && t.id === meId && s.projectileSpeed === 0) sfx.playHit('hit', 0.6, hitAt);
         break;
       }
       case 'cast': {
@@ -114,7 +114,6 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
       case 'death': {
         const u = w.unit(e.unitId);
         if (!u) break;
-        if (u.kind === 'hero') sfx.play('heroDeath', u.id === meId ? 1 : near(u));
         // A little piece of music when it's your own hero.
         if (u.id === meId) sfx.play('deathSong', 0.8);
         else if (u.kind === 'structure') sfx.play('collapse', Math.max(0.35, near(u)));

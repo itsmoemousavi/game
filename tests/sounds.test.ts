@@ -20,6 +20,17 @@ describe('sounds', () => {
     }
   });
 
+  it('the owner chose silence for these', () => {
+    for (const name of ['heroDeath', 'bodyFall', 'arrowHit', 'fireHit', 'treeFall', 'splash', 'winSong', 'loseSong']) {
+      expect(SOUND_NAMES as readonly string[]).not.toContain(name);
+    }
+  });
+
+  it('the end song is the same whoever wins', () => {
+    expect(main).toMatch(/sfx\.play\('endSong'/);
+    expect(main).not.toMatch(/won \? '[a-zA-Z]+Song'/);
+  });
+
   it('walking stays silent', () => {
     expect(heroAnims).not.toMatch(/sound\('(step|treeStep|stomp)'/);
     expect(SOUND_NAMES as readonly string[]).not.toContain('step');

@@ -1014,7 +1014,6 @@ export function heroCorpse(c: AnimCtx, k: Corpse): boolean {
         k.thud = true;
         c.fx.dust(x, y, 9, 1.8, 0x7a6448, 1.6, 1.1);
         c.fx.burst(v3(x, groundAt(c, x, y) + 1, y), 18, 0x5f8f24, 5, 0.3, 1.2, 6, false);
-        c.sound('treeFall', x, y, 1);
         shake(c, x, y, 0.35, 0);
       }
       sinkAt = 2.6;
@@ -1057,7 +1056,6 @@ export function heroCorpse(c: AnimCtx, k: Corpse): boolean {
           c.fx.dust(x, y, 6, 1.3, 0x5a4a40, 0.8, 1);
           c.fx.burst(v3(x, groundAt(c, x, y) + 1, y), 10, 0xff7a2a, 3, 0.25, 0.8, -1);
         }
-        c.sound('bodyFall', x, y, 0.8);
       }
       break;
     }
@@ -1074,7 +1072,6 @@ export function heroCorpse(c: AnimCtx, k: Corpse): boolean {
       if (!k.thud && t > 0.75) {
         k.thud = true;
         c.fx.dust(x, y, 4, 1.1, k.kind === 'syl' ? 0x2a1f3d : 0x8a7558, 0.8, 0.9);
-        c.sound('bodyFall', x, y, 0.7);
       }
     }
   }

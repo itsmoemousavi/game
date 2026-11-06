@@ -31,6 +31,13 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.17.x · New sounds
 
+### 0.17.2
+
+- **The final sounds are in,** chosen by ear, one by one. Nearly every sound in the game has changed.
+- **The same song plays at the end of every match,** win or lose, from the moment the camera sets off for the Shrine. The explosion still comes when the Shrine blows up.
+- **Quieter in a few places:** hero deaths, bodies falling, Grom falling, and arrows, fire bolts and water bolts landing no longer make a sound. Your own hero's death has its music instead.
+- Melee hits still land on the swing's hit frame with the new sounds.
+
 ### 0.17.1
 
 - **A war horn** now sounds three seconds before the battle begins.
