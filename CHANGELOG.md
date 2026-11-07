@@ -31,6 +31,10 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.17.x · New sounds
 
+### 0.17.11
+
+- **A shorter hero stats panel.** Tap the i on your portrait: three columns for Attack, Defense and Magic, showing only what isn't already on screen. Extras like lifesteal appear once you have them.
+
 ### 0.17.10
 
 - **A new tutorial.** Eight short lessons you can play in any order: the goal, moving and looking, fighting, gold and items, buildings, the map, totems and sight, and the Warden. Finished lessons get a tick. It works with every hero now.

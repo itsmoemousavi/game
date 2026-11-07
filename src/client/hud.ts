@@ -274,38 +274,36 @@ export class Hud {
       manaBuff += x.manaPerSec ?? 0;
     }
     const f1 = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
-    const rows: [string, string][] = [];
-    const sec = (t: string) => rows.push(['#', t]);
-    sec('Attack');
-    rows.push(['Damage', `${Math.round(me.damage * dmgMult)}${dmgMult > 1 ? ' (×2 rune)' : ''}`]);
-    rows.push(['Attack speed', `${f1(1 / me.attackInterval)} /s`]);
-    rows.push(['Attack time', `${f1(me.attackInterval)} s`]);
-    rows.push(['Attack range', `${f1(me.attackRange)} m${me.projectileSpeed ? '' : ' (melee)'}`]);
-    rows.push(['Lifesteal', `${b.lifestealPct}%`]);
-    rows.push(['Spell damage', `+${b.spellAmpPct}%`]);
-    rows.push(['Cooldowns', `−${b.cdrPct}%${b.ultUpgrade ? ' · Ultimate upgraded' : ''}`]);
-    sec('Defense & movement');
-    rows.push(['Armor', `${f1(armor)} (−${Math.round(reduction * 100)}% attack damage)`]);
-    rows.push(['Move speed', `${f1(w.speedOf(me))} m/s`]);
-    rows.push(['Health', `${Math.ceil(me.hp)} / ${Math.round(me.maxHp)}`]);
-    rows.push(['Health regen', `${f1(me.hpRegen + regenBuff)} /s`]);
-    rows.push(['Mana', `${Math.floor(me.mana)} / ${Math.round(me.maxMana)}`]);
-    rows.push(['Mana regen', `${f1(me.manaRegen + manaBuff)} /s`]);
-    sec('Match');
-    rows.push(['K / D / A', `${h.kills} / ${h.deaths} / ${h.assists}`]);
-    rows.push(['Last hits / Denies', `${h.lastHits} / ${h.denies}`]);
-    rows.push(['Gold', `${Math.floor(h.gold)}`]);
-    rows.push(['Gold per minute', `${w.time > 30 ? Math.round(h.goldEarned / (w.time / 60)) : 0}`]);
-    rows.push(['Level', `${h.level}${h.level < MAX_LEVEL ? ` (${Math.floor(h.xp)} / ${XP_TABLE[h.level]} XP)` : ' (max)'}`]);
-    rows.push(['Teleports', `${h.tpCount}`]);
-    const key = rows.map((r) => r[1]).join('|');
+    // Only what you can't already see on screen. Extras show up once an item or buff gives them.
+    const attack: [string, string][] = [
+      ['Damage', `${Math.round(me.damage * dmgMult)}`],
+      ['Attacks per second', f1(1 / me.attackInterval)],
+      ['Range', `${f1(me.attackRange)} m`],
+    ];
+    if (b.critChance > 0) attack.push(['Critical chance', `${b.critChance}%`]);
+    if (b.lifestealPct > 0) attack.push(['Lifesteal', `${b.lifestealPct}%`]);
+    if (b.cleavePct > 0) attack.push(['Cleave', `${b.cleavePct}%`]);
+    const defense: [string, string][] = [
+      ['Armor', f1(armor)],
+      ['Attack damage taken', `−${Math.round(reduction * 100)}%`],
+      ['Health regen', `${f1(me.hpRegen + regenBuff)} /s`],
+      ['Move speed', `${f1(w.speedOf(me))} m/s`],
+    ];
+    const magic: [string, string][] = [['Mana regen', `${f1(me.manaRegen + manaBuff)} /s`]];
+    if (b.spellAmpPct > 0) magic.push(['Ability damage', `+${b.spellAmpPct}%`]);
+    if (b.cdrPct > 0) magic.push(['Cooldowns', `−${b.cdrPct}%`]);
+    if (b.spellLifestealPct > 0) magic.push(['Ability lifesteal', `${b.spellLifestealPct}%`]);
+    if (b.ultUpgrade) magic.push(['Ultimate', 'Upgraded']);
+    const xp = h.level < MAX_LEVEL ? `${Math.floor(h.xp)} / ${XP_TABLE[h.level]} XP` : 'Max level';
+    const xpFrac = h.level < MAX_LEVEL ? Math.min(1, h.xp / XP_TABLE[h.level]) : 1;
+    const key = JSON.stringify([attack, defense, magic, h.level, xp]);
     if (key === this.statsKey) return;
     this.statsKey = key;
     const root = this.el.toasts.ownerDocument;
-    root.getElementById('stats-title')!.textContent = `${def.name} ${def.title} · Level ${h.level}`;
-    root.getElementById('stats-body')!.innerHTML = rows
-      .map(([k, v]) => (k === '#' ? `<h4>${v}</h4>` : `<div><span>${k}</span><b>${v}</b></div>`))
-      .join('');
+    const pic = heroPortraits[h.defId];
+    root.getElementById('stats-title')!.innerHTML = `${pic ? `<img class="st-pic" src="${pic}" alt="">` : ''}<span class="st-who"><b>${def.name}</b><small>${def.title} · Level ${h.level}</small><span class="st-xp"><i style="width:${xpFrac * 100}%"></i><em>${xp}</em></span></span>`;
+    const col = (title: string, rows: [string, string][]) => `<section><h4>${title}</h4>${rows.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</section>`;
+    root.getElementById('stats-body')!.innerHTML = col('Attack', attack) + col('Defense', defense) + col('Magic', magic);
   }
 
   private topKey = '';

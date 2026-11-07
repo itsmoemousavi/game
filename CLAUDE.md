@@ -141,7 +141,7 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
 8. Later: Capacitor app builds, store release.
 9. **Tutorial: shipped in 0.17.10.** `src/client/tutorial.ts`: `LESSONS`, eight short lessons in a quiet match with no enemy heroes; read steps have Next, do steps finish by themselves; rule numbers come from the sim's constants. Check it against any rule change (`tests/tutorial.test.ts` checks topics, length, buttons, and every hero).
 10. **Mega Creep armor: approved and shipped in 0.17.10** (`creep(..., mega)` in `three/models.ts`), same size as before.
-11. **Hero stats panel (owner, 2026-11-06; GO given, preview first).** The panel opened by the i on the portrait (`updateStats` in `hud.ts`) should show only the necessary data, not everything, with a better design. Show a preview before shipping.
+11. **Hero stats panel: approved and shipped in 0.17.11** (`updateStats` in `hud.ts`). Attack, Defense and Magic columns; nothing already on screen; extras only when you have them.
 
 15. **Full HUD redesign: ON HOLD (owner, 2026-11-06).** They rejected ornate concepts (ink, iron, glass) and then three console-style ones; a full-width slate console ("D") came closest but they didn't like it either. Keep the current HUD. Don't bring it up with new designs unless they ask. If it comes back, ask for screenshots of what they like first.
 16. **Item and spell cards (shipped 0.17.9):** the one layout is in `src/client/describe.ts`: name, mana and cooldown per level (current bold), Stats, then Active/Passive. Item text lives in `use` and `passive` in `items.ts`; stat lines are generated.
