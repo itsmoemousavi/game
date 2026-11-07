@@ -917,7 +917,17 @@ async function startMatch(m: Mode, d: Draft, info?: MatchInfo, catchUp = false) 
   }
   practicePanel.classList.toggle('hidden', m !== 'practice');
   tutorial?.hide();
-  tutorial = m === 'tutorial' ? new Tutorial($<HTMLElement>('#tutorial'), () => (tutorial = null)) : null;
+  tutorial =
+    m === 'tutorial'
+      ? new Tutorial(
+          $<HTMLElement>('#tutorial'),
+          () => {
+            tutorial = null;
+            leaveToMenu('');
+          },
+          () => (tutorial = null),
+        )
+      : null;
   myHeroId = info && net ? world.heroes[net.mySeat].id : world.heroes.find((h) => h.hero!.controller === 'human')!.id;
   renderer = makeRenderer(world.map);
   input?.destroy();

@@ -31,6 +31,11 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.17.x · New sounds
 
+### 0.17.10
+
+- **A new tutorial.** Eight short lessons you can play in any order: the goal, moving and looking, fighting, gold and items, buildings, the map, totems and sight, and the Warden. Finished lessons get a tick. It works with every hero now.
+- **Mega Creeps wear armor:** layered dark plate with gold edges and a strip of team colour. Casters get a metal circlet.
+
 ### 0.17.9
 
 - **All towers are stronger:** about 20% more health and 15% more damage, Shrine towers too.

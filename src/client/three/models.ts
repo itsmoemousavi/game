@@ -301,7 +301,8 @@ function creep(type: 'melee' | 'ranged', team: 0 | 1, mega = false): THREE.Objec
     add(b.head, mesh(lathe([[0.001, 0.27], [0.12, 0.23], [0.215, 0.1], [0.235, -0.02], [0.215, -0.07]], 8), steel), 0, 0, 0);
     add(b.head, mesh(box(0.05, 0.2, 0.05), iron), 0, -0.01, 0.215);
     add(b.torso, mesh(lathe([[0.235, 0.22], [0.3, 0.46], [0.315, 0.56], [0.2, 0.68]], 8), steel), 0, 0, 0).scale.set(1, 1, 0.78);
-    add(b.torso, mesh(cloth(0.3, 0.72, 1, 3, (_x, y) => [0, 0, (1 - y) * 0.07]), team1), 0, -0.05, 0.215);
+    // Mega Creeps wear plates here instead.
+    if (!mega) add(b.torso, mesh(cloth(0.3, 0.72, 1, 3, (_x, y) => [0, 0, (1 - y) * 0.07]), team1), 0, -0.05, 0.215);
     for (const arm of [b.armL, b.armR]) add(arm, mesh(new THREE.SphereGeometry(0.15, 7, 4, 0, Math.PI * 2, 0, Math.PI * 0.55), iron), 0, 0.03, 0).scale.set(1.15, 0.75, 1.05);
     // Short sword with a guard.
     const w = add(b.armR, grp(), 0, -0.62, 0.02);
@@ -323,7 +324,7 @@ function creep(type: 'melee' | 'ranged', team: 0 | 1, mega = false): THREE.Objec
     b.legL.visible = b.legR.visible = false;
     hood(b.head, 0.25, M(dark), M(0x0c0a0a), 0.58, 0.3);
     add(b.torso, mesh(lathe([[0.22, 0.1], [0.24, 0.3], [0.29, 0.52], [0.18, 0.66]], 8), M(dark)), 0, 0, 0).scale.set(1, 1, 0.82);
-    add(b.torso, mesh(cloth(0.09, 0.56, 1, 2, () => [0, 0, 0]), team1), 0, 0.36, 0.23);
+    if (!mega) add(b.torso, mesh(cloth(0.09, 0.56, 1, 2, () => [0, 0, 0]), team1), 0, 0.36, 0.23);
     for (const arm of [b.armL, b.armR]) add(arm, mesh(lathe([[0.09, 0], [0.1, -0.2], [0.14, -0.5], [0.15, -0.55]], 7), M(dark)), 0, 0, 0);
     const w = add(b.armR, grp(), 0, -0.62, 0.02);
     w.name = 'weapon';
@@ -342,6 +343,42 @@ function creep(type: 'melee' | 'ranged', team: 0 | 1, mega = false): THREE.Objec
     }
     for (const arm of [b.armL, b.armR]) for (const z of [-0.08, 0.08]) add(arm, mesh(taper([[0, 0.08, z], [0, 0.32, z]], 0.05, 0.005, 2, 4), iron), 0, 0, 0);
     add(b.torso, mesh(new THREE.OctahedronGeometry(0.09), fire), 0, 0.5, 0.27);
+    // Their armor: dark layered plate with gilded edges and a band of team colour, so the same soldier reads as far stronger.
+    const plate = M(0x4b515a, { metalness: 0.75, roughness: 0.36 });
+    const gold = M(0xb8923f, { metalness: 0.8, roughness: 0.34 });
+    // Breastplate over the old armor, with a raised ridge and a gilded belt.
+    add(b.torso, mesh(lathe([[0.27, 0.17], [0.33, 0.42], [0.35, 0.56], [0.24, 0.7]], 10), plate), 0, 0, 0).scale.set(1.04, 1, 0.84);
+    add(b.torso, mesh(box(0.05, 0.42, 0.05), gold), 0, 0.43, 0.28);
+    add(b.torso, rot(mesh(new THREE.TorusGeometry(0.28, 0.024, 4, 14), gold), Math.PI / 2, 0, 0), 0, 0.17, 0).scale.set(1.02, 0.84, 1);
+    // Gorget around the neck.
+    add(b.torso, mesh(lathe([[0.25, 0.68], [0.2, 0.75], [0.17, 0.82]], 10), gold), 0, 0, 0).scale.set(1, 1, 0.86);
+    // Tassets: plates hanging over the hips, team colour between them.
+    for (const x of [-0.2, 0, 0.2]) {
+      const t = add(b.torso, mesh(box(0.17, x === 0 ? 0.4 : 0.26, 0.035), x === 0 ? team1 : plate), x, x === 0 ? -0.04 : 0.03, x === 0 ? 0.27 : 0.26);
+      t.rotation.set(-0.14, 0, -x * 0.5);
+    }
+    for (const x of [-0.24, 0.24]) add(b.torso, mesh(box(0.14, 0.24, 0.035), plate), x, 0.04, -0.2).rotation.x = 0.14;
+    for (const arm of [b.armL, b.armR]) {
+      // Pauldrons of three overlapping plates, then a vambrace on the forearm.
+      for (let i = 0; i < 3; i++) {
+        add(arm, mesh(new THREE.SphereGeometry(0.19 - i * 0.012, 8, 4, 0, Math.PI * 2, 0, Math.PI * 0.55), i === 0 ? plate : i === 1 ? gold : plate), 0, 0.05 - i * 0.075, 0).scale.set(1.2, 0.72, 1.12);
+      }
+      add(arm, mesh(lathe([[0.085, -0.34], [0.105, -0.44], [0.095, -0.56]], 7), plate), 0, 0, 0);
+    }
+    if (type === 'melee') {
+      // A closed crest on the helm, and greaves.
+      add(b.head, mesh(box(0.04, 0.12, 0.34), gold), 0, 0.27, -0.01);
+      for (const s of [-1, 1]) add(b.head, mesh(box(0.035, 0.14, 0.13), plate), s * 0.205, -0.06, 0.07);
+      for (const leg of [b.legL, b.legR]) {
+        add(leg, mesh(lathe([[0.1, -0.42], [0.125, -0.56], [0.1, -0.78]], 7), plate), 0, 0, 0).scale.set(1, 1, 1.05);
+        add(leg, mesh(sph(0.1, 0), gold), 0, -0.41, 0.06).scale.set(1, 0.8, 0.7);
+      }
+    } else {
+      // A metal circlet with points over the hood, and armored plates down the robe.
+      add(b.head, rot(mesh(new THREE.TorusGeometry(0.245, 0.024, 4, 12), gold), Math.PI / 2, 0, 0), 0, 0.14, 0);
+      for (const x of [-0.12, 0, 0.12]) add(b.head, mesh(taper([[x, 0.14, 0.22], [x, x === 0 ? 0.36 : 0.28, 0.215]], 0.024, 0.004, 2, 4), gold), 0, 0, 0);
+      for (const x of [-0.17, 0.17]) add(b.root, mesh(box(0.15, 0.5, 0.035), plate), x, 0.42, 0.28).rotation.set(-0.1, 0, -x * 0.25);
+    }
   }
   const g = grp();
   g.add(b.root);

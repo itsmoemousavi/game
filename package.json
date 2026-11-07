@@ -1,6 +1,6 @@
 {
   "name": "ovra",
-  "version": "0.17.9",
+  "version": "0.17.10",
   "private": true,
   "description": "Mobile 3v3 lane-strategy game (Ovra)",
   "type": "module",
