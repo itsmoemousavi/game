@@ -155,9 +155,9 @@ with ~100 matches a hero's win rate still swings about ±5% from luck.
 13. **Announcer (owner, 2026-11-06; trimming the list).** They thought the list had too much in it and are editing it at https://claude.ai/artifact/8cW26H89uMdFPWjiNkT4ZV (read collections `lines`: `removed`, `text`, with a row only for touched lines; and `added`: their own new lines). Once done, update `docs/ANNOUNCER-LINES.md` to match. They make the voice lines in ElevenLabs and send a zip, named as in that file. Then wire them in with a queue so lines never overlap and a repeat timer per building.
 
 14. **Owner's test list (2026-11-06; WRITTEN DOWN, not started, wait for their go).**
-    - **Sounds:** menu click shipped in 0.17.4 (their earlier `click` pick). The rest are being picked at https://claude.ai/artifact/LE8h6HXLbCuwMLUmDX3QgA (collection `picks3`, options in scratchpad `snd/options3`, table in `snd/choose3.py`): Brakk Shield Charge, Vexa Arrow Storm, Orin attack, Grom Bark Skin and Root Snare, Kaela Maelstrom, Warden's death, Death Song, buyback song, and new sounds for Morra Feral Bond and all Seren and Rhen spells. Seren, Rhen and Morra's spells had no own sounds: add them to `CAST_SOUNDS`, and `wardenDeath` for `bossKilled`. Morra's attack shares `fireBolt`, so keep her current sound under its own name when Orin's changes.
+    - **Sounds:** menu click in 0.17.4, the rest in 0.17.5. Still open: orchestral, epic but short pieces for hero death (they call it "something blue", so sad), respawn (new, own hero only) and buyback (very short).
     - **Shipped in 0.17.3:** barracks, melee regen, fountain reach, creeps and the second Shrine tower, removed texts, channel bar margin, dead portrait, ping and shield beside the minimap.
-    - **New top bar:** Score | P1 | P2 | P3 | Timer and Day/Night | P3 | P2 | P1 | Score. Dead: grayscale portrait with respawn time under it. Disconnected or left (multiplayer): grayscale with a red disconnect icon. Bought back: a coin instead of the respawn time for 5 s. Test at 393 x 793.
+    - **Top bar shipped in 0.17.5** (`updateTopHeroes` in `hud.ts`): Score | P1 P2 P3 | clock | P3 P2 P1 | Score.
     - **Ping and shield buttons:** to the right of the minimap instead of below it, still stacked in a column.
 
 ## Gotchas

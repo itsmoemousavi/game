@@ -31,6 +31,12 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.17.x · New sounds
 
+### 0.17.5
+
+- **New top bar.** Every hero's picture now sits beside the score. Dead heroes turn grey with their respawn time under them, anyone who leaves a multiplayer match goes grey with a red icon, and a coin shows for 5 seconds after a buyback.
+- **More of the chosen sounds are in:** Brakk's Shield Charge, Vexa's Arrow Storm, Orin's attack, Grom's Bark Skin and Root Snare, Kaela's Maelstrom and the Warden's death.
+- **Morra, Seren and Rhen's spells have their own sounds now:** Feral Bond, Aegis, Rebuke, Sanctuary, Gale Step, Hawk Mark and Bolt Storm.
+
 ### 0.17.4
 
 - **Menu buttons now click.**

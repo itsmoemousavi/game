@@ -1,5 +1,6 @@
 import { esc, heroName, rosterName } from './player-names';
 import {
+  BUYBACK_COOLDOWN,
   AbilityDef,
   HeroId,
   HEROES,
@@ -29,6 +30,11 @@ const fmtTime = (t: number) => {
   const a = t < 0 ? Math.ceil(-t) : Math.floor(t);
   return `${Math.floor(a / 60)}:${String(a % 60).padStart(2, '0')}`;
 };
+
+/** How long the top bar shows a coin under a hero who bought back (seconds). */
+const BOUGHT_BACK_SHOWN = 5;
+const COIN_ICON = '<svg class="coin" viewBox="0 0 16 16" aria-label="Bought back"><circle cx="8" cy="8" r="7" fill="#f5b800" stroke="#7a5600" stroke-width="1.2"/><circle cx="8" cy="8" r="4.3" fill="none" stroke="#ffe27a" stroke-width="1.1"/></svg>';
+const GONE_ICON = '<svg class="gone" viewBox="0 0 16 16" aria-label="Left the match"><circle cx="8" cy="8" r="7.5" fill="#d92626" stroke="#fff"/><path d="M4.5 11.5 11.5 4.5M5.5 6.5 4 8a2.8 2.8 0 0 0 4 4l1.5-1.5M6.5 5.5 8 4a2.8 2.8 0 0 1 4 4l-1.5 1.5" fill="none" stroke="#fff" stroke-width="1.3" stroke-linecap="round"/></svg>';
 
 /** Hero headshots (image URLs), filled in by main.ts once the 3D portraits are rendered. */
 export const heroPortraits: Partial<Record<HeroId, string>> = {};
@@ -302,6 +308,49 @@ export class Hud {
       .join('');
   }
 
+  private topKey = '';
+  private topHeroes: { id: number; el: HTMLElement; time: HTMLElement; coin: HTMLElement; gone: HTMLElement }[] = [];
+
+  /** Top bar: every hero's picture. Dead: grey with the respawn time. Left: grey with a red icon. Just bought back: a coin. */
+  private updateTopHeroes(w: World, root: Document) {
+    const key = w.heroes.map((u) => `${u.id}${u.hero!.defId}${heroPortraits[u.hero!.defId] ? 1 : 0}`).join();
+    if (key !== this.topKey) {
+      this.topKey = key;
+      this.topHeroes = [];
+      for (const team of [0, 1] as Team[]) {
+        const box = root.getElementById(`tb-heroes-${team}`)!;
+        box.replaceChildren();
+        for (const u of w.heroes.filter((h) => h.team === team)) {
+          const def = HEROES[u.hero!.defId];
+          const pic = heroPortraits[u.hero!.defId];
+          const el = root.createElement('span');
+          el.className = 'tb-hero';
+          el.innerHTML = `<span class="pic">${pic ? `<img alt="" src="${pic}">` : def.name[0]}</span><b class="time"></b>${COIN_ICON}${GONE_ICON}`;
+          box.append(el);
+          this.topHeroes.push({
+            id: u.id,
+            el,
+            time: el.querySelector<HTMLElement>('.time')!,
+            coin: el.querySelector<HTMLElement>('.coin')!,
+            gone: el.querySelector<HTMLElement>('.gone')!,
+          });
+        }
+      }
+    }
+    for (const s of this.topHeroes) {
+      const u = w.unit(s.id);
+      if (!u?.hero) continue;
+      const h = u.hero;
+      const dead = !u.alive;
+      const justBought = !dead && h.buybackCooldown > BUYBACK_COOLDOWN - BOUGHT_BACK_SHOWN;
+      s.el.classList.toggle('out', dead || h.away);
+      s.gone.style.display = h.away ? '' : 'none';
+      s.coin.style.display = justBought && !h.away ? '' : 'none';
+      const time = dead && !h.away ? String(Math.max(1, Math.ceil(h.respawnTimer))) : '';
+      if (s.time.textContent !== time) s.time.textContent = time;
+    }
+  }
+
   private scoreKey = '';
 
   /** Scoreboard (tap the top bar): both teams' heroes, K/D/A, farm, net worth and items. */
@@ -467,6 +516,7 @@ export class Hud {
 
     this.el['score-0'].textContent = String(w.teamKills[0]);
     this.el['score-1'].textContent = String(w.teamKills[1]);
+    this.updateTopHeroes(w, document);
     this.el.clock.textContent = fmtTime(w.time);
     this.el['hp-fill'].style.width = `${(me.hp / me.maxHp) * 100}%`;
     this.el['hp-text'].textContent = `${Math.ceil(me.hp)} / ${Math.round(me.maxHp)}`;

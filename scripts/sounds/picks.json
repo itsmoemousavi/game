@@ -90,12 +90,6 @@
 "file": "qubodupImpactMetal.flac"
 },
 {
-"sound": "shieldCharge",
-"option": "A",
-"source": "https://opengameart.org/content/150-combat-sound-effects",
-"file": "Wind Spell Impact 1_s07.wav"
-},
-{
 "sound": "shieldBash",
 "option": "D",
 "source": "https://opengameart.org/content/100-cc0-metal-and-wood-sfx",
@@ -142,18 +136,6 @@
 "option": "D",
 "source": "https://opengameart.org/content/20-sword-sound-effects-attacks-and-clashes",
 "file": "sword.3.ogg"
-},
-{
-"sound": "arrowRain",
-"option": "E",
-"source": "https://opengameart.org/content/150-combat-sound-effects",
-"file": "Wind Spell Impact 5_s07.wav"
-},
-{
-"sound": "fireBolt",
-"option": "B",
-"source": "https://opengameart.org/content/catching-fire",
-"file": "flame_0.ogg"
 },
 {
 "sound": "fireballCast",
@@ -216,22 +198,10 @@
 "file": "impactwood14.mp3.flac"
 },
 {
-"sound": "rootSnare",
-"option": "A",
-"source": "https://opengameart.org/content/150-combat-sound-effects",
-"file": "Plant Spell Impact 1_s07.wav"
-},
-{
 "sound": "rootsErupt",
 "option": "A",
 "source": "https://opengameart.org/content/150-combat-sound-effects",
 "file": "Plant Spell Impact 2_s07.wav"
-},
-{
-"sound": "barkSkin",
-"option": "D",
-"source": "https://opengameart.org/content/fantasy-sound-effects-tinysized-sfx",
-"file": "floor-creak-01.wav"
 },
 {
 "sound": "overgrowth",
@@ -256,12 +226,6 @@
 "option": "B",
 "source": "https://opengameart.org/content/40-cc0-water-splash-slime-sfx",
 "file": "bubble_01.ogg"
-},
-{
-"sound": "maelstrom",
-"option": "D",
-"source": "https://opengameart.org/content/random-sfx",
-"file": "Falls.wav"
 },
 {
 "sound": "salve",
@@ -406,5 +370,95 @@
 "option": "C",
 "source": "https://opengameart.org/content/point-bell",
 "file": "sd_0.wav"
+},
+{
+"sound": "morraShot",
+"option": "B",
+"source": "https://opengameart.org/content/catching-fire",
+"file": "flame_0.ogg"
+},
+{
+"sound": "shieldCharge",
+"option": "E",
+"source": "https://opengameart.org/content/150-combat-sound-effects",
+"file": "Earth Spell Impact 1_s07.wav"
+},
+{
+"sound": "arrowRain",
+"option": "A",
+"source": "https://freesound.org/s/394004/",
+"file": "394004.mp3"
+},
+{
+"sound": "fireBolt",
+"option": "A",
+"source": "https://freesound.org/s/539972/",
+"file": "539972.mp3"
+},
+{
+"sound": "barkSkin",
+"option": "F",
+"source": "https://opengameart.org/content/150-combat-sound-effects",
+"file": "Earth Spell Impact 3_s07.wav"
+},
+{
+"sound": "rootSnare",
+"option": "F",
+"source": "https://opengameart.org/content/150-combat-sound-effects",
+"file": "Earth Spell Impact 2_s07.wav"
+},
+{
+"sound": "maelstrom",
+"option": "B",
+"source": "https://opengameart.org/content/150-combat-sound-effects",
+"file": "Water Spell Impact 1_s06.wav"
+},
+{
+"sound": "feralBond",
+"option": "A",
+"source": "https://freesound.org/s/398430/",
+"file": "398430.mp3"
+},
+{
+"sound": "aegis",
+"option": "C",
+"source": "https://opengameart.org/content/150-combat-sound-effects",
+"file": "Healing Spell Impact 9_s08.wav"
+},
+{
+"sound": "rebuke",
+"option": "D",
+"source": "https://opengameart.org/content/150-combat-sound-effects",
+"file": "Healing Spell Impact 11_s08.wav"
+},
+{
+"sound": "sanctuary",
+"option": "A",
+"source": "https://freesound.org/s/522699/",
+"file": "522699.mp3"
+},
+{
+"sound": "galeStep",
+"option": "F",
+"source": "https://opengameart.org/content/fantasy-sound-effects-tinysized-sfx",
+"file": "tube-plastic-whoosh-02.wav"
+},
+{
+"sound": "hawkMark",
+"option": "D",
+"source": "https://opengameart.org/content/various-sound-effects-0",
+"file": "snd_birdscream.wav"
+},
+{
+"sound": "boltStorm",
+"option": "B",
+"source": "https://freesound.org/s/384919/",
+"file": "384919.mp3"
+},
+{
+"sound": "wardenDeath",
+"option": "B",
+"source": "https://freesound.org/s/559558/",
+"file": "559558.mp3"
 }
 ]

@@ -21,6 +21,13 @@ const CAST_SOUNDS: Record<string, SoundName> = {
   tidalWave: 'tidalWave',
   brineVeil: 'brineVeil',
   maelstrom: 'maelstrom',
+  feralBond: 'feralBond',
+  aegis: 'aegis',
+  rebuke: 'rebuke',
+  sanctuary: 'sanctuary',
+  galeStep: 'galeStep',
+  hawkMark: 'hawkMark',
+  boltStorm: 'boltStorm',
 };
 
 /** Each hero's basic attack. */
@@ -31,7 +38,7 @@ const ATTACK_SOUNDS: Record<string, SoundName> = {
   syl: 'daggerSlash',
   grom: 'woodPunch',
   kaela: 'waterBolt',
-  morra: 'fireBolt',
+  morra: 'morraShot',
   seren: 'hammerAttack',
   rhen: 'bowShot',
 };
@@ -160,7 +167,7 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
         break;
       }
       case 'bossKilled':
-        sfx.play('roar', 0.9);
+        sfx.play('wardenDeath', 0.9);
         break;
       case 'revive':
         sfx.play('revive', near(w.unit(e.unitId)));
