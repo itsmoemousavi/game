@@ -1,18 +1,17 @@
 # Announcer lines
 
-One voice file per line, named exactly as below, all in one zip. MP3 or WAV. Use the same voice and settings for every
-line, with no music or effects behind it. "Your" and "enemy" are heard from each player's own side.
+The owner's 36 voice lines, made in ElevenLabs. The originals are cleaned and leveled by `scripts/sounds/voices.py` into
+`public/sfx/voice`. To add or replace a line: same file name, then add new names to `VOICE_NAMES` in `src/client/audio.ts`.
+Which line plays when is in `src/client/announcer.ts`. "Your" and "enemy" are heard from each player's own side.
+
+Lines never overlap. They wait their turn, most important first, and a line still waiting after 10 seconds is dropped.
 
 ## The match
 
-| File | Line |
-|---|---|
-| `battle_soon` | Thirty seconds until the battle begins. |
-| `battle_begins` | The battle begins! |
-| `victory` | Victory! |
-| `defeat` | Defeat. |
-| `your_team_surrendered` | Your team has surrendered. |
-| `enemy_surrendered` | The enemy has surrendered. |
+| File | Line | Plays |
+|---|---|---|
+| `battle_soon` | Fifteen seconds until the battle begins. | at -0:15 |
+| `battle_begins` | The battle begins! | at 0:00 |
 
 ## Towers
 
@@ -30,8 +29,9 @@ line, with no music or effects behind it. "Your" and "enemy" are heard from each
 | `your_shrine_tower_attacked` | Your Shrine tower is under attack! |
 | `your_shrine_tower_fallen` | Your Shrine tower has fallen. |
 | `enemy_shrine_tower_fallen` | An enemy Shrine tower has fallen! |
-| `your_tower_shield` | Tower shield activated. |
-| `enemy_tower_shield` | The enemy has activated their tower shield. |
+
+An "under attack" line repeats for the same building only after 30 seconds of match time. Each tower has its own timer;
+a lane's two barracks share one, and so do the two Shrine towers. Your team's own denies don't count.
 
 ## Barracks and Mega Creeps
 
@@ -52,64 +52,34 @@ line, with no music or effects behind it. "Your" and "enemy" are heard from each
 | File | Line |
 |---|---|
 | `your_shrine_attacked` | Your Shrine is under attack! |
-| `your_shrine_critical` | Your Shrine is about to fall! |
-| `enemy_shrine_attacked` | Your team is attacking the enemy Shrine! |
 
 ## Kills
 
-| File | Line |
-|---|---|
-| `first_blood` | First blood! |
-| `double_kill` | Double kill! |
-| `triple_kill` | Triple kill! |
-| `team_wipe` | Team wipe! |
-| `hot_streak` | Hot streak! |
-| `blazing` | Blazing! |
-| `inferno` | Inferno! |
-| `legendary` | Legendary! |
-| `shutdown` | Shutdown! |
-| `you_slain` | You have been slain. |
-| `you_killed` | You have slain an enemy. |
-| `ally_slain` | An ally has been slain. |
-| `enemy_slain` | An enemy has been slain. |
-| `enemy_bought_back` | The enemy has bought back. |
-| `you_revived` | You have returned. |
+Everyone hears these, whichever team made the kill.
+
+| File | Line | Plays |
+|---|---|---|
+| `first_blood` | First blood! | the match's first hero kill |
+| `double_kill` | Double kill! | one hero, two kills in a row |
+| `triple_kill` | Triple kill! | one hero, three kills in a row |
+| `team_wipe` | Team wipe! | all three heroes of a team are dead, whoever killed them |
+| `hot_streak` | Hot streak! | 3 kills without dying |
+| `blazing` | Blazing! | 4 kills without dying |
+| `inferno` | Inferno! | 5 kills without dying |
+| `legendary` | Legendary! | 6 or more kills without dying |
+| `shutdown` | Shutdown! | a hero on a streak is killed |
 
 ## The Warden
 
-| File | Line |
+| File | Plays |
 |---|---|
-| `your_team_slew_warden` | Your team has slain the Warden! |
-| `enemy_slew_warden` | The enemy has slain the Warden. |
-| `your_team_took_charm` | Your team has taken the Warden's charm! |
-| `enemy_took_charm` | The enemy has taken the Warden's charm. |
-| `charm_revive` | The charm has brought back a hero! |
-
-## The map
-
-| File | Line |
-|---|---|
-| `runes_appeared` | Runes have appeared on the river. |
-| `night_falls` | Night falls. |
-| `dawn_breaks` | Dawn breaks. |
-| `couriers_fly` | Couriers can now fly. |
+| `warden_fallen` | every time the Warden dies, whoever killed it, on both teams |
 
 ## Your hero
+
+Only when you tap a spell that can't go yet, only when nothing else is being said, and at most once every 3 seconds.
 
 | File | Line |
 |---|---|
 | `not_enough_mana` | Not enough mana. |
-| `not_enough_gold` | Not enough gold. |
 | `on_cooldown` | Not ready yet. |
-| `level_up` | Level up! |
-| `new_ultimate` | Your ultimate is ready to learn. |
-| `item_delivered` | Your item has arrived. |
-
-## Multiplayer
-
-| File | Line |
-|---|---|
-| `player_left` | A player has left the game. |
-| `player_back` | A player has returned. |
-| `game_paused` | The game is paused. |
-| `game_resumed` | The game has resumed. |

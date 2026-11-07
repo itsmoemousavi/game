@@ -253,7 +253,7 @@ Re-run the script after any hero or item change and keep every hero within about
 - **Multi-kills:** kills within 10 s of each other. **Double Kill**, then **Triple Kill — Team Wipe** (all three enemies in a 3v3).
 - **Streaks** (kills without dying): **Hot Streak** (3), **Blazing** (4), **Inferno** (5), **Legendary** (6+). The phrases are original or plain English, not Dota's callouts.
 - **Shutdown:** killing a hero on a streak pays 60 gold per kill above 2, up to 400.
-- **Announcer:** a big banner in the middle of the screen with a short jingle (higher for your team, lower for the enemy).
+- **Announcer:** a big banner in the middle of the screen, and a voice (lines and rules in `docs/ANNOUNCER-LINES.md`).
 - **End of match:** a table of every player's level, K/D/A, last hits/denies, gold earned, damage to heroes, damage to buildings, healing and items, with a ★ MVP. It also appears after a surrender, saying who surrendered.
 
 ### Pings (implemented)

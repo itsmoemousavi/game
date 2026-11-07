@@ -18,6 +18,19 @@ export const SOUND_NAMES = [
 ] as const;
 export type SoundName = (typeof SOUND_NAMES)[number];
 
+/** The announcer's lines, in public/sfx/voice (see docs/ANNOUNCER-LINES.md). */
+export const VOICE_NAMES = [
+  'battle_begins', 'battle_soon', 'blazing', 'double_kill', 'enemy_bot_barracks_fallen',
+  'enemy_bot_tower_fallen', 'enemy_mega_creeps', 'enemy_mid_barracks_fallen', 'enemy_mid_tower_fallen', 'enemy_shrine_tower_fallen',
+  'enemy_top_barracks_fallen', 'enemy_top_tower_fallen', 'first_blood', 'hot_streak', 'inferno',
+  'legendary', 'not_enough_mana', 'on_cooldown', 'shutdown', 'team_wipe',
+  'triple_kill', 'warden_fallen', 'your_barracks_attacked', 'your_bot_barracks_fallen', 'your_bot_tower_attacked',
+  'your_bot_tower_fallen', 'your_mega_creeps', 'your_mid_barracks_fallen', 'your_mid_tower_attacked', 'your_mid_tower_fallen',
+  'your_shrine_attacked', 'your_shrine_tower_attacked', 'your_shrine_tower_fallen', 'your_top_barracks_fallen', 'your_top_tower_attacked',
+  'your_top_tower_fallen',
+] as const;
+export type VoiceName = (typeof VOICE_NAMES)[number];
+
 declare const __VERSION__: string;
 
 const SIMULTANEOUS_LOADS = 8;
@@ -44,7 +57,7 @@ interface Voice {
 export class Sfx {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
-  private samples = new Map<SoundName, Sample>();
+  private samples = new Map<string, Sample>();
   private voices: Voice[] = [];
   private last = new Map<SoundName, number>();
   private unlockedOnce = false;
@@ -80,12 +93,14 @@ export class Sfx {
   async load(onProgress: (done: number, total: number) => void = () => {}) {
     const ctx = this.start();
     if (!ctx) return;
-    const queue = [...SOUND_NAMES];
+    const queue = [...SOUND_NAMES.map((n) => [n, `sfx/${n}.mp3`]), ...VOICE_NAMES.map((n) => [n, `sfx/voice/${n}.mp3`])];
+    const total = queue.length;
     let done = 0;
     const worker = async () => {
-      for (let name = queue.shift(); name; name = queue.shift()) {
+      for (let item = queue.shift(); item; item = queue.shift()) {
+        const [name, file] = item;
         try {
-          const res = await fetch(`${import.meta.env.BASE_URL}sfx/${name}.mp3?v=${__VERSION__}`);
+          const res = await fetch(`${import.meta.env.BASE_URL}${file}?v=${__VERSION__}`);
           const data = await res.arrayBuffer();
           const buffer = await new Promise<AudioBuffer>((ok, fail) => void ctx.decodeAudioData(data, ok, fail));
           const d = buffer.getChannelData(0);
@@ -99,7 +114,7 @@ export class Sfx {
         } catch (err) {
           console.warn('Sound unavailable', name, err);
         }
-        onProgress(++done, SOUND_NAMES.length);
+        onProgress(++done, total);
       }
     };
     await Promise.all(Array.from({ length: SIMULTANEOUS_LOADS }, worker));
@@ -172,6 +187,27 @@ export class Sfx {
   playHit(name: SoundName, volume: number, hitIn: number): Voice | null {
     const wait = hitIn - (this.samples.get(name)?.impact ?? 0);
     return this.play(name, volume, Math.max(0, wait), Math.max(0, -wait));
+  }
+
+  /** The audio clock, seconds. It stands still while the audio is suspended. */
+  get clock(): number {
+    return this.ctx?.currentTime ?? 0;
+  }
+
+  /**
+   * Speak an announcer line at full volume, outside the limit on how many sounds play at once (a big fight must not
+   * cut the voice). Returns how long it lasts, or 0 if it couldn't play.
+   */
+  speak(name: VoiceName): number {
+    const ctx = this.ctx;
+    const sample = this.samples.get(name);
+    if (this.muted || !ctx || ctx.state !== 'running' || !sample) return 0;
+    const src = ctx.createBufferSource();
+    src.buffer = sample.buffer;
+    src.connect(this.master!);
+    src.onended = () => src.disconnect();
+    src.start(ctx.currentTime, sample.offset);
+    return sample.buffer.duration - sample.offset;
   }
 
   /** Fade a playing sound away quickly (a teleport that was cancelled). */

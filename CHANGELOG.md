@@ -31,6 +31,14 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.17.x · New sounds
 
+### 0.17.8
+
+- **The game now has an announcer.** A voice tells you when the battle is about to begin, when towers and barracks are under attack or fall, about Mega Creeps, first blood, kill streaks, team wipes and shutdowns.
+- **The Warden falling is announced** to both teams, whoever killed it.
+- Tap a spell that isn't ready and the voice tells you why, if nothing else is being said.
+- Lines never talk over each other, and a building under attack only repeats its warning every 30 seconds.
+- The short jingle under the kill banners is gone, so the voice is heard clearly.
+
 ### 0.17.7
 
 - **A harp sweep plays when your hero respawns.** Only you hear it, and not after a buyback, which has its own sound.

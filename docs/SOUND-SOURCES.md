@@ -4,6 +4,8 @@ The owner chose every file in `public/sfx` by ear. All are **CC0** (free for com
 
 Walking, hero deaths, falling bodies and trees, and projectiles landing are silent on purpose.
 
+The announcer voice in `public/sfx/voice` is not from these sources: the owner made it in ElevenLabs. Before a store release, check that their plan allows commercial use.
+
 | Sound | Source | Original file |
 |---|---|---|
 | `matchHorn` | https://freesound.org/s/714562/ | 714562.mp3 |

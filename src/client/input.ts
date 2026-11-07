@@ -48,7 +48,9 @@ export class Input {
   joyRadius = 55;
   /** Long-press info card for an ability (null hides it). */
   onTip: (slot: number | null) => void = () => {};
-  private tip: { pointer: number; timer: ReturnType<typeof setTimeout> | null; shown: boolean } | null = null;
+  /** You tried a spell that is cooling down or that you can't pay for. */
+  onCastRefused: (why: 'cooldown' | 'mana') => void = () => {};
+  private tip: { pointer: number; timer: ReturnType<typeof setTimeout> | null; shown: boolean; refused?: 'cooldown' | 'mana' } | null = null;
 
   /** A ping waiting to be placed: the next tap on the map or minimap places it. */
   pingKind: PingKind | null = null;
@@ -292,6 +294,8 @@ export class Input {
     if (!me) return;
     const def = abilityDef(me, slot);
     if (!def) return;
+    const blocked = castBlocker(me, slot);
+    if (me.alive && (blocked === 'cooldown' || blocked === 'mana')) this.onCastRefused(blocked);
     if (def.targeting === 'enemy' || def.targeting === 'ally') {
       const t = this.pickUnit(w, me, def.targeting, p.x, p.y, 3);
       this.queue.push({ type: 'cast', unitId: me.id, slot, targetId: t?.id });
@@ -400,6 +404,7 @@ export class Input {
         }
       }, 450),
       shown: false,
+      refused: me.alive && (blocked === 'cooldown' || blocked === 'mana') ? blocked : undefined,
     };
     if (blocked !== null) return;
     const { x, y } = toLocal(e.clientX, e.clientY);
@@ -538,6 +543,8 @@ export class Input {
     let tipWasShown = false;
     if (this.tip && this.tip.pointer === e.pointerId) {
       tipWasShown = this.tip.shown;
+      // Told on release: a long press only reads the spell's card.
+      if (!tipWasShown && !cancelled && this.tip.refused) this.onCastRefused(this.tip.refused);
       this.hideTip();
     }
     if (this.drag && e.pointerId === this.drag.id) {

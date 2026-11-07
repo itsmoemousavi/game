@@ -8,6 +8,7 @@ import { ItemsUi } from './items-ui';
 import { Sfx, SoundName } from './audio';
 import { Tutorial, spawnDummy } from './tutorial';
 import { playEvents } from './sound-events';
+import { Announcer } from './announcer';
 import { ScreenFx } from './screen-fx';
 import { EndScreen } from './end-screen';
 import { GameEvent, HERO_IDS, HEROES as HERO_DEFS, PingKind, RUNE_INFO, RuneKind, TEAM_NAMES } from '../sim';
@@ -372,6 +373,7 @@ function stopEndSong() {
 }
 function playEnding(w: World) {
   ending = true;
+  announcer.reset();
   app.classList.add('ending');
   settingsPanel.classList.add('hidden');
   itemsUi.toggleShop(false);
@@ -410,6 +412,7 @@ function playEnding(w: World) {
 }
 
 const sfx = new Sfx();
+const announcer = new Announcer(sfx);
 const sfxLoaded = sfx.load();
 const itemsUi = new ItemsUi(
   app,
@@ -809,7 +812,7 @@ function announce(w: World, events: GameEvent[]) {
       continue;
     }
     if (e.type === 'announce') {
-      if (hud.announce(w, e, myTeam)) sfx.play(w.unit(e.unitId)?.team === myTeam ? 'levelUp' : 'glyph', 0.6);
+      hud.announce(w, e, myTeam);
       continue;
     }
     if (e.type === 'bossKilled') {
@@ -919,6 +922,8 @@ async function startMatch(m: Mode, d: Draft, info?: MatchInfo, catchUp = false) 
   renderer = makeRenderer(world.map);
   input?.destroy();
   input = new Input(canvas, renderer, () => world!, () => myHeroId, app);
+  input.onCastRefused = (why) => announcer.refused(why);
+  announcer.reset();
   input.onWardPlaced = () => {
     itemsUi.placingSlot = null;
   };
@@ -962,6 +967,7 @@ let acc = 0;
 let last = performance.now();
 let lastDraw = 0;
 function frame(now: number) {
+  announcer.update();
   acc += Math.min(0.25, (now - last) / 1000);
   last = now;
   if (paused || ending) acc = 0;
@@ -1001,6 +1007,7 @@ function frame(now: number) {
       tutorial?.update(world, world.unit(myHeroId)!);
       playEvents(sfx, world, world.events, myHeroId, myTeam, { x: renderer.camX, y: renderer.camY });
       announce(world, world.events);
+      announcer.onStep(world, before, world.events, myTeam);
       screenFx.onEvents(world, world.events, myHeroId);
       for (const e of world.events) {
         if (e.type === 'attack' && e.targetId === myHeroId && world.unit(e.sourceId)?.kind === 'hero') buzz(20);
