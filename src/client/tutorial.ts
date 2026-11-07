@@ -50,46 +50,173 @@ export interface Lesson {
   steps: Step[];
 }
 
-/** The nearest spot a hero can stand, searching outward from a point. */
-export function openSpot(w: World, x: number, y: number): Point {
-  const { grid, cell } = w.nav;
-  const free = (cx: number, cy: number) => cx >= 0 && cy >= 0 && cx < grid && cy < grid && w.nav.walkable[cy * grid + cx] === 1;
-  const c0 = Math.floor(x / cell);
-  const r0 = Math.floor(y / cell);
-  for (let r = 0; r < 60; r++) {
-    for (let dy = -r; dy <= r; dy++) {
-      for (let dx = -r; dx <= r; dx++) {
-        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
-        // Needs room around it, so a hero isn't wedged against a wall.
-        const room = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].every(([a, b]) => free(c0 + dx + a, r0 + dy + b));
-        if (room) return { x: (c0 + dx + 0.5) * cell, y: (r0 + dy + 0.5) * cell };
+/** For every cell, how far (in cells) it is to the nearest thing that blocks walking: tree, wall or building. */
+const clearances = new WeakMap<World, Int16Array>();
+function clearance(w: World): Int16Array {
+  const known = clearances.get(w);
+  if (known) return known;
+  const { grid, walkable } = w.nav;
+  const dist = new Int16Array(grid * grid).fill(-1);
+  const queue: number[] = [];
+  for (let i = 0; i < dist.length; i++) {
+    if (!walkable[i]) {
+      dist[i] = 0;
+      queue.push(i);
+    }
+  }
+  for (let q = 0; q < queue.length; q++) {
+    const i = queue[q];
+    const cx = i % grid;
+    const cy = (i - cx) / grid;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 0 || y < 0 || x >= grid || y >= grid) continue;
+      const n = y * grid + x;
+      if (dist[n] < 0) {
+        dist[n] = dist[i] + 1;
+        queue.push(n);
       }
     }
   }
-  return { x, y };
+  clearances.set(w, dist);
+  return dist;
+}
+
+/** Cells you can walk to from your fountain, so a lesson never leaves you shut in a forest pocket. */
+const reachable = new WeakMap<World, Uint8Array>();
+function walkableFromBase(w: World): Uint8Array {
+  const known = reachable.get(w);
+  if (known) return known;
+  const { grid, cell, walkable } = w.nav;
+  const seen = new Uint8Array(grid * grid);
+  const stack: number[] = [];
+  for (const f of w.map.fountains) {
+    const c0 = Math.floor(f.x / cell);
+    const r0 = Math.floor(f.y / cell);
+    for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) {
+      const i = (r0 + dy) * grid + c0 + dx;
+      if (walkable[i] && !seen[i]) {
+        seen[i] = 1;
+        stack.push(i);
+      }
+    }
+  }
+  while (stack.length) {
+    const i = stack.pop()!;
+    const cx = i % grid;
+    for (const n of [cx + 1 < grid ? i + 1 : -1, cx > 0 ? i - 1 : -1, i + grid, i - grid]) {
+      if (n >= 0 && n < seen.length && walkable[n] && !seen[n]) {
+        seen[n] = 1;
+        stack.push(n);
+      }
+    }
+  }
+  reachable.set(w, seen);
+  return seen;
+}
+
+/** How clear of trees and walls a spot is, in meters. */
+export function roomAt(w: World, x: number, y: number): number {
+  const { grid, cell } = w.nav;
+  return clearance(w)[Math.floor(y / cell) * grid + Math.floor(x / cell)] * cell;
+}
+
+/** The nearest open ground to a point, with this many meters clear all round if it can be had. */
+export function openSpot(w: World, x: number, y: number, room = 3.5): Point {
+  const { grid, cell } = w.nav;
+  const clear = clearance(w);
+  const walk = walkableFromBase(w);
+  const reach = Math.ceil(30 / cell);
+  const c0 = Math.floor(x / cell);
+  const r0 = Math.floor(y / cell);
+  let best = -1;
+  let bestScore = -Infinity;
+  for (let cy = Math.max(0, r0 - reach); cy <= Math.min(grid - 1, r0 + reach); cy++) {
+    for (let cx = Math.max(0, c0 - reach); cx <= Math.min(grid - 1, c0 + reach); cx++) {
+      const i = cy * grid + cx;
+      if (!walk[i] || clear[i] < 1) continue;
+      // Being short of room costs far more than walking a little further.
+      const short = Math.max(0, room - clear[i] * cell);
+      const score = -short * 100 - Math.hypot(cx - c0, cy - r0) * cell;
+      if (score > bestScore) {
+        bestScore = score;
+        best = i;
+      }
+    }
+  }
+  if (best < 0) return { x, y };
+  return { x: ((best % grid) + 0.5) * cell, y: (Math.floor(best / grid) + 0.5) * cell };
+}
+
+const distToSegment = (p: Point, a: Point, b: Point) => {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const k = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1)));
+  return Math.hypot(p.x - a.x - k * dx, p.y - a.y - k * dy);
+};
+
+/**
+ * The practice ground: the roomiest open clearing in your half of the jungle, away from lanes (creeps), towers and
+ * the fountain (they would shoot the dummies) and jungle camps. Worked out once per match.
+ */
+const practiceGrounds = new WeakMap<World, Map<number, Point>>();
+export function practiceGround(w: World, team: number): Point {
+  let known = practiceGrounds.get(w);
+  if (!known) practiceGrounds.set(w, (known = new Map()));
+  const cached = known.get(team);
+  if (cached) return cached;
+  const { grid, cell, height } = w.nav;
+  const clear = clearance(w);
+  const walk = walkableFromBase(w);
+  const mine = w.map.fountains[team as 0 | 1];
+  const theirs = w.map.fountains[team === 0 ? 1 : 0];
+  const lanes = Object.values(w.map.lanes);
+  const buildings = w.map.structures;
+  let best: Point = mine;
+  let bestScore = -Infinity;
+  // A coarse sweep is plenty: clearings are many meters across.
+  const stride = Math.max(1, Math.round(2 / cell));
+  for (let cy = 0; cy < grid; cy += stride) {
+    for (let cx = 0; cx < grid; cx += stride) {
+      const i = cy * grid + cx;
+      if (!walk[i] || height[i] !== 1 || clear[i] * cell < 4) continue;
+      const p = { x: (cx + 0.5) * cell, y: (cy + 0.5) * cell };
+      if (Math.hypot(p.x - mine.x, p.y - mine.y) >= Math.hypot(p.x - theirs.x, p.y - theirs.y)) continue;
+      if (buildings.some((b) => Math.hypot(p.x - b.pos.x, p.y - b.pos.y) < 22)) continue;
+      if (w.map.camps.some((c) => Math.hypot(p.x - c.x, p.y - c.y) < 14)) continue;
+      if (w.map.hills.some((h) => Math.hypot(p.x - h.x, p.y - h.y) < 12)) continue;
+      if (lanes.some((l) => l.some((a, k) => k > 0 && distToSegment(p, l[k - 1], a) < 20))) continue;
+      const score = Math.min(clear[i] * cell, 9) * 10 - Math.hypot(p.x - mine.x, p.y - mine.y) * 0.05;
+      if (score > bestScore) {
+        bestScore = score;
+        best = p;
+      }
+    }
+  }
+  known.set(team, best);
+  return best;
 }
 
 /** Lift the hero to a place on the map, standing still. Only the tutorial does this. */
-function put(w: World, me: Unit, p: Point) {
-  const q = openSpot(w, p.x, p.y);
+function put(w: World, me: Unit, p: Point, room?: number) {
+  const q = openSpot(w, p.x, p.y, room);
   me.x = me.px = q.x;
   me.y = me.py = q.y;
   w.enqueue({ type: 'stop', unitId: me.id });
 }
 
-/** A spot beside a building, on the side of its own fountain. */
-function beside(w: World, me: Unit, b: Unit | undefined): Point {
+/** Just above a building on screen, so it shows below the hero, clear of the lesson text. */
+function beside(me: Unit, b: Unit | undefined): Point {
   if (!b) return { x: me.x, y: me.y };
-  const f = w.map.fountains[me.team as 0 | 1];
-  const d = Math.hypot(f.x - b.x, f.y - b.y) || 1;
-  return { x: b.x + ((f.x - b.x) / d) * (b.radius + 3), y: b.y + ((f.y - b.y) / d) * (b.radius + 3) };
+  return { x: b.x, y: b.y - b.radius - 3 };
 }
 
-const atBuilding = (tier: Tier, lane: LaneName | null = 'mid') => (w: World, me: Unit) => put(w, me, beside(w, me, w.findStructure(me.team, tier, lane)[0]));
+const atBuilding = (tier: Tier, lane: LaneName | null = 'mid') => (w: World, me: Unit) => put(w, me, beside(me, w.findStructure(me.team, tier, lane)[0]));
 const buildingMark = (tier: Tier, lane: LaneName | null = 'mid') => (w: World, me: Unit) => w.findStructure(me.team, tier, lane)[0] ?? null;
 const atFountain = (w: World, me: Unit) => put(w, me, w.map.fountains[me.team as 0 | 1]);
-/** Quiet ground on your side, away from lanes and towers: the foot of your nearest mountain. */
-const quietSpot = (w: World, me: Unit): Point => {
+/** Your nearest mountain. */
+const nearestMountain = (w: World, me: Unit): Point => {
   const f = w.map.fountains[me.team as 0 | 1];
   return [...w.map.hills].sort((a, b) => Math.hypot(a.x - f.x, a.y - f.y) - Math.hypot(b.x - f.x, b.y - f.y))[0];
 };
@@ -124,8 +251,8 @@ export const LESSONS: Lesson[] = [
       {
         text: 'Drag on the left side of the screen: that is your joystick. Walk to the glowing marker.',
         enter: (w, me, t) => {
-          put(w, me, quietSpot(w, me));
-          t.goal = openSpot(w, me.x + 7, me.y + 7);
+          put(w, me, practiceGround(w, me.team));
+          t.goal = openSpot(w, me.x + 6, me.y + 4);
         },
         marker: (_w, _me, t) => t.goal,
         done: (_w, me, t) => !!t.goal && Math.hypot(me.x - t.goal.x, me.y - t.goal.y) < 3,
@@ -143,7 +270,7 @@ export const LESSONS: Lesson[] = [
       {
         text: 'Each level gives you a point to spend on a spell. Tap a + on your spells to learn one. Passive spells work by themselves, so you will get to pick again until you have one to cast.',
         enter: (w, me, t) => {
-          put(w, me, quietSpot(w, me));
+          put(w, me, practiceGround(w, me.team));
           me.hero!.skillPoints = Math.max(1, me.hero!.skillPoints);
           t.autoAttackOff(w, me);
         },
@@ -157,7 +284,7 @@ export const LESSONS: Lesson[] = [
         text: 'Use a spell: hold its button, drag to aim, and let go. A quick tap aims for you. Drag onto the cancel area to call it off. Hold still to read what the spell does.',
         spot: ['#btn-q', '#btn-w'],
         enter: (w, me, t) => {
-          t.addDummy(w, me, 4, -2);
+          t.addDummy(w, me, 4, 3);
           me.mana = me.maxMana;
           for (const a of me.hero!.abilities) a.cooldown = 0;
         },
@@ -170,7 +297,7 @@ export const LESSONS: Lesson[] = [
         enter: (w, me, t) => {
           const d = w.unit(t.dummyId);
           if (d?.alive) d.hp = Math.min(d.hp, 260);
-          else t.addDummy(w, me, 3, -2, 1, 260);
+          else t.addDummy(w, me, 3, 3, 1, 260);
         },
         marker: dummyMark,
         done: (w, _me, t) => !w.unit(t.dummyId)?.alive,
@@ -191,7 +318,7 @@ export const LESSONS: Lesson[] = [
         spot: ['#btn-attack'],
         enter: (w, me, t) => {
           t.denies = me.hero!.denies;
-          t.addDummy(w, me, 3, -2, me.team as Team, 5);
+          t.addDummy(w, me, -3, 3, me.team as Team, 5);
         },
         marker: dummyMark,
         done: (_w, me, t) => me.hero!.denies > t.denies,
@@ -241,7 +368,13 @@ export const LESSONS: Lesson[] = [
       { text: 'Three lanes join the bases: top, middle and bottom. Only the middle lane crosses the river. The side lanes stay high and dry, and you can see down into the river from them.', enter: (w, me) => put(w, me, w.map.runeSpots[me.team as 0 | 1]) },
       { text: `Runes appear on the river at ${RUNE_FIRST / 60}:00 and every ${RUNE_INTERVAL / 60} minutes after. Walk onto one for a burst of speed, double damage, healing, invisibility or gold.`, marker: (w, me) => w.map.runeSpots[me.team as 0 | 1] },
       { text: 'Trees block walking and sight, but never spells. Some forest pockets have no way out on foot: get out with a blink, a charge, or a teleport.' },
-      { text: "This mountain can't be walked on. You get up or down only by blink, charge or teleport. Anyone can stand at its foot and plant a totem on top.", enter: (w, me) => put(w, me, quietSpot(w, me)), marker: (w, me) => quietSpot(w, me) },
+      {
+        text: "This mountain can't be walked on. You get up or down only by blink, charge or teleport. Anyone can stand at its foot and plant a totem on top.", enter: (w, me) => {
+          const m = nearestMountain(w, me);
+          put(w, me, { x: m.x, y: m.y - 9 });
+        },
+        marker: (w, me) => nearestMountain(w, me),
+      },
       { text: `Dark areas are fog: you see only what your heroes, creeps and totems see. Day lasts ${DAY_SECONDS / 60} minutes and night ${NIGHT_SECONDS / 60}, and at night everyone sees less far.`, spot: ['#clock-disc'] },
     ],
   },
@@ -274,7 +407,7 @@ export const LESSONS: Lesson[] = [
         text: 'The Warden lives on the river in one of two walled houses, and you can only see or fight it from inside. This is its house. It leaves you alone until someone attacks it.',
         enter: (w, me) => {
           const h = wardenHouse(w);
-          put(w, me, { x: h.x + h.door.x * (h.outer + 3), y: h.y + h.door.y * (h.outer + 3) });
+          put(w, me, { x: h.x, y: h.y - h.inner + 3 }, 2);
         },
         marker: (w) => wardenHouse(w),
       },
@@ -334,7 +467,7 @@ export class Tutorial {
 
   /** Make a dummy near the hero (offset in meters). */
   addDummy(w: World, me: Unit, dx: number, dy: number, team: Team = 1, hp = 1200) {
-    const p = openSpot(w, me.x + dx, me.y + dy);
+    const p = openSpot(w, me.x + dx, me.y + dy, 2);
     const d = spawnDummy(w, p.x, p.y, team, hp);
     this.dummies.push(d.id);
     this.dummyId = d.id;
@@ -427,7 +560,7 @@ export class Tutorial {
     this.setSpots(step.spot ?? []);
     this.box.className = '';
     const nextLabel = this.i === lesson.steps.length - 1 ? 'Finish' : 'Next';
-    this.box.innerHTML = `<div class="tut-step">${lesson.title} · ${this.i + 1} of ${lesson.steps.length}</div><p>${step.text}</p><div class="tut-acts"><button id="tut-lessons">Lessons</button>${step.done ? '' : `<button id="tut-next" class="on">${nextLabel}</button>`}</div>`;
+    this.box.innerHTML = `<div class="tut-text"><div class="tut-step">${lesson.title} · ${this.i + 1} of ${lesson.steps.length}</div><p>${step.text}</p></div><div class="tut-acts">${step.done ? '' : `<button id="tut-next" class="on">${nextLabel}</button>`}<button id="tut-lessons">Lessons</button></div>`;
     this.tap('#tut-lessons', () => {
       this.closeLesson();
       this.renderMenu();

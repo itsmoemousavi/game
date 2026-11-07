@@ -42,7 +42,7 @@ let myHeroId = 0;
 let myTeam: Team = 0;
 let devPick: HeroId | null = null;
 // Local dev server only (never in the published game): lets test scripts look at the match.
-if (import.meta.env.DEV) Object.assign(window, { dbg: { world: () => world, me: () => world?.unit(myHeroId), pick: (h: HeroId) => (devPick = h), renderer: () => renderer, net: () => net, draft: () => draftUi, sfx: () => sfx } });
+if (import.meta.env.DEV) Object.assign(window, { dbg: { world: () => world, me: () => world?.unit(myHeroId), pick: (h: HeroId) => (devPick = h), renderer: () => renderer, net: () => net, draft: () => draftUi, sfx: () => sfx, tutorial: () => tutorial } });
 const profile = loadProfile(phoneStorage);
 let pickedLane: LaneId = 'mid';
 let pickedDifficulty: BotDifficulty = 'normal';

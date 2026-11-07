@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { describe, expect, it } from 'vitest';
 import { HERO_IDS, Team, World } from '../src/sim';
-import { LESSONS, Tutorial, openSpot, spawnDummy } from '../src/client/tutorial';
+import { LESSONS, Tutorial, openSpot, practiceGround, roomAt, spawnDummy } from '../src/client/tutorial';
 import indexHtml from '../index.html?raw';
 
 const box = () => ({ innerHTML: '', className: '', classList: { add() {}, remove() {} }, ownerDocument: { querySelectorAll: () => [] }, querySelector: () => null }) as unknown as HTMLElement;
@@ -53,6 +53,44 @@ describe('tutorial', () => {
         expect(w.nav.walkable[Math.floor(me.y / c) * w.nav.grid + Math.floor(me.x / c)], `${l.id}: ${s.text}`).toBe(1);
         w.step();
       }
+    }
+  });
+
+  it('every place a lesson puts you has open ground around it, never a gap in the trees', () => {
+    const { w, me, t } = setup();
+    for (const l of LESSONS) {
+      for (const s of l.steps) {
+        if (!s.enter) continue;
+        s.enter(w, me, t);
+        expect(roomAt(w, me.x, me.y), `${l.id}: ${s.text.slice(0, 40)}`).toBeGreaterThanOrEqual(2);
+        w.step();
+      }
+    }
+  });
+
+  it('buildings a lesson talks about show below the hero, clear of the lesson text', () => {
+    const { w, me, t } = setup();
+    for (const l of LESSONS) {
+      for (const s of l.steps) {
+        if (!s.enter || !s.marker) continue;
+        s.enter(w, me, t);
+        const m = s.marker(w, me, t)!;
+        expect(m.y, `${l.id}: ${s.text.slice(0, 40)}`).toBeGreaterThan(me.y);
+        expect(Math.hypot(m.x - me.x, m.y - me.y), `${l.id}: ${s.text.slice(0, 40)}`).toBeLessThan(13);
+        w.step();
+      }
+    }
+  });
+
+  it('the practice ground is a roomy clearing, on your side, far from lanes, towers and camps', () => {
+    const { w } = setup();
+    for (const team of [0, 1]) {
+      const p = practiceGround(w, team);
+      expect(roomAt(w, p.x, p.y)).toBeGreaterThanOrEqual(6);
+      const d = (f: { x: number; y: number }) => Math.hypot(p.x - f.x, p.y - f.y);
+      expect(d(w.map.fountains[team as 0 | 1])).toBeLessThan(d(w.map.fountains[team === 0 ? 1 : 0]));
+      for (const b of w.map.structures) expect(d(b.pos)).toBeGreaterThanOrEqual(22);
+      for (const c of w.map.camps) expect(d(c)).toBeGreaterThanOrEqual(14);
     }
   });
 

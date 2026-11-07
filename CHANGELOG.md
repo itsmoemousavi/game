@@ -31,6 +31,11 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.17.x · New sounds
 
+### 0.17.12
+
+- **The tutorial puts you in better places.** Fighting practice now happens in an open clearing in the jungle instead of between trees, and you always stand with open ground around you.
+- **You can see what a lesson is talking about.** Buildings and the mountain now show below your hero, the text box is wider and shorter so it covers less, and the Warden lesson takes you inside its house.
+
 ### 0.17.11
 
 - **A shorter hero stats panel.** Tap the i on your portrait: three columns for Attack, Defense and Magic, showing only what isn't already on screen. Extras like lifesteal appear once you have them.
