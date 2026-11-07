@@ -31,6 +31,12 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.17.x · New sounds
 
+### 0.17.9
+
+- **All towers are stronger:** about 20% more health and 15% more damage, Shrine towers too.
+- **New item and spell descriptions:** name, mana and cooldown per level with your current level in bold, then Stats, then Active or Passive. Stats are short lines like "+45 Damage".
+- Spell numbers that showed odd internal names now have plain names.
+
 ### 0.17.8
 
 - **The game now has an announcer.** A voice tells you when the battle is about to begin, when towers and barracks are under attack or fall, about Mega Creeps, first blood, kill streaks, team wipes and shutdowns.

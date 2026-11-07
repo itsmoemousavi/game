@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { VALUE_LABELS, itemCard, itemStatLines, perLevel } from '../src/client/describe';
+import { HEROES } from '../src/sim';
 import { HERO_IDS, ITEMS, ItemId, LANE_IDS, PlayerSlot, TICK_RATE, Team, Unit, World, castBlocker, isInvisible } from '../src/sim';
 
 function humans() {
@@ -31,7 +33,7 @@ describe('more items', () => {
       const d = ITEMS[id];
       const parts = (d.recipe ?? []).reduce((s, p) => s + ITEMS[p].cost, 0);
       expect(d.cost).toBeGreaterThan(parts);
-      expect(d.summary.length).toBeGreaterThan(10);
+      expect(Object.keys(d.stats).length > 0 || d.use || d.passive).toBeTruthy();
     }
   });
 
@@ -207,5 +209,23 @@ describe('more items', () => {
     expect(foe.buffs.some((b) => b.key === 'slow:mireStaff')).toBe(true);
     expect(foe.hp).toBeLessThan(hp);
     expect(a.hero!.items[0]!.cooldown).toBeGreaterThan(0);
+  });
+});
+
+describe('item and spell cards', () => {
+  it('every number a spell has is named in plain words', () => {
+    for (const h of Object.values(HEROES)) for (const a of h.abilities) for (const k of Object.keys(a.values)) expect(VALUE_LABELS[k], `${a.name}: ${k}`).toBeTruthy();
+  });
+  it('the current level is marked, and an item lists its stats and what it does', () => {
+    expect(perLevel([25, 35, 45, 55], 2)).toMatch(/25.*class="lv cur">35.*45.*55/);
+    expect((perLevel([25, 35], 0).match(/ cur/g) ?? []).length).toBe(0);
+    expect(itemStatLines(ITEMS.reaperEdge.stats)).toContain('+45 Damage');
+    expect(itemStatLines(ITEMS.sunderPike.stats)).toContain('−5 Target armor');
+    const cloak = itemCard('wardedCloak');
+    expect(cloak.indexOf('Cooldown')).toBeLessThan(cloak.indexOf('Stats'));
+    expect(cloak.indexOf('Stats')).toBeLessThan(cloak.indexOf('Active'));
+  });
+  it('anything you can use says what it does', () => {
+    for (const d of Object.values(ITEMS)) if (d.active || d.consumable) expect(d.use, d.name).toBeTruthy();
   });
 });

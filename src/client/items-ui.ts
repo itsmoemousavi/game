@@ -27,6 +27,7 @@ import {
 import { TEAM_COLORS } from './renderer';
 import { toLocal } from './screen';
 import { itemIcon } from './icons';
+import { itemCard } from './describe';
 
 /**
  * Item bar (6 slots + teleport slot), shop panel and teleport destination picker.
@@ -364,7 +365,7 @@ export class ItemsUi {
     if (sel.kind === 'tp') {
       box.innerHTML = `
         <div class="d-top"><i>${itemIcon('tp')}</i><div><b>Teleport Scroll</b><span class="d-cost">${TELEPORT.cost} gold</span></div></div>
-        <p class="d-sum">Stand still for 3 s, then teleport to any allied building. You can't move while it charges, and tapping the X stops it.</p>
+        <h4 class="c-head">Active</h4><p class="c-text">Stand still for 3 s, then teleport to any allied building. You can't move while it charges, and tapping the X stops it.</p>
         <div class="d-acts"><button id="shop-act"></button></div>
         <small id="shop-why"></small>`;
       onTap(box.querySelector('#shop-act')!, () => {
@@ -386,7 +387,7 @@ export class ItemsUi {
     if (id === 'tp') {
       box.innerHTML = `
         <div class="d-top"><i>${itemIcon('tp')}</i><div><b>Teleport Scroll${slot!.count > 1 ? ` ×${slot!.count}` : ''}</b><span class="d-cost">${TELEPORT.cost} gold each</span></div></div>
-        <p class="d-sum">Teleport to an allied building. On the courier: it goes into your TP slot when delivered.</p>
+        <h4 class="c-head">Active</h4><p class="c-text">Teleport to an allied building. On the courier: it goes into your TP slot when delivered.</p>
         <div class="d-acts"><button id="shop-act"></button></div>
         <small id="shop-why"></small>`;
     } else {
@@ -395,7 +396,7 @@ export class ItemsUi {
       const usedIn = ITEM_IDS.filter((x) => ITEMS[x].recipe?.includes(id));
       box.innerHTML = `
         <div class="d-top"><i>${itemIcon(id)}</i><div><b>${d.name}</b><span class="d-cost">${d.cost} gold</span></div></div>
-        <p class="d-sum">${d.summary}</p>
+        ${itemCard(id)}
         ${parts ? `<div class="d-row"><small>Made from</small>${parts}</div>` : ''}
         ${usedIn.length ? `<div class="d-row"><small>Part of</small>${usedIn.map((x) => `<span class="part" title="${ITEMS[x].name}">${itemIcon(x)}</span>`).join('')}</div>` : ''}
         <div class="d-acts"><button id="shop-act"></button>${mine ? '<button id="shop-drop">DROP</button>' : ''}</div>
@@ -580,7 +581,7 @@ export class ItemsUi {
         el.classList.toggle('reserved', !!s?.reserved);
         el.querySelector('.lbl')!.innerHTML = d ? itemIcon(d.id) : '';
         el.querySelector('.cnt')!.textContent = s && s.count > 1 ? String(s.count) : '';
-        el.title = d ? `${d.name}: ${d.summary}${this.shopOpen ? ' (tap to pick it, then Sell or Drop)' : ' (hold to drop it)'}` : 'Empty slot';
+        el.title = d ? `${d.name}${this.shopOpen ? ' (tap to pick it, then Sell or Drop)' : ' (hold to drop it)'}` : 'Empty slot';
       });
       this.tpSlot.querySelector('.cnt')!.textContent = String(h.tpCount);
       const cd = Math.ceil(h.tpCooldown);

@@ -1,3 +1,4 @@
+import { abilityCard } from './describe';
 import { esc, heroName, rosterName } from './player-names';
 import {
   BUYBACK_COOLDOWN,
@@ -6,7 +7,6 @@ import {
   HEROES,
   ITEMS,
   TELEPORT,
-  effectiveCooldown,
   MAX_LEVEL,
   STATUS_INFO,
   Status,
@@ -396,38 +396,7 @@ export class Hud {
     }
     const h = me.hero!;
     const def: AbilityDef = HEROES[h.defId].abilities[slot];
-    const lvl = h.abilities[slot].level;
-    const levels = def.manaCost.length;
-    const perLevel = (vals: number[], fmt = (v: number) => String(Math.round(v * 10) / 10)) =>
-      vals.map((v, i) => (i === lvl - 1 ? `<span class="cur">${fmt(v)}</span>` : fmt(v))).join(' / ');
-    const labels: Record<string, string> = {
-      damage: 'Damage',
-      stun: 'Stun (s)',
-      block: 'Damage blocked per attack',
-      lowHpArmor: 'Armor below 50% HP',
-      windup: 'Wind-up (s)',
-      critMult: 'Critical multiplier',
-      speedPct: 'Speed bonus %',
-      dps: 'Damage per second',
-      slowPct: 'Slow %',
-      duration: 'Duration (s)',
-      heal: 'Total heal',
-      delay: 'Delay (s)',
-      burnDps: 'Burn damage per second',
-      burnDuration: 'Burn duration (s)',
-    };
-    const kind =
-      def.targeting === 'passive'
-        ? 'Passive'
-        : { none: 'Active · around you', direction: 'Active · aimed direction', point: 'Active · aimed area', enemy: 'Active · enemy', ally: 'Active · ally' }[def.targeting];
-    let html = `<h3>${def.name}${def.ultimate ? ' <small>(Ultimate)</small>' : ''}</h3><div class="tag">${kind} · Level ${lvl}/${levels}</div><p>${def.summary}</p>`;
-    for (const [k, vals] of Object.entries(def.values)) html += `<div class="row"><b>${labels[k] ?? k}</b><span>${perLevel(vals)}</span></div>`;
-    if (def.targeting !== 'passive') {
-      html += `<div class="row"><b>Mana</b><span>${perLevel(def.manaCost)}</span></div>`;
-      html += `<div class="row"><b>Cooldown (s)</b><span>${perLevel(def.cooldown.map((_, i) => effectiveCooldown(me, def, i + 1)))}</span></div>`;
-      if (def.castRange) html += `<div class="row"><b>Range</b><span>${def.castRange} m</span></div>`;
-      if (def.radius && def.targeting !== 'direction') html += `<div class="row"><b>Radius</b><span>${def.radius} m</span></div>`;
-    }
+    const html = abilityCard(me, def, h.abilities[slot].level);
     tip.innerHTML = html;
     tip.classList.remove('hidden');
   }

@@ -109,7 +109,10 @@ export interface ItemDef {
   /** Item with a button. */
   active?: { kind: 'blink' | 'immunity' | 'manaBurst' | 'frostNova' | 'stoneskin' | 'silence' | 'teamHeal' | 'vanish' | 'mire'; cooldown: number; range?: number; duration?: number; amount?: number };
   aura?: ItemAura;
-  summary: string;
+  /** What the button does, for an item you can use. */
+  use?: string;
+  /** What it does by itself, when its stat lines don't say it all. */
+  passive?: string;
   /** Not sold in the shop and can't be sold back (the Warden's revive charm). */
   noShop?: boolean;
   /** Shop tab, when what it does matters more than the stats it gives. */
@@ -125,7 +128,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     icon: '#60a5fa',
     stats: {},
     consumable: { maxStack: 3 },
-    summary: 'Use: restores 150 mana over 8 seconds. Stacks up to 3.',
+    use: "Restores 150 mana over 8 seconds. Stacks up to 3.",
   },
   longScope: {
     id: 'longScope',
@@ -135,7 +138,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     icon: '#fcd34d',
     stats: { attackRange: 1.5, attackSpeedPct: 8 },
     tab: 'attack',
-    summary: 'Ranged heroes only: +1.5 m attack range. Everyone: +8% attack speed.',
+    passive: "The extra attack range works for ranged heroes only.",
   },
   wayfarerBoots: {
     id: 'wayfarerBoots',
@@ -146,8 +149,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     stats: { moveSpeedPct: 30, teleportBoots: true },
     recipe: ['swiftBoots'],
     tab: 'upgrade',
-    summary:
-      '+30% move speed. You always have 1 teleport, which is never used up, with a 30 s cooldown (instead of 60 s). You can teleport to allied heroes and creeps too, not only buildings. If you drop or sell them you keep 1 teleport. Upgraded from Swift Boots.',
+    passive: "You always have 1 teleport, which is never used up, with a 30 s cooldown instead of 60 s. You can teleport to allied heroes and creeps too, not only buildings. If you drop or sell them you keep 1 teleport.",
   },
   healingSalve: {
     id: 'healingSalve',
@@ -157,7 +159,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     icon: '#4ade80',
     stats: {},
     consumable: { maxStack: 3 },
-    summary: 'Use: restores 350 health over 8 seconds. Stacks up to 3.',
+    use: "Restores 350 health over 8 seconds. Stacks up to 3.",
   },
   observerWard: {
     id: 'observerWard',
@@ -167,7 +169,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     icon: '#facc15',
     stats: {},
     consumable: { maxStack: 2 },
-    summary: 'Use, then tap the ground nearby: an invisible totem that gives vision for 6 minutes. Stacks up to 2.',
+    use: "Tap the ground nearby to plant an invisible totem that gives vision for 6 minutes. Stacks up to 2.",
   },
   sentryWard: {
     id: 'sentryWard',
@@ -177,7 +179,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     icon: '#60a5fa',
     stats: {},
     consumable: { maxStack: 2 },
-    summary: 'Use, then tap the ground nearby: reveals invisible enemies and totems around it for 6 minutes.',
+    use: "Tap the ground nearby to plant a totem that reveals invisible enemies and totems around it for 6 minutes.",
   },
   twinBlades: {
     id: 'twinBlades',
@@ -187,7 +189,6 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     icon: '#e2e8f0',
     stats: { damage: 30, attackSpeedPct: 30 },
     recipe: ['ironBlade', 'quickGloves'],
-    summary: '+30 damage, +30% attack speed. Built from Iron Blade + Quick Gloves.',
   },
   titanHeart: {
     id: 'titanHeart',
@@ -197,7 +198,6 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     icon: '#b91c1c',
     stats: { hp: 650, hpRegen: 6 },
     recipe: ['vitalStone', 'vitalStone'],
-    summary: '+650 health, +6 health regen. Built from two Vital Stones.',
   },
   archmageStaff: {
     id: 'archmageStaff',
@@ -207,7 +207,6 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     icon: '#7c3aed',
     stats: { mana: 450, manaRegen: 3, spellAmpPct: 22 },
     recipe: ['manaCrystal', 'arcaneAmplifier'],
-    summary: '+450 mana, +3 mana regen, +22% ability damage. Built from Mana Crystal + Arcane Amplifier.',
   },
   wardedCloak: {
     id: 'wardedCloak',
@@ -218,7 +217,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     stats: { armor: 6, mana: 150 },
     recipe: ['guardPlate', 'manaCrystal'],
     active: { kind: 'immunity', cooldown: 50, duration: 4 },
-    summary: '+6 armor, +150 mana. Use: immune to abilities (damage, stuns, slows) for 4 s. Built from Guard Plate + Mana Crystal.',
+    use: "Immune to abilities (damage, stuns, slows) for 4 s.",
   },
   shadowStep: {
     id: 'shadowStep',
@@ -228,7 +227,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     icon: '#6366f1',
     stats: {},
     active: { kind: 'blink', cooldown: 12, range: 11 },
-    summary: 'Use, then tap the ground: blink up to 11 m. Can’t be used for 3 s after taking damage from a hero.',
+    use: "Tap the ground to blink up to 11 m. Can't be used for 3 s after taking damage from a hero.",
   },
   swiftBoots: {
     id: 'swiftBoots',
@@ -237,7 +236,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     cost: 450,
     icon: '#a3a3a3',
     stats: { moveSpeedPct: 15 },
-    summary: '+15% move speed (one pair of boots counts).',
+    passive: "Only one pair of boots counts.",
   },
   ironBlade: {
     id: 'ironBlade',
@@ -246,7 +245,6 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     cost: 400,
     icon: '#e5e7eb',
     stats: { damage: 15 },
-    summary: '+15 attack damage.',
   },
   vitalStone: {
     id: 'vitalStone',
@@ -255,7 +253,6 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     cost: 450,
     icon: '#ef4444',
     stats: { hp: 220, hpRegen: 1.5 },
-    summary: '+220 health, +1.5 health regen.',
   },
   manaCrystal: {
     id: 'manaCrystal',
@@ -264,7 +261,6 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     cost: 450,
     icon: '#3b82f6',
     stats: { mana: 200, manaRegen: 1.5 },
-    summary: '+200 mana, +1.5 mana regen.',
   },
   quickGloves: {
     id: 'quickGloves',
@@ -273,7 +269,6 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     cost: 500,
     icon: '#f59e0b',
     stats: { attackSpeedPct: 20 },
-    summary: '+20% attack speed.',
   },
   guardPlate: {
     id: 'guardPlate',
@@ -282,7 +277,6 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     cost: 500,
     icon: '#64748b',
     stats: { armor: 5 },
-    summary: '+5 armor.',
   },
   focusLens: {
     id: 'focusLens',
@@ -291,7 +285,6 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     cost: 1200,
     icon: '#22d3ee',
     stats: { cdrPct: 15, mana: 150, manaRegen: 1 },
-    summary: '−15% ability cooldowns, +150 mana, +1 mana regen.',
   },
   arcaneAmplifier: {
     id: 'arcaneAmplifier',
@@ -300,7 +293,6 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     cost: 1300,
     icon: '#a855f7',
     stats: { spellAmpPct: 15, mana: 150 },
-    summary: '+15% ability damage, +150 mana.',
   },
   lifedrinker: {
     id: 'lifedrinker',
@@ -309,7 +301,6 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     cost: 1100,
     icon: '#be123c',
     stats: { damage: 12, lifestealPct: 15 },
-    summary: '+12 damage. Attacks heal for 15% of damage dealt.',
   },
   crownOfAscension: {
     id: 'crownOfAscension',
@@ -318,7 +309,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     cost: 2600,
     icon: '#facc15',
     stats: { ultUpgrade: true, hp: 200, mana: 200 },
-    summary: 'Upgrades your Ultimate: +25% effect, −30% cooldown. +200 health, +200 mana.',
+    passive: "Upgrades your Ultimate: +25% effect, −30% cooldown.",
   },
   // ---- boot upgrades (built from Swift Boots; only one pair of boots counts for speed)
   fleetBoots: {
@@ -329,7 +320,6 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     icon: '#fde68a',
     stats: { moveSpeedPct: 24, attackSpeedPct: 10 },
     recipe: ['swiftBoots'],
-    summary: '+24% move speed, +10% attack speed. Upgraded from Swift Boots.',
   },
   platedBoots: {
     id: 'platedBoots',
@@ -339,7 +329,6 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     icon: '#94a3b8',
     stats: { moveSpeedPct: 18, armor: 5, hpRegen: 3 },
     recipe: ['swiftBoots', 'guardPlate'],
-    summary: '+18% move speed, +5 armor, +3 health regen. Built from Swift Boots + Guard Plate.',
   },
   arcaneBoots: {
     id: 'arcaneBoots',
@@ -350,7 +339,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     stats: { moveSpeedPct: 18, mana: 250 },
     recipe: ['swiftBoots', 'manaCrystal'],
     active: { kind: 'manaBurst', cooldown: 45, range: 10, amount: 135 },
-    summary: '+18% move speed, +250 mana. Use: restores 135 mana to you and allied heroes within 10 m. Built from Swift Boots + Mana Crystal.',
+    use: "Restores 135 mana to you and allied heroes within 10 m.",
   },
   // ---- critical hits
   keenEdge: {
@@ -361,7 +350,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     icon: '#fca5a5',
     stats: { damage: 15, critChance: 20, critMult: 1.6 },
     recipe: ['ironBlade'],
-    summary: '+15 damage. Attacks have a 20% chance to deal 160% damage (not on buildings). Built from Iron Blade.',
+    passive: "A critical hit deals 160% damage. Not on buildings.",
   },
   reaperEdge: {
     id: 'reaperEdge',
@@ -371,7 +360,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     icon: '#dc2626',
     stats: { damage: 45, critChance: 25, critMult: 2.1 },
     recipe: ['keenEdge', 'ironBlade'],
-    summary: '+45 damage. Attacks have a 25% chance to deal 210% damage (not on buildings). Built from Keen Edge + Iron Blade.',
+    passive: "A critical hit deals 210% damage. Not on buildings.",
   },
   // ---- melee only
   cleavingAxe: {
@@ -382,7 +371,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     icon: '#f97316',
     stats: { damage: 25, cleavePct: 40 },
     recipe: ['ironBlade', 'quickGloves'],
-    summary: '+25 damage. Melee heroes only: attacks also hit enemies within 3 m of the target for 40% damage. Built from Iron Blade + Quick Gloves.',
+    passive: "Melee heroes only: attacks also hit enemies within 3 m of the target for 40% damage.",
   },
   // ---- casters
   soulChalice: {
@@ -393,7 +382,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     icon: '#e879f9',
     stats: { hp: 250, mana: 200, spellLifestealPct: 15 },
     recipe: ['vitalStone', 'manaCrystal'],
-    summary: '+250 health, +200 mana. Ability damage heals you for 15% of it (5% against creeps and monsters). Built from Vital Stone + Mana Crystal.',
+    passive: "Ability damage heals you for 15% of it, 5% against creeps and monsters.",
   },
   // ---- team
   bannerOfValor: {
@@ -405,7 +394,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     stats: { hp: 200, armor: 2 },
     recipe: ['guardPlate', 'vitalStone'],
     aura: { radius: 12, armor: 4, hpRegen: 3 },
-    summary: '+200 health, +2 armor. Aura: you and allied heroes within 12 m get +4 armor and +3 health regen (auras of the same kind don\'t stack). Built from Guard Plate + Vital Stone.',
+    passive: "You and allied heroes within 12 m get +4 armor and +3 health regen. Auras of the same kind don't stack.",
   },
   // ---- actives
   frostHorn: {
@@ -416,7 +405,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     icon: '#7dd3fc',
     stats: { hp: 150, damage: 10 },
     active: { kind: 'frostNova', cooldown: 20, range: 6, duration: 3, amount: 80 },
-    summary: '+150 health, +10 damage. Use: a blast of frost deals 80 damage to enemies within 6 m and slows them by 45% for 3 s.',
+    use: "A blast of frost deals 80 damage to enemies within 6 m and slows them by 45% for 3 s.",
   },
   stoneskinAmulet: {
     id: 'stoneskinAmulet',
@@ -426,7 +415,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     icon: '#a8a29e',
     stats: { hp: 250, armor: 3 },
     active: { kind: 'stoneskin', cooldown: 30, duration: 4, amount: 15 },
-    summary: '+250 health, +3 armor. Use: +15 armor for 4 s.',
+    use: "+15 armor for 4 s.",
   },
   // ---- attackers
   sunderPike: {
@@ -438,7 +427,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     stats: { damage: 25, sunderArmor: 5 },
     recipe: ['ironBlade', 'guardPlate'],
     tab: 'attack',
-    summary: '+25 damage. Your attacks lower the target\'s armor by 5 for 4 s (doesn\'t stack). Built from Iron Blade + Guard Plate.',
+    passive: "Your attacks lower the target's armor by 5 for 4 s. Doesn't stack.",
   },
   stormBlade: {
     id: 'stormBlade',
@@ -449,7 +438,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     stats: { damage: 25, attackSpeedPct: 20, chainChance: 25 },
     recipe: ['ironBlade', 'quickGloves'],
     tab: 'attack',
-    summary: '+25 damage, +20% attack speed. Attacks have a 25% chance to throw lightning: 80 damage to the target and up to 2 enemies near it (not on buildings). Built from Iron Blade + Quick Gloves.',
+    passive: "The lightning deals 80 damage to the target and up to 2 enemies near it. Not on buildings.",
   },
   siegeMaul: {
     id: 'siegeMaul',
@@ -460,7 +449,6 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     stats: { damage: 20, buildingDamagePct: 60 },
     recipe: ['ironBlade'],
     tab: 'attack',
-    summary: '+20 damage. Your attacks deal 60% more damage to buildings. Built from Iron Blade.',
   },
   ghostShroud: {
     id: 'ghostShroud',
@@ -472,7 +460,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     recipe: ['vitalStone', 'quickGloves'],
     active: { kind: 'vanish', cooldown: 35, duration: 5, amount: 25 },
     tab: 'attack',
-    summary: '+150 health, +20% attack speed. Use: turn invisible for 5 s and move 25% faster. Attacking or casting ends it. Built from Vital Stone + Quick Gloves.',
+    use: "Turn invisible for 5 s and move 25% faster. Attacking or casting ends it.",
   },
   // ---- defenders
   brambleMail: {
@@ -484,7 +472,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     stats: { hp: 200, armor: 6, thornsPct: 30 },
     recipe: ['guardPlate', 'vitalStone'],
     tab: 'defense',
-    summary: '+200 health, +6 armor. Melee attackers take 30% of the damage they deal to you. Built from Guard Plate + Vital Stone.',
+    passive: "Melee attackers take 30% of the damage they deal to you.",
   },
   mendersCenser: {
     id: 'mendersCenser',
@@ -496,7 +484,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     recipe: ['vitalStone', 'manaCrystal'],
     active: { kind: 'teamHeal', cooldown: 32, range: 10, amount: 200 },
     tab: 'defense',
-    summary: '+150 health, +150 mana, +1 mana regen. Use: you and allied heroes within 10 m heal 200 health. Built from Vital Stone + Mana Crystal.',
+    use: "You and allied heroes within 10 m heal 200 health.",
   },
   // ---- casters
   hushBell: {
@@ -509,7 +497,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     recipe: ['manaCrystal', 'guardPlate'],
     active: { kind: 'silence', cooldown: 30, range: 7, duration: 3 },
     tab: 'magic',
-    summary: '+200 mana, +3 armor. Use: enemy heroes within 7 m can\'t cast abilities for 3 s. Built from Mana Crystal + Guard Plate.',
+    use: "Enemy heroes within 7 m can't cast abilities for 3 s.",
   },
   mireStaff: {
     id: 'mireStaff',
@@ -521,7 +509,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     recipe: ['manaCrystal'],
     active: { kind: 'mire', cooldown: 18, range: 9, duration: 3.5, amount: 50 },
     tab: 'magic',
-    summary: '+200 mana, +1.5 mana regen. Use: tap the item, then an enemy within 9 m: 50 damage and 60% slower for 3.5 s. Built from Mana Crystal.',
+    use: "Tap the item, then an enemy within 9 m: 50 damage and 60% slower for 3.5 s.",
   },
   wardenCharm: {
     id: 'wardenCharm',
@@ -531,8 +519,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     icon: '#fcd34d',
     stats: {},
     noShop: true,
-    summary:
-      'Dropped by the Warden; anyone can pick it up, enemies too. If you die while carrying it you come back to life on the spot 3 s later and lose no gold. It crumbles 5 minutes after the Warden falls.',
+    passive: "Dropped by the Warden; anyone can pick it up, enemies too. If you die while carrying it you come back to life on the spot 3 s later and lose no gold. It crumbles 5 minutes after the Warden falls.",
   },
 };
 
