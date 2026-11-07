@@ -11,7 +11,7 @@
 export const SOUND_NAMES = [
   'hit', 'shoot', 'tower', 'creep', 'cast', 'slam', 'fireBlast', 'heal', 'coin', 'levelUp', 'collapse', 'teleport',
   'deny', 'rune', 'buyback', 'glyph', 'ward', 'roar', 'revive', 'purchase', 'itemDrop', 'itemPickUp', 'click', 'clockTick', 'clockTock', 'clockGo',
-  'ping', 'feralBond', 'aegis', 'rebuke', 'sanctuary', 'galeStep', 'hawkMark', 'boltStorm', 'wardenDeath', 'morraShot', 'matchHorn', 'deathSong', 'endSong', 'shrineBoom', 'salve', 'bowShot', 'piercingShot', 'critPing', 'arrowRain', 'fireBolt', 'fireballCast',
+  'ping', 'feralBond', 'aegis', 'rebuke', 'sanctuary', 'galeStep', 'hawkMark', 'boltStorm', 'wardenDeath', 'morraShot', 'matchHorn', 'deathSong', 'respawn', 'endSong', 'shrineBoom', 'salve', 'bowShot', 'piercingShot', 'critPing', 'arrowRain', 'fireBolt', 'fireballCast',
   'mendFlame', 'meteorFall', 'meteorImpact', 'daggerSlash', 'shadowStep', 'vanish', 'execute', 'woodPunch', 'rootSnare', 'rootsErupt', 'barkSkin',
   'overgrowth', 'waterBolt', 'tidalWave', 'brineVeil', 'maelstrom', 'zap', 'bellToll', 'frostNova', 'stoneCrumble',
   'wardenPunch', 'impStab', 'hammerAttack', 'shieldCharge', 'shieldBash', 'quakeCharge', 'earthsplitter', 'ironClang', 'armorFall', 'tpChannel',

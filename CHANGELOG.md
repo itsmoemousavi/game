@@ -31,6 +31,10 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.17.x · New sounds
 
+### 0.17.7
+
+- **A harp sweep plays when your hero respawns.** Only you hear it, and not after a buyback, which has its own sound.
+
 ### 0.17.6
 
 - **Your hero's death** now plays short, sad orchestral strings.

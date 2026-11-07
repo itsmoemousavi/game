@@ -453,6 +453,7 @@ export type GameEvent =
   | { type: 'ward'; unitId: number }
   | { type: 'bossKilled'; killerId: number | null; team: Side }
   | { type: 'revive'; unitId: number }
+  | { type: 'respawn'; unitId: number }
   | { type: 'purchase'; unitId: number }
   | { type: 'courierSend'; unitId: number }
   | { type: 'courierDeliver'; unitId: number }
@@ -1247,7 +1248,7 @@ export class World {
       h.respawnTimer -= DT;
       if (h.respawnTimer <= 0) {
         const p = h.reviveAt ?? this.respawnPoint(u.team as Team, h.slot);
-        if (h.reviveAt) this.events.push({ type: 'revive', unitId: u.id });
+        this.events.push({ type: h.reviveAt ? 'revive' : 'respawn', unitId: u.id });
         h.reviveAt = null;
         u.x = u.px = p.x;
         u.y = u.py = p.y;

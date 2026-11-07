@@ -83,3 +83,4 @@ Walking, hero deaths, falling bodies and trees, and projectiles landing are sile
 | `wardenDeath` | https://freesound.org/s/559558/ | 559558.mp3 |
 | `deathSong` | https://freesound.org/s/578578/ | Tremolo Strings 5 |
 | `buyback` | https://freesound.org/s/90741/ | Orch Hit.wav |
+| `respawn` | https://freesound.org/s/578782/ | harp gliss 02.mp3 |

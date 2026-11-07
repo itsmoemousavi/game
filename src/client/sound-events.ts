@@ -1,4 +1,4 @@
-import { GameEvent, HEROES, Team, Unit, World } from '../sim';
+import { BUYBACK_COOLDOWN, GameEvent, HEROES, Team, Unit, World } from '../sim';
 import { Sfx, SoundName } from './audio';
 
 /** When each Brakk last started a Shield Charge (to give its hits a shield-bash sound). */
@@ -172,6 +172,12 @@ export function playEvents(sfx: Sfx, w: World, events: GameEvent[], meId: number
       case 'revive':
         sfx.play('revive', near(w.unit(e.unitId)));
         break;
+      case 'respawn': {
+        // Your own hero only, and not right on top of the buyback sound.
+        const h = w.unit(e.unitId)?.hero;
+        if (e.unitId === meId && h && h.buybackCooldown <= BUYBACK_COOLDOWN - 1) sfx.play('respawn', 0.8);
+        break;
+      }
       case 'blink':
         sfx.play('shadowStep', near(w.unit(e.unitId)) * 0.8);
         break;

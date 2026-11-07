@@ -460,5 +460,11 @@
 "option": "C",
 "source": "https://freesound.org/s/90741/",
 "file": "Orch Hit.wav"
+},
+{
+"sound": "respawn",
+"option": "D",
+"source": "https://freesound.org/s/578782/",
+"file": "harp gliss 02.mp3"
 }
 ]
