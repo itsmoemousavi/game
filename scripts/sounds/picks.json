@@ -24,12 +24,6 @@
 "file": "bell_01.ogg"
 },
 {
-"sound": "deathSong",
-"option": "H",
-"source": "https://freesound.org/s/609656/",
-"file": "609656.mp3"
-},
-{
 "sound": "endSong",
 "option": "B",
 "source": "https://opengameart.org/content/medieval-defeat-theme",
@@ -282,12 +276,6 @@
 "file": "small_amber.wav"
 },
 {
-"sound": "buyback",
-"option": "A",
-"source": "https://opengameart.org/content/150-combat-sound-effects",
-"file": "Healing Spell Impact 12_s08.wav"
-},
-{
 "sound": "frostNova",
 "option": "A",
 "source": "https://opengameart.org/content/freeze-spell-0",
@@ -460,5 +448,17 @@
 "option": "B",
 "source": "https://freesound.org/s/559558/",
 "file": "559558.mp3"
+},
+{
+"sound": "deathSong",
+"option": "G",
+"source": "https://freesound.org/s/578578/",
+"file": "Tremolo Strings 5"
+},
+{
+"sound": "buyback",
+"option": "C",
+"source": "https://freesound.org/s/90741/",
+"file": "Orch Hit.wav"
 }
 ]

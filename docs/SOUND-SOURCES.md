@@ -10,7 +10,6 @@ Walking, hero deaths, falling bodies and trees, and projectiles landing are sile
 | `clockTick` | https://opengameart.org/content/various-sound-effects-0 | tick_0.wav |
 | `clockTock` | https://opengameart.org/content/51-ui-sound-effects-buttons-switches-and-clicks | click4.wav |
 | `clockGo` | https://opengameart.org/content/100-cc0-sfx-2 | bell_01.ogg |
-| `deathSong` | https://freesound.org/s/609656/ | 609656.mp3 |
 | `endSong` | https://opengameart.org/content/medieval-defeat-theme | defeat_0.mp3 |
 | `shrineBoom` | https://opengameart.org/content/battle-at-sea | ship_destroyed_short.ogg |
 | `hit` | https://opengameart.org/content/150-combat-sound-effects | impact_punch_medium_000_48kHz_16bit_0.36s_bd322da3_s02.wav |
@@ -53,7 +52,6 @@ Walking, hero deaths, falling bodies and trees, and projectiles landing are sile
 | `cast` | https://opengameart.org/content/150-combat-sound-effects | Wind Spell Impact 2_s07.wav |
 | `glyph` | https://opengameart.org/content/150-combat-sound-effects | Healing Spell Impact 7_s08.wav |
 | `rune` | https://opengameart.org/content/various-sound-effects-0 | small_amber.wav |
-| `buyback` | https://opengameart.org/content/150-combat-sound-effects | Healing Spell Impact 12_s08.wav |
 | `frostNova` | https://opengameart.org/content/freeze-spell-0 | freeze.wav |
 | `bellToll` | https://opengameart.org/content/100-cc0-sfx-2 | gong_01.ogg |
 | `zap` | https://opengameart.org/content/35-wooden-crackshitsdestructions | crack07.mp3.flac |
@@ -83,3 +81,5 @@ Walking, hero deaths, falling bodies and trees, and projectiles landing are sile
 | `hawkMark` | https://opengameart.org/content/various-sound-effects-0 | snd_birdscream.wav |
 | `boltStorm` | https://freesound.org/s/384919/ | 384919.mp3 |
 | `wardenDeath` | https://freesound.org/s/559558/ | 559558.mp3 |
+| `deathSong` | https://freesound.org/s/578578/ | Tremolo Strings 5 |
+| `buyback` | https://freesound.org/s/90741/ | Orch Hit.wav |

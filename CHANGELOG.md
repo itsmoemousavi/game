@@ -31,6 +31,11 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.17.x · New sounds
 
+### 0.17.6
+
+- **Your hero's death** now plays short, sad orchestral strings.
+- **Buying back** now plays a very short orchestra hit.
+
 ### 0.17.5
 
 - **New top bar.** Every hero's picture now sits beside the score. Dead heroes turn grey with their respawn time under them, anyone who leaves a multiplayer match goes grey with a red icon, and a coin shows for 5 seconds after a buyback.
