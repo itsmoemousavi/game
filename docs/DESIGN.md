@@ -51,7 +51,8 @@ If 3D performance in a Capacitor WebView ever becomes a blocker, the simulation 
   - Towers stand a little off the lane's centre (toward the map's inside); the road bulges out around each one so creeps and heroes pass easily
 - **Protection rules** (structures are invulnerable until their turn; shown in-game by a dashed gold ring):
   1. Tier‑1 towers: always attackable.
-  2. Tier‑2 tower **and** barracks of a lane: after that lane's Tier‑1 falls.
+  2. Tier‑2 tower of a lane: after that lane's Tier‑1 falls. Tier‑3: after Tier‑2.
+  2b. Barracks of a lane: after that lane's Tier‑3 falls. A standing melee barracks regenerates 5 health a second.
   3. Both Shrine towers: after **any** barracks of that team falls.
   4. Shrine: after **both** Shrine towers fall. **Destroying the Shrine wins.**
 - Losing a barracks makes the enemy's creeps in that lane **super creeps** (×1.6 HP/damage).

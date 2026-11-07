@@ -772,6 +772,16 @@ for (const p of [settingsPanel, statsPanel, scorePanel, pauseEl]) p.addEventList
 for (const ev of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) {
   window.addEventListener(ev, () => sfx.unlock(), { capture: true, passive: true });
 }
+// Every button on a menu clicks; the buttons you play with during a match have their own sounds.
+const MENU_BUTTONS = '#select button, #draft button, #settings button, #name-modal button, #endscreen button';
+window.addEventListener(
+  'pointerdown',
+  (e) => {
+    const b = (e.target as Element).closest?.<HTMLButtonElement>(MENU_BUTTONS);
+    if (b && !b.disabled) sfx.play('click');
+  },
+  { capture: true, passive: true },
+);
 // Any UI tap gets a soft click.
 app.addEventListener('pointerdown', (e) => {
   if ((e.target as HTMLElement).closest('button')) sfx.play('click', 0.6);

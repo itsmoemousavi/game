@@ -31,6 +31,10 @@ The version you're playing is shown in **Settings → View** in the game.
 
 ## 0.17.x · New sounds
 
+### 0.17.4
+
+- **Menu buttons now click.**
+
 ### 0.17.3
 
 - **Barracks stay safe until the tower beside them falls.** They used to open up one tower earlier.
